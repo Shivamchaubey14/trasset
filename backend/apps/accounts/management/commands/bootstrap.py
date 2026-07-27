@@ -16,8 +16,8 @@ from django.db import transaction
 from django.db.models import Count
 
 from apps.accounts.models import Role, User
-from apps.assets.constants import AssetStatus, DepreciationMethod
-from apps.assets.models import Asset
+from apps.assets.constants import AssetStatus, AssignmentAction, DepreciationMethod
+from apps.assets.models import Asset, AssetAssignment
 from apps.masters.models import Category, Department, Location, Vendor
 from common.roles import Roles
 
@@ -148,6 +148,7 @@ class Command(BaseCommand):
             self._create_demo_users(roles)
             self._create_masters()
             self._create_assets(options["assets"])
+            self._backfill_assignment_history()
 
         self.stdout.write(self.style.SUCCESS("\nBootstrap complete."))
 
@@ -306,6 +307,36 @@ class Command(BaseCommand):
         self.stdout.write(
             "    " + ", ".join(f"{row['status']}={row['count']}" for row in breakdown)
         )
+
+    def _backfill_assignment_history(self):
+        """
+        Give already-assigned demo assets a check-out row.
+
+        Assets seeded before the history model existed hold an assignee but no
+        timeline, which makes the detail page look wrong. This writes the
+        missing opening row once.
+        """
+        manager = User.objects.filter(email="manager@trasset.local").first()
+
+        assigned = (
+            Asset.objects.filter(status=AssetStatus.ASSIGNED, assigned_to__isnull=False)
+            .exclude(assignments__isnull=False)
+            .select_related("assigned_to")
+        )
+
+        created = 0
+        for asset in assigned:
+            AssetAssignment.objects.create(
+                asset=asset,
+                user=asset.assigned_to,
+                assigned_by=manager,
+                action=AssignmentAction.CHECKOUT,
+                notes="Opening balance — recorded during demo seeding.",
+            )
+            created += 1
+
+        if created:
+            self.stdout.write(f"  + {created} assignment history rows backfilled")
 
     def _report(self, kind, name, created):
         marker = self.style.SUCCESS("  +") if created else "  ="

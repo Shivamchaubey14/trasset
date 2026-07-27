@@ -19,6 +19,8 @@ from apps.assets.models import Asset
 from apps.masters.models import Category
 from common.responses import ok
 
+from .serializers import DashboardStatsSerializer
+
 MONEY = DecimalField(max_digits=14, decimal_places=2)
 ZERO = Decimal("0.00")
 TREND_MONTHS = 12
@@ -37,10 +39,12 @@ def _money_sum(field):
         "Counts exclude soft-deleted assets. Auditors and employees see the same "
         "figures as managers — visibility is read-only for them, not narrower."
     ),
+    responses={200: DashboardStatsSerializer},
 )
 class DashboardStatsView(APIView):
     permission_classes = [IsAuthenticated]
     resource_name = "Dashboard statistics"
+    serializer_class = DashboardStatsSerializer  # documentation only
 
     def get(self, request):
         today = timezone.now().date()

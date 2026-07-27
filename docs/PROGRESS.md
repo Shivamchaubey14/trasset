@@ -16,12 +16,13 @@
 | Phase | Days | Status |
 |-------|------|--------|
 | Phase 0 — Foundation | 1–5 | ✅ Complete |
-| Phase 1 — Core Asset Engine | 6–12 | 🟡 Day 6 done · Day 9 engine done · Days 7, 8, 10–12 open |
+| Phase 1 — Core Asset Engine | 6–12 | 🟡 Days 6, 7, 8, 9 done · Days 10–12 open |
 | Phase 2 — Maintenance, Procurement, Reports | 13–18 | 🟡 Day 15 dashboard API done · rest open |
-| Phase 3 — Frontend | 19–26 | 🟡 Days 19, 20, 21 done · Day 25 partly done |
+| Phase 3 — Frontend | 19–26 | 🟡 Days 19–23 done · Day 25 partly done |
 | Phase 4 — Integration, Testing & Launch | 27–30 | ⬜ Not started |
 
-**Backend test suite:** 105 tests, all passing · **Coverage:** 77.9% (target ≥ 70%, NFR-12)
+**Backend test suite:** 163 tests, all passing · **Coverage:** 80.3% (target ≥ 70%, NFR-12)
+**OpenAPI schema:** 34 endpoints, 0 errors, 0 warnings (NFR-13)
 
 > **Note on sequencing.** The plan runs backend-first (Days 1–18) then frontend
 > (19–26). At the user's request the frontend was pulled forward once auth,
@@ -32,25 +33,23 @@
 
 ## ▶ Next up — start here
 
-**Day 7 — Asset CRUD API** 🟢 — the one thing blocking the rest of the UI.
+**Day 10 — Audit logging** 🟢
 
-1. Asset serializers: lightweight list vs. nested detail (category / location / vendor / assignee).
-2. `AssetViewSet` with create / list / retrieve / update / soft-delete.
-3. Filtering by status, category, location, department, assignee and date ranges;
-   search by tag / name / serial; ordering.
-4. Image + attachment upload endpoints with validation.
-5. Uncomment `path("", include("apps.assets.urls"))` in `backend/config/api_urls.py`.
+1. `AuditLog` model + signals/middleware capturing create/update/delete/assign
+   with user, IP and a JSON diff of what changed.
+2. `GET /audit-logs/` read-only, Admin + Auditor only, filterable by entity.
+3. Flip the `audit` nav item in `frontend/js/shell.js` to `ready: true` and
+   build `audit.html` off the existing table pattern.
 
-**DoD:** Assets fully CRUD via API with filters, search and pagination; validation
-errors are structured.
+**DoD:** Every asset action produces an audit entry; the endpoint lists them;
+auditors are read-only.
 
-Then **Day 22 (Asset list UI)** can follow immediately — the table, toolbar,
-modal-form and pagination patterns are already built and reusable from
-`js/masters.js`.
+**Then Day 11** (asset requests & approvals) and **Day 13** (maintenance),
+which unlock the two remaining greyed-out nav items.
 
-Groundwork in place: the `Asset` / `Attachment` models, tag generator,
-depreciation service, `common/viewsets.BaseModelViewSet`, and 42 demo assets
-already seeded.
+Reusable groundwork: `BaseModelViewSet`, the envelope, the table/toolbar/modal
+patterns in `js/masters.js` and `js/assets.js`, and `js/asset-form.js` for any
+dialog that mutates an asset.
 
 ---
 
@@ -123,13 +122,50 @@ already seeded.
 - `Attachment` model with type/size validation (FR-3.7).
 - State-machine and warranty helper properties.
 
-### Day 9 — Depreciation engine ✅ (endpoint pending)
+### Day 7 — Asset CRUD API ✅
+- `AssetListSerializer` (flat, cheap) vs `AssetDetailSerializer` (nested
+  category / location / department / vendor / assignee / attachments).
+- `AssetWriteSerializer` takes `*_id` fields per SRS §5.3 and returns the nested
+  detail shape; validates duplicate tag and serial, salvage ≤ cost, warranty ≥
+  purchase date, and a category's **required custom fields** (FR-3.8).
+- Status is not directly writable — the serializer redirects callers to the
+  assign / checkin / retire endpoints so history can't be bypassed.
+- `AssetFilter`: multi-select status, category, location, department, vendor,
+  assignee, `unassigned`, purchase/created/warranty date ranges, value band, a
+  derived `warranty` filter (expiring / expired / active / none) and `active_only`.
+- Search across tag, name, serial, model and manufacturer; ordering on 8 columns.
+- `GET /assets/stats/` returns the summary cards and respects the active filters.
+- `AttachmentViewSet` with type/size validation; deleting drops the stored file.
+- A list page costs a flat 4 queries regardless of row count (asserted in tests).
+
+### Day 8 — Assignment (check-out / check-in) ✅
+- `AssetAssignment` model — immutable by construction: `save()` refuses updates
+  and `delete()` raises, so history can only ever be appended (FR-4.3).
+- `services/assignment.py` runs every transition in a transaction and re-reads
+  the asset with `SELECT … FOR UPDATE`, so two managers racing on the same asset
+  can't both win.
+- `POST /assets/{id}/assign/` · `/checkin/` · `/retire/`, all returning the
+  updated asset; `GET /assets/{id}/history/` returns the timeline.
+- Guards return **409 Conflict** with a sentence that says what to do:
+  already assigned, under maintenance, terminal status, not currently assigned,
+  already retired, deleting while still assigned.
+- Retiring an assigned asset auto-closes the assignment so no dangling holder
+  is left behind.
+- Check-in records `days_held` and can move the asset to a new location.
+
+### Day 9 — Depreciation engine ✅
 - `apps/assets/services/depreciation.py` — straight-line and declining balance
   per SRS §11.1, in `Decimal`, floored at salvage.
-- `Asset.current_value` recomputed on save; `Asset.depreciation_schedule()`
-  returns the year-by-year table.
-- **Pending:** `GET /assets/{id}/depreciation/` needs Day 7's viewset; the
-  monthly recalculation task lands on Day 18.
+- `Asset.current_value` recomputed on save; `GET /assets/{id}/depreciation/`
+  returns the year-by-year schedule.
+- Verified against hand calculations: ₹78,000 cost / ₹8,000 salvage / 4 years
+  gives ₹17,500 a year and lands exactly on salvage.
+- **Still pending:** the monthly recalculation Celery task (Day 18).
+
+### Day 9.1 — QR codes ✅ (pulled forward)
+- `GET /assets/{id}/qr/` returns a PNG encoding the asset's detail URL
+  (FR-9.1), cacheable for a day since tags never change.
+- `asset-detail.html?tag=TRA-…` resolves a scanned tag to the asset (FR-9.2).
 
 ### Day 15 — Dashboard stats API ✅
 - `GET /dashboard/stats/` returns every KPI and chart dataset in one call:
@@ -191,6 +227,31 @@ already seeded.
 **Still to do on Day 25:** asset request flow, approvals inbox, and the
 notifications dropdown (needs the Day 11 and Day 18 backends).
 
+### Day 22 — Asset list UI ✅
+- Six summary cards that re-aggregate as filters change, so the numbers always
+  describe what's on screen.
+- Table with sortable columns, status pills, category colour dots, assignee
+  avatars and warranty pills that turn Cream Yolk near expiry and Slate once past.
+- Filters for status, category, location and warranty state, plus debounced
+  search and a "Clear filters" button that only appears when something is set.
+- Row actions adapt to state: Available offers Assign, Assigned offers Check in.
+- Add/Edit modal in `js/asset-form.js`, shared with the detail page.
+- **Category-driven custom fields** — changing category swaps the extra inputs
+  live and preserves whatever was already typed (FR-3.8).
+- Top-bar global search now hands off here via `assets.html?q=…`.
+
+### Day 23 — Asset detail UI ✅
+- Header with live status pill and state-aware actions (Assign / Check in /
+  Edit / Retire / Delete), each hidden unless the role permits it.
+- Overview panel, valuation card with a retained-value progress bar, and an
+  assignment card showing the holder and how long they've had it.
+- Tabs: **History** as a timeline with check-out/check-in dots, actor, notes and
+  days held; **Specifications** rendering custom fields against their category
+  labels; **Depreciation** with a Chart.js book-value curve against a dashed
+  salvage floor, plus the year-by-year table.
+- QR label fetched with the bearer token and inlined as a blob, with a print
+  action and print CSS that strips the chrome.
+
 ---
 
 ## Verified working
@@ -211,6 +272,23 @@ GET  /api/v1/users/       (employee → admin)  → 403 / 200
 GET  /api/v1/categories/  (no token)          → 401
 POST bad colour / bad custom_fields            → 400 with field-level errors
 OPTIONS preflight from :5500                   → 200, CORS headers present
+
+GET  /api/v1/assets/?page_size=3               → 200, 42 assets, 14 pages
+GET  /api/v1/assets/?status=available&warranty=expiring → 200, filters compose
+GET  /api/v1/assets/?search=latitude           → 200, 3 matches
+GET  /api/v1/assets/stats/                     → 200, cards match the table
+POST /api/v1/assets/  (SRS §5.3 payload)       → 201, tag TRA-2026-000014 generated
+POST /assets/{id}/assign/                      → 200 "assigned to Karan Verma"
+POST /assets/{id}/assign/  again               → 409 "already assigned to …"
+POST /assets/{id}/assign/  as employee         → 403
+POST /assets/{id}/checkin/                     → 200
+POST /assets/{id}/checkin/  again              → 409 "not currently assigned"
+POST /assets/{id}/retire/  {status: disposed}  → 200
+POST /assets/{id}/assign/  after disposal      → 409
+DELETE assigned asset as admin                 → 409 "still assigned to …"
+GET  /assets/{id}/history/                     → 200, 2 immutable rows
+GET  /assets/{id}/depreciation/                → 200, ends exactly at salvage
+GET  /assets/{id}/qr/                          → 200 image/png, 895 bytes
 ```
 
 **Frontend** — all 21 files serve over HTTP; every JS file and inline block
@@ -224,13 +302,12 @@ passes a syntax check. Not yet clicked through in a browser (see below).
   syntax-checking every script, and exercising the exact API calls each page
   makes — but nobody has driven the real UI yet. Expect small visual fixes on
   first run.
-- Asset, maintenance, procurement, reports and audit screens show a "soon" badge
+- Maintenance, procurement, reports and audit screens still show a "soon" badge
   in the sidebar; their backends aren't built.
-- Global search in the top bar toasts "coming with the assets screen" rather than
-  searching — deliberate, since `/assets/` doesn't exist yet.
 - Notifications dropdown renders an empty state; the model arrives on Day 18.
-- `Conflict` (409) is raised by the DB-constraint path but not yet by the asset
-  state machine — that lands with Day 8's assignment guards.
+- Attachment upload works via the API but has no UI yet — the detail page shows
+  specifications and history, not a documents tab. Worth adding with Day 26.
+- The asset form has no image upload control yet; `image` is accepted by the API.
 - Celery is configured with a beat schedule, but the tasks it names don't exist
   yet; dev runs eagerly so nothing breaks.
 - Redis not installed locally — not needed until Day 18.

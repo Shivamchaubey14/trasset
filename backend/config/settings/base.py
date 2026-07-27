@@ -225,6 +225,13 @@ SPECTACULAR_SETTINGS = {
     "COMPONENT_SPLIT_REQUEST": True,
     "SCHEMA_PATH_PREFIX": "/api/v1",
     "SORT_OPERATIONS": False,
+    # Several serializers expose a "status" field over different choice sets;
+    # name them explicitly so the generated client isn't full of StatusA6bEnum.
+    "ENUM_NAME_OVERRIDES": {
+        "AssetStatusEnum": "apps.assets.constants.AssetStatus.choices",
+        "DepreciationMethodEnum": "apps.assets.constants.DepreciationMethod.choices",
+        "AssignmentActionEnum": "apps.assets.constants.AssignmentAction.choices",
+    },
     "SWAGGER_UI_SETTINGS": {
         "persistAuthorization": True,
         "displayRequestDuration": True,

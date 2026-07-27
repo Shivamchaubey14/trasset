@@ -13,6 +13,7 @@ from .constants import (
     ASSIGNABLE_STATUSES,
     MAINTAINABLE_STATUSES,
     TERMINAL_STATUSES,
+    AssignmentAction,
     AssetStatus,
     DepreciationMethod,
     STATUS_COLORS,
@@ -195,6 +196,51 @@ class Asset(TimeStampedModel, SoftDeleteModel):
     def warranty_expired(self) -> bool:
         days = self.warranty_days_remaining
         return days is not None and days < 0
+
+
+class AssetAssignment(TimeStampedModel):
+    """
+    One immutable row per check-out or check-in (FR-4.3).
+
+    Rows are never edited or deleted — the history is the audit story of who
+    held an asset and when. ``save()`` refuses updates to enforce that.
+    """
+
+    asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name="assignments")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="asset_assignments",
+    )
+    assigned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        related_name="assignments_made", null=True, blank=True,
+    )
+    action = models.CharField(max_length=12, choices=AssignmentAction.choices)
+    notes = models.TextField(blank=True)
+
+    #: Set on the check-in row so reports can measure how long an asset was held.
+    days_held = models.PositiveIntegerField(null=True, blank=True)
+
+    class Meta:
+        db_table = "asset_assignments"
+        ordering = ("-created_at", "-id")
+        indexes = [
+            models.Index(fields=["asset", "-created_at"], name="idx_assign_asset_date"),
+            models.Index(fields=["user", "-created_at"], name="idx_assign_user_date"),
+        ]
+
+    def __str__(self):
+        return f"{self.get_action_display()} · {self.asset_id} → {self.user_id}"
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            raise ValueError(
+                "Assignment history is immutable — create a new row instead of editing one."
+            )
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Assignment history is immutable and cannot be deleted.")
 
 
 class Attachment(TimeStampedModel):

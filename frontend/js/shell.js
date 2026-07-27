@@ -22,7 +22,7 @@ window.Trasset = window.Trasset || {};
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: 'dashboard.html', ready: true },
 
     { section: 'Manage' },
-    { id: 'assets', label: 'Assets', icon: 'box', href: 'assets.html', ready: false },
+    { id: 'assets', label: 'Assets', icon: 'box', href: 'assets.html', ready: true },
     { id: 'maintenance', label: 'Maintenance', icon: 'wrench', href: 'maintenance.html', ready: false },
     { id: 'procurement', label: 'Procurement', icon: 'cart', href: 'procurement.html', ready: false },
     { id: 'reports', label: 'Reports', icon: 'chart', href: 'reports.html', ready: false },
@@ -216,13 +216,12 @@ window.Trasset = window.Trasset || {};
       if (event.key === 'Escape') { closeSidebar(); }
     });
 
-    // Global search: assets aren't built yet, so say so rather than fail silently.
+    // Global search hands off to the asset list, which owns the filtering UI.
     $('#globalSearch').on('keydown', function (event) {
       if (event.key !== 'Enter') { return; }
       var term = $(this).val().trim();
       if (!term) { return; }
-      ui.info('Asset search is coming with the assets screen',
-              'Searched for "' + term + '".');
+      window.location.href = 'assets.html?q=' + encodeURIComponent(term);
     });
   }
 
