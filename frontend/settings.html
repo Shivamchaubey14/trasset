@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings · Trasset</title>
+
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Lexend:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/layout.css">
+</head>
+<body>
+
+<div class="boot" id="boot">
+  <div class="boot-inner">
+    <div class="spinner-lg"></div>
+    <p class="text-muted text-small">Loading your profile…</p>
+  </div>
+</div>
+
+<a href="#main" class="skip-link">Skip to content</a>
+
+<div class="app" id="app">
+  <main class="main">
+    <div class="content" id="main" style="max-width:860px">
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Settings</h1>
+          <p class="page-subtitle">Your profile, password and notification preferences.</p>
+        </div>
+      </div>
+
+      <!-- Identity summary -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="flex items-center gap-4 flex-wrap">
+            <span class="avatar avatar-lg" id="profileAvatar">—</span>
+            <div class="flex-1">
+              <h2 id="profileName" style="font-size:21px">—</h2>
+              <p class="text-muted text-small mb-0" id="profileEmail">—</p>
+            </div>
+            <div class="text-right">
+              <span class="pill pill-success" id="profileRole">—</span>
+              <div class="text-small text-muted mt-2" id="profileDept"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Profile -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <div>
+            <h3>Profile</h3>
+            <div class="card-subtitle">How your name appears across Trasset.</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <form id="profileForm" novalidate>
+            <div class="form-grid">
+              <div class="field">
+                <label class="label" for="full_name">Full name<span class="req">*</span></label>
+                <input class="input" type="text" id="full_name" name="full_name" required>
+                <div class="field-error"></div>
+              </div>
+              <div class="field">
+                <label class="label" for="phone">Phone</label>
+                <input class="input" type="text" id="phone" name="phone" placeholder="+91 …">
+                <div class="field-error"></div>
+              </div>
+              <div class="field field-full">
+                <label class="checkbox">
+                  <input type="checkbox" id="email_notifications" name="email_notifications">
+                  <span>Email me about assignments, maintenance and warranty alerts</span>
+                </label>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="card-footer flex justify-end">
+          <button class="btn btn-primary" id="saveProfileBtn">
+            <span class="btn-label">Save changes</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Password -->
+      <div class="card" id="password">
+        <div class="card-header">
+          <div>
+            <h3>Change password</h3>
+            <div class="card-subtitle">
+              At least 8 characters, and not something a dictionary would guess.
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <form id="passwordForm" novalidate>
+            <div class="form-grid">
+              <div class="field field-full">
+                <label class="label" for="current_password">
+                  Current password<span class="req">*</span>
+                </label>
+                <input class="input" type="password" id="current_password"
+                       name="current_password" autocomplete="current-password" required>
+                <div class="field-error"></div>
+              </div>
+              <div class="field">
+                <label class="label" for="new_password">New password<span class="req">*</span></label>
+                <input class="input" type="password" id="new_password"
+                       name="new_password" autocomplete="new-password" required>
+                <div class="field-error"></div>
+              </div>
+              <div class="field">
+                <label class="label" for="confirm_password">
+                  Confirm new password<span class="req">*</span>
+                </label>
+                <input class="input" type="password" id="confirm_password"
+                       name="confirm_password" autocomplete="new-password" required>
+                <div class="field-error"></div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="card-footer flex justify-end">
+          <button class="btn btn-primary" id="savePasswordBtn">
+            <span class="btn-label">Update password</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="js/vendor/jquery.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/shell.js"></script>
+<script>
+(function (T, $) {
+  'use strict';
+
+  var ui = T.ui;
+
+  function paint(user) {
+    $('#profileAvatar').text(user.initials || ui.fmt.initials(user.full_name));
+    $('#profileName').text(user.full_name);
+    $('#profileEmail').text(user.email);
+    $('#profileRole').text(user.role ? user.role.label : '—');
+    $('#profileDept').text(user.department_name || 'No department');
+
+    $('#full_name').val(user.full_name);
+    $('#phone').val(user.phone || '');
+    $('#email_notifications').prop('checked', Boolean(user.email_notifications));
+  }
+
+  $(function () {
+    T.shell.render('settings');
+
+    T.auth.requireAuth()
+      .then(function (user) {
+        paint(user);
+        T.shell.ready();
+      })
+      .catch(function () { T.shell.ready(); });
+
+    $('#saveProfileBtn').on('click', function () {
+      var $button = $(this);
+      var $form = $('#profileForm');
+      var payload = ui.formToObject($form);
+
+      ui.clearFieldErrors($form);
+      ui.setButtonLoading($button, true);
+
+      T.api.request({ method: 'PATCH', path: '/auth/me/', data: payload })
+        .then(function (user) {
+          T.api.profile.set(user);
+          T.auth.session.user = user;
+          T.shell.applyUser(user);
+          paint(user);
+          ui.success('Profile updated');
+        })
+        .catch(function (error) {
+          if (!ui.applyFieldErrors($form, error)) {
+            ui.apiError(error, 'Could not save your profile');
+          }
+        })
+        ['finally'](function () { ui.setButtonLoading($button, false); });
+    });
+
+    $('#savePasswordBtn').on('click', function () {
+      var $button = $(this);
+      var $form = $('#passwordForm');
+      var payload = ui.formToObject($form);
+
+      ui.clearFieldErrors($form);
+
+      // Catch the mismatch here so the server round trip isn't wasted.
+      if (payload.new_password !== payload.confirm_password) {
+        $('#confirm_password').addClass('is-invalid')
+          .closest('.field').find('.field-error')
+          .addClass('is-visible').text('The two passwords do not match.');
+        return;
+      }
+
+      ui.setButtonLoading($button, true);
+
+      T.api.post('/auth/password/change/', payload)
+        .then(function () {
+          $form[0].reset();
+          ui.success('Password updated', 'Use it the next time you sign in.');
+        })
+        .catch(function (error) {
+          if (!ui.applyFieldErrors($form, error)) {
+            ui.apiError(error, 'Could not change your password');
+          }
+        })
+        ['finally'](function () { ui.setButtonLoading($button, false); });
+    });
+  });
+
+}(window.Trasset, window.jQuery));
+</script>
+</body>
+</html>

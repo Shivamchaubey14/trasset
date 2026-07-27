@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 64" width="260" height="64" role="img" aria-label="Trasset">
+  <rect x="0" y="12" width="40" height="40" rx="11" fill="#3BB77E"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M20 21 9.5 26.5v11L20 43l10.5-5.5v-11z"/>
+    <path d="M9.5 26.5 20 32l10.5-5.5M20 32v11"/>
+  </g>
+  <text x="52" y="42"
+        font-family="Quicksand, 'Trebuchet MS', sans-serif"
+        font-size="30" font-weight="700" letter-spacing="-0.5">
+    <tspan fill="#253D4E">Tr</tspan><tspan fill="#3BB77E">asset</tspan>
+  </text>
+</svg>

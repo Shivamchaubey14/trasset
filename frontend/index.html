@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in · Trasset</title>
+  <meta name="description" content="Trasset — Asset Management System">
+
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Lexend:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/layout.css">
+</head>
+<body>
+
+<div class="auth-page">
+
+  <!-- Brand panel (hidden below 1024px) -->
+  <aside class="auth-aside">
+    <div class="auth-aside-content">
+      <div class="flex items-center gap-3 mb-5" id="asideBrand"></div>
+
+      <h1 class="auth-headline">
+        Every asset,<br>
+        <span class="hl">accounted for.</span>
+      </h1>
+      <p class="auth-sub">
+        Track laptops, vehicles, furniture and licences across their whole life —
+        from purchase order to disposal — with depreciation, maintenance and a
+        full audit trail built in.
+      </p>
+
+      <div class="auth-features" id="asideFeatures"></div>
+    </div>
+
+    <div class="auth-foot">
+      Trasset v1.0 · Asset Management System
+    </div>
+  </aside>
+
+  <!-- Sign-in form -->
+  <main class="auth-main">
+    <div class="auth-card">
+      <div class="auth-brand" id="formBrand"></div>
+
+      <h2 class="auth-title">Welcome back</h2>
+      <p class="auth-lede">Sign in to your Trasset workspace.</p>
+
+      <div class="auth-alert" id="authAlert" role="alert">
+        <span id="authAlertIcon"></span>
+        <span id="authAlertText"></span>
+      </div>
+
+      <form id="loginForm" novalidate>
+        <div class="field">
+          <label class="label" for="email">Email address</label>
+          <div class="input-group">
+            <span class="input-group-icon" id="emailIcon"></span>
+            <input class="input" type="email" id="email" name="email"
+                   placeholder="you@company.com" autocomplete="email" required>
+          </div>
+          <div class="field-error"></div>
+        </div>
+
+        <div class="field">
+          <label class="label" for="password">Password</label>
+          <div class="input-group">
+            <span class="input-group-icon" id="passwordIcon"></span>
+            <input class="input" type="password" id="password" name="password"
+                   placeholder="Enter your password" autocomplete="current-password" required>
+            <button type="button" class="input-affix-btn" id="togglePassword"
+                    aria-label="Show password"></button>
+          </div>
+          <div class="field-error"></div>
+        </div>
+
+        <div class="auth-row">
+          <label class="checkbox">
+            <input type="checkbox" id="remember" checked>
+            <span class="text-small">Keep me signed in</span>
+          </label>
+          <a href="forgot-password.html" class="text-small">Forgot password?</a>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg btn-block" id="loginBtn">
+          <span class="btn-label">Sign in</span>
+        </button>
+      </form>
+
+      <!-- Development convenience. Remove this block before production. -->
+      <div class="demo-hint" id="demoHint">
+        <div class="demo-hint-title">Demo accounts · click to fill</div>
+        <div class="demo-accounts" id="demoAccounts"></div>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<script src="js/vendor/jquery.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/auth.js"></script>
+<script>
+(function ($) {
+  'use strict';
+
+  var T = window.Trasset;
+  var ui = T.ui;
+
+  var DEMO_ACCOUNTS = [
+    { role: 'Super Admin',     email: 'admin@trasset.local' },
+    { role: 'Asset Manager',   email: 'manager@trasset.local' },
+    { role: 'Department Head', email: 'head@trasset.local' },
+    { role: 'Employee',        email: 'employee@trasset.local' },
+    { role: 'Auditor',         email: 'auditor@trasset.local' }
+  ];
+  var DEMO_PASSWORD = 'Trasset@2026';
+
+  var FEATURES = [
+    { icon: 'tag',   title: 'Auto asset tags',
+      desc: 'Sequential TRA-2026-000001 identifiers, generated on create.' },
+    { icon: 'money', title: 'Live depreciation',
+      desc: 'Straight-line or declining balance, recalculated automatically.' },
+    { icon: 'shield', title: 'Role-based access',
+      desc: 'Five roles, enforced on every endpoint — not just hidden in the UI.' }
+  ];
+
+  function paintStatic() {
+    $('#asideBrand').html(
+      '<span class="brand-mark"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg></span>' +
+      '<span class="brand-text">Tr<span class="brand-accent">asset</span></span>'
+    );
+
+    $('#formBrand').html(
+      '<span class="brand-mark"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg></span>' +
+      '<span class="brand-text">Tr<span class="brand-accent">asset</span></span>'
+    );
+
+    $('#asideFeatures').html(FEATURES.map(function (f) {
+      return '<div class="auth-feature">' +
+               '<span class="auth-feature-icon">' + ui.icon(f.icon, 18) + '</span>' +
+               '<span>' +
+                 '<span class="auth-feature-title">' + ui.esc(f.title) + '</span><br>' +
+                 '<span class="auth-feature-desc">' + ui.esc(f.desc) + '</span>' +
+               '</span>' +
+             '</div>';
+    }).join(''));
+
+    $('#emailIcon').html(ui.icon('mail', 17));
+    $('#passwordIcon').html(ui.icon('lock', 17));
+    $('#togglePassword').html(ui.icon('eye', 17));
+
+    $('#demoAccounts').html(DEMO_ACCOUNTS.map(function (a) {
+      return '<button type="button" class="demo-account" data-email="' + ui.esc(a.email) + '">' +
+               '<span class="role">' + ui.esc(a.role) + '</span>' +
+               '<span class="email">' + ui.esc(a.email) + '</span>' +
+             '</button>';
+    }).join(''));
+  }
+
+  function showAlert(message, kind) {
+    $('#authAlertIcon').html(ui.icon(kind === 'info' ? 'info' : 'alert', 17));
+    $('#authAlertText').text(message);
+    $('#authAlert').toggleClass('is-info', kind === 'info').addClass('is-visible');
+  }
+
+  function hideAlert() {
+    $('#authAlert').removeClass('is-visible');
+  }
+
+  function readReason() {
+    var match = window.location.search.match(/[?&]reason=([^&]+)/);
+    if (!match) { return; }
+    var reason = decodeURIComponent(match[1]);
+    if (reason === 'expired') {
+      showAlert('Your session has expired. Please sign in again.', 'info');
+    } else if (reason === 'reset') {
+      showAlert('Password updated. Sign in with your new password.', 'info');
+    }
+  }
+
+  $(function () {
+    paintStatic();
+    readReason();
+
+    // Already signed in? Go straight to the dashboard.
+    T.auth.redirectIfAuthenticated();
+
+    $('#togglePassword').on('click', function () {
+      var $input = $('#password');
+      var toText = $input.attr('type') === 'password';
+      $input.attr('type', toText ? 'text' : 'password');
+      $(this).html(ui.icon(toText ? 'eyeOff' : 'eye', 17))
+             .attr('aria-label', toText ? 'Hide password' : 'Show password');
+      $input.focus();
+    });
+
+    $('#demoAccounts').on('click', '.demo-account', function () {
+      $('#email').val($(this).data('email'));
+      $('#password').val(DEMO_PASSWORD);
+      hideAlert();
+      $('#loginBtn').focus();
+    });
+
+    $('#loginForm').on('submit', function (event) {
+      event.preventDefault();
+      hideAlert();
+
+      var $form = $(this);
+      var $button = $('#loginBtn');
+      ui.clearFieldErrors($form);
+
+      var email = $.trim($('#email').val());
+      var password = $('#password').val();
+      var invalid = false;
+
+      if (!email) {
+        $('#email').addClass('is-invalid')
+          .closest('.field').find('.field-error')
+          .addClass('is-visible').text('Enter your email address.');
+        invalid = true;
+      }
+      if (!password) {
+        $('#password').addClass('is-invalid')
+          .closest('.field').find('.field-error')
+          .addClass('is-visible').text('Enter your password.');
+        invalid = true;
+      }
+      if (invalid) { return; }
+
+      ui.setButtonLoading($button, true);
+
+      T.api.login(email, password)
+        .then(function (data) {
+          ui.success('Signed in', 'Welcome back, ' + (data.user ? data.user.full_name : '') + '.');
+          window.location.href = T.auth.HOME_PAGE;
+        })
+        .catch(function (error) {
+          ui.setButtonLoading($button, false);
+
+          if (error.status === 0) {
+            showAlert(error.message);
+            return;
+          }
+          if (!ui.applyFieldErrors($form, error)) {
+            showAlert(error.message || 'Unable to sign in. Check your details and try again.');
+          }
+          $('#password').val('').focus();
+        });
+    });
+  });
+
+}(window.jQuery));
+</script>
+</body>
+</html>
