@@ -22,7 +22,7 @@
 | Phase 0 — Foundation | 1–5 | ✅ Complete |
 | Phase 1 — Core Asset Engine | 6–12 | ✅ Complete (Days 6–12) |
 | Phase 2 — Maintenance, Procurement, Reports | 13–18 | ✅ Complete (Days 13–18) |
-| Phase 3 — Frontend | 19–26 | 🟡 Days 19–23, 25 done · Day 24 done · Day 26 (polish/QA) open |
+| Phase 3 — Frontend | 19–26 | 🟡 Days 19–25 done · Day 26 done except browser QA |
 | Phase 4 — Integration, Testing & Launch | 27–30 | ⬜ Not started |
 
 **Backend test suite:** 498 tests, all passing · **Coverage:** 88.7% (target ≥ 70%, NFR-12)
@@ -42,22 +42,24 @@
 
 ## ▶ Next up — start here
 
-**Day 26 — Frontend polish, then Phase 4** 🔵
+**Day 26 is blocked on one thing only: somebody opening the app in a browser.**
 
-The backend is feature-complete, so what remains is quality rather than
-capability. In rough priority order:
+Everything on Day 26 that could be done without a browser is done (see below).
+What remains needs a human at a screen:
 
-1. **Click through the whole app in a browser.** This is the standing gap: the
-   UI has been verified by syntax-checking every script and exercising the exact
-   API calls each page makes, but no human has driven it. Do this before
-   polishing anything, since it will generate the actual punch list.
-2. Accessibility and responsive pass (NFR-9): keyboard focus order, ARIA labels
-   on icon-only buttons, contrast, and behaviour down to 768px. The components
-   were built with this in mind but nothing has been verified.
-3. Settings screen is missing the notification-preference toggle now that
-   `email_notifications` actually does something.
-4. Asset detail has no Documents tab, though the attachment API and its
-   validation are done.
+1. **Click through the whole app.** The standing gap. Every script is
+   syntax-checked and every API call each page makes has been exercised, but
+   nobody has driven the UI. This will generate the real punch list, and it
+   should happen before Phase 4 rather than after.
+2. **Responsive check down to 768px** (NFR-9). The breakpoints are written and
+   the layout is built for it, but it has never been resized.
+3. **Screen-reader spot check.** The structural work is done — focus trap,
+   `aria-sort`, labelled controls, tablists — but no assistive technology has
+   actually been pointed at it.
+
+Run both servers, open `http://127.0.0.1:5500`, and note anything that looks
+wrong. Small visual fixes are cheap now and get more expensive once Phase 4
+starts.
 
 **Then Phase 4:**
 - **Day 27** — walk every journey per role against SRS §11.4.
@@ -183,6 +185,31 @@ audit row.
 - Verified against hand calculations: ₹78,000 cost / ₹8,000 salvage / 4 years
   gives ₹17,500 a year and lands exactly on salvage.
 - **Still pending:** the monthly recalculation Celery task (Day 18).
+
+### Day 26 (partial) — Documents tab & accessibility ✅
+Everything on Day 26 that does not require a browser.
+
+- **Documents tab on asset detail (FR-3.7).** The attachment API and its
+  upload validation had been done since Day 7 with no UI at all. Now: list with
+  type icon, size, uploader and age; open in a new tab; delete with the file
+  removed from storage as well as the row; drag-and-drop or click-to-choose,
+  multi-file, uploaded one at a time so a single rejection does not lose the
+  batch; per-file errors reported by name. Write controls hidden for
+  non-managers, and the API refuses them independently.
+- **Modal focus trap.** Tab and Shift+Tab now cycle inside an open dialog.
+  Without it a keyboard user tabbed straight past the last control into the page
+  behind — still live, still interactive, invisible behind the backdrop. This
+  was the most serious accessibility defect in the app.
+- **`aria-sort` on every sortable column.** The arrow told a sighted user which
+  column was sorted and which way; a screen-reader user got nothing. Wired
+  through all seven tables plus the dynamically-built masters header.
+- **Arrow-key navigation between tabs** on asset detail, with `aria-selected`
+  kept in step — a tablist should be operable from the keyboard.
+- Audited every icon-only control for an accessible name: **all named**.
+
+**Correction:** PROGRESS previously claimed the settings screen was missing the
+notification-preference toggle. It was not — the control and the serializer
+field both existed. The note was stale, not the code.
 
 ### Day 18 — Notifications & scheduled jobs ✅
 - `Notification` model with type-driven icon and colour, so the UI has no
@@ -587,20 +614,19 @@ passes a syntax check. Not yet clicked through in a browser (see below).
   syntax-checking every script, and exercising the exact API calls each page
   makes — but nobody has driven the real UI yet. Expect small visual fixes on
   first run.
-- Maintenance, procurement and reports screens still show a "soon" badge in the
-  sidebar; their backends aren't built.
 - Audit rows are written but never pruned. A busy register will grow this table
   indefinitely — worth a retention policy (archive or partition by month) before
-  production, and it pairs naturally with the Day 18 Celery work.
+  production. `purge_read_notifications` shows the shape; audit needs its own,
+  and needs deciding rather than defaulting, since an audit trail is usually
+  kept for a stated period.
 - The audit trail is append-only at the application layer. A DB superuser can
   still edit the table, so production should restrict grants on `audit_logs`.
-- Notifications dropdown renders an empty state; the model arrives on Day 18.
-- Attachment upload works via the API but has no UI yet — the detail page shows
-  specifications and history, not a documents tab. Worth adding with Day 26.
 - The asset form has no image upload control yet; `image` is accepted by the API.
-- Celery is configured with a beat schedule, but the tasks it names don't exist
-  yet; dev runs eagerly so nothing breaks.
-- Redis not installed locally — not needed until Day 18.
+  The Documents tab covers attachments, but the asset's own photo still cannot
+  be set from the UI.
+- Redis is installed and running locally; Celery worker and beat have been
+  verified against it. Dev still defaults to eager execution so the app runs
+  without a broker.
 - `value_over_time` is built from purchase dates (how the register grew), not a
   historical revaluation. Worth revisiting if finance wants true month-end book values.
 

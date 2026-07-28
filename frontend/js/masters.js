@@ -233,6 +233,7 @@
       html += '<th style="text-align:right;width:110px">Actions</th>';
     }
     $('#tableHead').html(html);
+    ui.syncSortState('.table');
   }
 
   function renderRows(results) {

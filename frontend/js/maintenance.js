@@ -582,6 +582,7 @@
       state.page = 1;
       $('.table thead th').removeClass('is-sorted-asc is-sorted-desc');
       $(this).addClass(state.ordering.charAt(0) === '-' ? 'is-sorted-desc' : 'is-sorted-asc');
+      ui.syncSortState('.table');
       loadTable();
     });
 

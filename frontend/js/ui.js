@@ -134,6 +134,51 @@ window.Trasset = window.Trasset || {};
      ---------------------------------------------------------------------- */
   var openModals = [];
 
+  //: Everything that can hold focus, in DOM order.
+  var FOCUSABLE = [
+    'a[href]', 'button:not([disabled])', 'input:not([disabled]):not([type="hidden"])',
+    'select:not([disabled])', 'textarea:not([disabled])', '[tabindex]:not([tabindex="-1"])'
+  ].join(',');
+
+  function focusableWithin($modal) {
+    return $modal.find(FOCUSABLE).filter(':visible');
+  }
+
+  /**
+   * Keep Tab inside the dialog.
+   *
+   * Without this a keyboard user tabs straight past the last control and into
+   * the page behind, which is still there and still interactive — they end up
+   * operating a screen they cannot see past the backdrop.
+   */
+  function trapFocus(event) {
+    if (event.key !== 'Tab' || !openModals.length) { return; }
+
+    var $modal = openModals[openModals.length - 1].$modal;
+    var $focusable = focusableWithin($modal);
+    if (!$focusable.length) { return; }
+
+    var first = $focusable[0];
+    var last = $focusable[$focusable.length - 1];
+    var active = document.activeElement;
+
+    // Focus escaping the dialog entirely — pull it back.
+    if (!$.contains($modal[0], active)) {
+      event.preventDefault();
+      first.focus();
+      return;
+    }
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  $(document).on('keydown', trapFocus);
+
   function closeTopModal() {
     var top = openModals.pop();
     if (!top) { return; }
@@ -257,6 +302,10 @@ window.Trasset = window.Trasset || {};
     if (event.key === 'Escape' && openModals.length) { closeTopModal(); }
   });
 
+  // Give statically-declared sortable headers their initial aria-sort. Pages
+  // that build headers dynamically call syncSortState themselves after render.
+  $(function () { syncSortState('.table'); });
+
   /* ------------------------------------------------------------------------
      Formatting
      ---------------------------------------------------------------------- */
@@ -377,6 +426,29 @@ window.Trasset = window.Trasset || {};
                  '</button>'
                : '') +
            '</div>';
+  }
+
+  /**
+   * Mirror a table's visual sort state into `aria-sort`.
+   *
+   * The arrow tells a sighted user which column is sorted and which way; a
+   * screen-reader user gets nothing without this. Call it after changing the
+   * `is-sorted-*` classes, and once after first render.
+   *
+   * @param {jQuery|string} table the table, or a selector for it
+   */
+  function syncSortState(table) {
+    $(table).find('thead th').each(function () {
+      var $th = $(this);
+      if (!$th.hasClass('is-sortable')) {
+        $th.removeAttr('aria-sort');
+        return;
+      }
+      $th.attr('aria-sort',
+        $th.hasClass('is-sorted-asc') ? 'ascending'
+          : $th.hasClass('is-sorted-desc') ? 'descending'
+            : 'none');
+    });
   }
 
   /** Windowed page numbers: « 1 … 4 5 [6] 7 8 … 20 » */
@@ -505,6 +577,7 @@ window.Trasset = window.Trasset || {};
     skeletonRows: skeletonRows,
     emptyState: emptyState,
     pagination: pagination,
+    syncSortState: syncSortState,
     clearFieldErrors: clearFieldErrors,
     applyFieldErrors: applyFieldErrors,
     formToObject: formToObject,

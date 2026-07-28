@@ -259,6 +259,162 @@
   }
 
   /* ----------------------------------------------------------------------
+     Documents (FR-3.7)
+     ---------------------------------------------------------------------- */
+  var DOC_ICONS = {
+    pdf: 'inbox', csv: 'chart', xlsx: 'chart', xls: 'chart',
+    doc: 'inbox', docx: 'inbox',
+    png: 'eye', jpg: 'eye', jpeg: 'eye', webp: 'eye'
+  };
+
+  function docIcon(filename) {
+    var extension = (filename || '').split('.').pop().toLowerCase();
+    return DOC_ICONS[extension] || 'inbox';
+  }
+
+  function renderDocuments() {
+    var attachments = asset.attachments || [];
+    $('#docCount').text(attachments.length ? '(' + attachments.length + ')' : '');
+
+    var canWrite = session.canWrite();
+    $('#documentsToolbar').toggle(canWrite);
+
+    if (!attachments.length) {
+      $('#documentsContent').html(
+        canWrite
+          ? '<div class="dropzone" id="dropzone" role="button" tabindex="0" ' +
+                 'aria-label="Upload a document">' +
+              ui.icon('download', 26) +
+              '<p class="mt-3" style="margin-bottom:0">' +
+                'Drop a file here, or click to choose one' +
+              '</p>' +
+              '<p class="text-tiny" style="margin:6px 0 0">' +
+                'PDF, images, Word or Excel — up to 10 MB' +
+              '</p>' +
+            '</div>'
+          : ui.emptyState({
+              icon: 'inbox',
+              title: 'No documents',
+              message: 'Invoices and warranty certificates will appear here.'
+            })
+      );
+      return;
+    }
+
+    var rows = attachments.map(function (doc) {
+      return '<div class="doc-row">' +
+        '<span class="doc-icon">' + ui.icon(docIcon(doc.filename), 18) + '</span>' +
+        '<span class="doc-info">' +
+          '<span class="doc-name" title="' + ui.esc(doc.filename) + '">' +
+            ui.esc(doc.filename) +
+          '</span>' +
+          '<span class="doc-meta">' +
+            ui.esc(doc.size_display) +
+            (doc.uploaded_by_name ? ' · ' + ui.esc(doc.uploaded_by_name) : '') +
+            ' · ' + ui.esc(fmt.relative(doc.created_at)) +
+            (doc.description ? ' · ' + ui.esc(doc.description) : '') +
+          '</span>' +
+        '</span>' +
+        '<a class="btn btn-ghost btn-icon btn-sm" href="' + ui.esc(doc.file) + '" ' +
+           'target="_blank" rel="noopener" title="Open ' + ui.esc(doc.filename) + '" ' +
+           'aria-label="Open ' + ui.esc(doc.filename) + '">' +
+          ui.icon('eye', 16) +
+        '</a>' +
+        (canWrite
+          ? '<button class="btn btn-ghost btn-icon btn-sm" data-doc-delete="' + doc.id + '" ' +
+                    'data-doc-name="' + ui.esc(doc.filename) + '" ' +
+                    'title="Delete" aria-label="Delete ' + ui.esc(doc.filename) + '" ' +
+                    'style="color:var(--color-danger)">' +
+              ui.icon('trash', 16) +
+            '</button>'
+          : '') +
+      '</div>';
+    }).join('');
+
+    $('#documentsContent').html(
+      rows +
+      (canWrite
+        ? '<div class="dropzone mt-4" id="dropzone" role="button" tabindex="0" ' +
+               'aria-label="Upload another document">' +
+            '<span class="text-small">Drop another file here, or click to choose</span>' +
+          '</div>'
+        : '')
+    );
+  }
+
+  /** Shared by the toolbar button, the dropzone and drag-and-drop. */
+  function uploadFiles(files) {
+    if (!files || !files.length) { return; }
+
+    var pending = Array.prototype.slice.call(files);
+    var uploaded = 0;
+    var failed = [];
+
+    function next() {
+      if (!pending.length) {
+        if (uploaded) {
+          ui.success(
+            uploaded + ' document' + (uploaded === 1 ? '' : 's') + ' uploaded',
+            failed.length ? failed.length + ' could not be uploaded' : ''
+          );
+        }
+        failed.forEach(function (entry) {
+          ui.error('Could not upload ' + entry.name, entry.reason);
+        });
+        // Re-read the asset so the list reflects what the server actually stored.
+        refresh().then(function () { renderDocuments(); });
+        return;
+      }
+
+      var file = pending.shift();
+      var form = new FormData();
+      form.append('asset', asset.id);
+      form.append('file', file);
+
+      T.api.upload('/attachments/', form)
+        .then(function () { uploaded += 1; })
+        .catch(function (error) {
+          var detail = error.errors && error.errors.file
+            ? [].concat(error.errors.file).join(' ')
+            : error.message;
+          failed.push({ name: file.name, reason: detail });
+        })
+        ['finally'](next);
+    }
+
+    ui.info('Uploading…', pending.length + ' file' + (pending.length === 1 ? '' : 's'));
+    next();
+  }
+
+  function pickFiles() {
+    // A detached input avoids leaving a stray control in the layout.
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = '.pdf,.png,.jpg,.jpeg,.webp,.csv,.xlsx,.xls,.doc,.docx';
+    input.addEventListener('change', function () { uploadFiles(this.files); });
+    input.click();
+  }
+
+  function deleteDocument(id, name) {
+    ui.confirm({
+      title: 'Delete ' + name + '?',
+      message: 'The file is removed from storage as well as from this asset.',
+      confirmLabel: 'Delete'
+    }).then(function (confirmed) {
+      if (!confirmed) { return; }
+
+      T.api.del('/attachments/' + id + '/')
+        .then(function () {
+          ui.success('Document deleted', name);
+          return refresh();
+        })
+        .then(function () { renderDocuments(); })
+        .catch(function (error) { ui.apiError(error, 'Could not delete'); });
+    });
+  }
+
+  /* ----------------------------------------------------------------------
      History (FR-4.3)
      ---------------------------------------------------------------------- */
   function renderHistory(rows) {
@@ -405,11 +561,14 @@
     renderValuation();
     renderAssignment();
     renderSpecs();
+    renderDocuments();
   }
 
   function refresh(updated) {
+    // An action response carries the asset but not its attachments, so a
+    // document change always re-reads rather than trusting the payload.
     if (updated) {
-      asset = updated;
+      asset = $.extend({}, updated, { attachments: asset.attachments });
       paint();
       loadHistory();
       return Promise.resolve();
@@ -452,14 +611,60 @@
 
     $('.tabs').on('click', '.tab', function () {
       var tab = $(this).data('tab');
-      $('.tab').removeClass('is-active');
-      $(this).addClass('is-active');
 
-      $('#tabHistory, #tabSpecs, #tabDepreciation').addClass('hidden');
+      $('.tab').removeClass('is-active').attr('aria-selected', 'false');
+      $(this).addClass('is-active').attr('aria-selected', 'true');
+
+      $('#tabHistory, #tabSpecs, #tabDocuments, #tabDepreciation').addClass('hidden');
       $('#tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).removeClass('hidden');
 
       if (tab === 'depreciation') { loadDepreciation(); }
     });
+
+    // Arrow-key navigation between tabs, as a tablist should have.
+    $('.tabs').on('keydown', '.tab', function (event) {
+      if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') { return; }
+      event.preventDefault();
+
+      var $tabs = $('.tab');
+      var index = $tabs.index(this);
+      var next = event.key === 'ArrowRight'
+        ? (index + 1) % $tabs.length
+        : (index - 1 + $tabs.length) % $tabs.length;
+
+      $tabs.eq(next).trigger('click').focus();
+    });
+
+    /* --- Documents --- */
+    $('#uploadDocBtn').on('click', pickFiles);
+
+    $('#documentsContent')
+      .on('click', '#dropzone', pickFiles)
+      .on('keydown', '#dropzone', function (event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          pickFiles();
+        }
+      })
+      .on('dragover dragenter', '#dropzone', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        $(this).addClass('is-over');
+      })
+      .on('dragleave dragend drop', '#dropzone', function () {
+        $(this).removeClass('is-over');
+      })
+      .on('drop', '#dropzone', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        uploadFiles(event.originalEvent.dataTransfer.files);
+      })
+      .on('click', '[data-doc-delete]', function () {
+        deleteDocument($(this).data('doc-delete'), $(this).data('doc-name'));
+      });
+
+    // Dropping a file anywhere else must not make the browser navigate to it.
+    $(document).on('dragover drop', function (event) { event.preventDefault(); });
 
     $('#assetActions')
       .on('click', '[data-act="assign"]', function () {
