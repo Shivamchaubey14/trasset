@@ -6,6 +6,9 @@ disabled here: the rate limits are a production concern (SEC-7) and would
 otherwise reject the many logins a test run performs. Throttle behaviour
 itself is asserted in its own test with explicit overrides.
 """
+import tempfile
+from pathlib import Path
+
 from .base import *  # noqa: F401,F403
 
 DEBUG = False
@@ -36,8 +39,10 @@ EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
 
-# Keep uploads out of the real media directory during tests.
-MEDIA_ROOT = BASE_DIR / "tests" / "_media"  # noqa: F405
+# Uploads go to a throwaway temp directory rather than anywhere inside the
+# repo — the upload tests write real files, and they must not accumulate in the
+# working tree (or get committed).
+MEDIA_ROOT = Path(tempfile.mkdtemp(prefix="trasset-test-media-"))
 
 LOGGING["root"]["level"] = "CRITICAL"  # noqa: F405
 # Negative-path tests deliberately trigger 400/401/403 responses; don't log them.
