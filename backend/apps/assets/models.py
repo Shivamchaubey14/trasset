@@ -11,11 +11,14 @@ from common.validators import validate_document_upload, validate_image_upload
 
 from .constants import (
     ASSIGNABLE_STATUSES,
+    DECIDED_REQUEST_STATUSES,
     MAINTAINABLE_STATUSES,
+    REQUEST_STATUS_COLORS,
     TERMINAL_STATUSES,
     AssignmentAction,
     AssetStatus,
     DepreciationMethod,
+    RequestStatus,
     STATUS_COLORS,
 )
 from .services import depreciation as depreciation_service
@@ -241,6 +244,87 @@ class AssetAssignment(TimeStampedModel):
 
     def delete(self, *args, **kwargs):
         raise ValueError("Assignment history is immutable and cannot be deleted.")
+
+
+class AssetRequest(TimeStampedModel):
+    """
+    An employee asking for an asset (FR-4.4).
+
+    A request names either a specific ``asset`` ("I want TRA-2026-000014") or a
+    ``category`` ("I need a laptop"), so someone can ask without first browsing
+    the register. Approving a category request requires the approver to pick the
+    actual asset.
+    """
+
+    requester = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name="asset_requests",
+    )
+    asset = models.ForeignKey(
+        Asset, on_delete=models.SET_NULL,
+        related_name="requests", null=True, blank=True,
+    )
+    category = models.ForeignKey(
+        "masters.Category", on_delete=models.SET_NULL,
+        related_name="requests", null=True, blank=True,
+    )
+
+    reason = models.TextField(help_text="Why the requester needs it.")
+    needed_by = models.DateField(null=True, blank=True)
+
+    status = models.CharField(
+        max_length=12, choices=RequestStatus.choices,
+        default=RequestStatus.PENDING, db_index=True,
+    )
+
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        related_name="request_decisions", null=True, blank=True,
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decision_notes = models.TextField(blank=True)
+
+    #: The asset actually handed over, which may differ from the one requested
+    #: when the approver substitutes an equivalent item.
+    fulfilled_asset = models.ForeignKey(
+        Asset, on_delete=models.SET_NULL,
+        related_name="fulfilled_requests", null=True, blank=True,
+    )
+
+    class Meta:
+        db_table = "asset_requests"
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=["status", "-created_at"], name="idx_request_status_date"),
+            models.Index(fields=["requester", "-created_at"], name="idx_request_user_date"),
+        ]
+
+    def __str__(self):
+        target = self.asset.asset_tag if self.asset_id else (
+            self.category.name if self.category_id else "an asset"
+        )
+        return f"{self.requester.full_name} → {target}"
+
+    @property
+    def is_pending(self) -> bool:
+        return self.status == RequestStatus.PENDING
+
+    @property
+    def is_decided(self) -> bool:
+        return self.status in DECIDED_REQUEST_STATUSES
+
+    @property
+    def status_color(self) -> str:
+        return REQUEST_STATUS_COLORS.get(self.status, "#7B8794")
+
+    @property
+    def target_label(self) -> str:
+        """What was asked for, in one line."""
+        if self.asset_id:
+            return f"{self.asset.asset_tag} — {self.asset.name}"
+        if self.category_id:
+            return f"Any {self.category.name}"
+        return "Any asset"
 
 
 class Attachment(TimeStampedModel):

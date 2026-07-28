@@ -23,6 +23,7 @@ window.Trasset = window.Trasset || {};
 
     { section: 'Manage' },
     { id: 'assets', label: 'Assets', icon: 'box', href: 'assets.html', ready: true },
+    { id: 'requests', label: 'Requests', icon: 'inbox', href: 'requests.html', ready: true },
     { id: 'maintenance', label: 'Maintenance', icon: 'wrench', href: 'maintenance.html', ready: false },
     { id: 'procurement', label: 'Procurement', icon: 'cart', href: 'procurement.html', ready: false },
     { id: 'reports', label: 'Reports', icon: 'chart', href: 'reports.html', ready: false },

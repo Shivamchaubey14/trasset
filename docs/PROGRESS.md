@@ -16,13 +16,13 @@
 | Phase | Days | Status |
 |-------|------|--------|
 | Phase 0 — Foundation | 1–5 | ✅ Complete |
-| Phase 1 — Core Asset Engine | 6–12 | 🟡 Days 6–10 done · Days 11, 12 open |
+| Phase 1 — Core Asset Engine | 6–12 | 🟡 Days 6–11 done · Day 12 open |
 | Phase 2 — Maintenance, Procurement, Reports | 13–18 | 🟡 Day 15 dashboard API done · rest open |
-| Phase 3 — Frontend | 19–26 | 🟡 Days 19–23 done · Day 25 partly done · audit screen done |
+| Phase 3 — Frontend | 19–26 | 🟡 Days 19–23 done · Day 25 mostly done · audit + requests screens done |
 | Phase 4 — Integration, Testing & Launch | 27–30 | ⬜ Not started |
 
-**Backend test suite:** 191 tests, all passing · **Coverage:** 82.4% (target ≥ 70%, NFR-12)
-**OpenAPI schema:** 37 endpoints, 0 errors, 0 warnings (NFR-13)
+**Backend test suite:** 224 tests, all passing · **Coverage:** 83.3% (target ≥ 70%, NFR-12)
+**OpenAPI schema:** 43 endpoints, 0 errors, 0 warnings (NFR-13)
 
 > **Note on sequencing.** The plan runs backend-first (Days 1–18) then frontend
 > (19–26). At the user's request the frontend was pulled forward once auth,
@@ -33,29 +33,32 @@
 
 ## ▶ Next up — start here
 
-**Day 11 — Asset requests & approvals** 🟢
+**Day 12 — Backend test & hardening pass** 🟡
 
-1. `AssetRequest` model: requester, asset (or category if the user is asking for
-   "a laptop"), reason, status (pending / approved / rejected / cancelled),
-   decided_by, decided_at, decision notes.
-2. Endpoints: `POST /asset-requests/` (employee), `GET` list scoped by role —
-   employees see their own, managers see all — plus
-   `POST /asset-requests/{id}/approve/` and `/reject/`.
-3. Approval triggers the existing `assignment.assign()` service inside the same
-   transaction, so an approved request produces a real check-out and its audit
-   row. Guard the transitions: a decided request can't be decided twice → 409.
-4. Frontend: a "Requests" screen — employees get a request form and their own
-   list, managers get an approvals inbox. Add the nav item to `js/shell.js`.
+1. Review query counts on every list endpoint — `assets` is asserted flat at 4
+   queries; do the same for `asset-requests`, `audit-logs` and `users`, which
+   have nested serializers and haven't been measured.
+2. Confirm the indexes in SRS §4.3 all exist against the live MySQL schema, not
+   just in the model definitions.
+3. Throttling is declared but never exercised by a test — add one that asserts
+   the `write` scope actually returns 429.
+4. Coverage is 83.3%; the weakest files are `common/validators.py` (56%) and
+   `common/permissions.py` (65%). Upload validation in particular is a security
+   control (SEC-8) with no test behind it.
+5. Swagger should be read end to end once — it is generated clean, but nobody
+   has checked the descriptions actually make sense to a consumer.
 
-**DoD:** Full request → approve → auto-assign loop works with correct
-permissions, and every step lands in the audit trail.
+**DoD:** Test suite green, Swagger reflects all endpoints, no obvious N+1 on
+list endpoints.
 
-**Then Day 12** (backend hardening pass) and **Day 13** (maintenance).
+**Then Day 13** (maintenance) and **Day 14** (procurement), which clear the last
+two greyed-out nav items.
 
 Reusable groundwork: `BaseModelViewSet`, the envelope, the table/toolbar/modal
-patterns in `js/masters.js`, `js/assets.js` and `js/audit.js`, `js/asset-form.js`
-for any dialog that mutates an asset, and `audit.services.domain_action()` to
-give a new business verb its own audit row.
+patterns in `js/masters.js`, `js/assets.js`, `js/audit.js` and `js/requests.js`,
+`js/asset-form.js` for any dialog that mutates an asset, and
+`audit.services.domain_action()` / `record()` to give a new business verb its own
+audit row.
 
 ---
 
@@ -167,6 +170,31 @@ give a new business verb its own audit row.
 - Verified against hand calculations: ₹78,000 cost / ₹8,000 salvage / 4 years
   gives ₹17,500 a year and lands exactly on salvage.
 - **Still pending:** the monthly recalculation Celery task (Day 18).
+
+### Day 11 — Asset requests & approvals ✅
+- `AssetRequest` names **either** a specific asset or a category, so someone can
+  ask for "a laptop" without first browsing the register (FR-4.4).
+- Approval delegates to the existing `assignment.assign()` **inside the same
+  transaction**. If the asset was taken between the request and the decision,
+  `assign` raises 409 and the whole approval rolls back — the request stays
+  pending rather than being marked approved with nothing handed over. Covered by
+  a test.
+- Approving a category request requires the approver to choose the asset; they
+  can also substitute an equivalent item, recorded as `fulfilled_asset`.
+- Guards: a decided request can't be decided again (409); only the requester can
+  withdraw one; a reason is required to reject.
+- **Visibility is scoped in `get_queryset`, not by a client filter** — employees
+  see only their own, department heads see their department's, managers see
+  everything. Tested that a crafted `?requester=` can't widen it.
+- The requester is taken from the token, never the payload.
+- Duplicate pending requests for the same asset are refused.
+- `AssetRequest` is deliberately **not** in `TRACKED_MODELS`: every transition is
+  a named business event, so Requested / Approved / Rejected / Cancelled are
+  recorded explicitly rather than as generic Created-then-Updated pairs.
+- Requests screen reads as "My requests" for employees and "Approvals" for
+  approvers, with pending rows marked in Cream Yolk.
+- Demo users now sit in departments — the head and employee share one, so the
+  department-head approval path is actually demonstrable in the seeded data.
 
 ### Day 10 — Audit logging ✅
 - `AuditLog` per SRS §4.1, append-only by construction: `save()` refuses updates
@@ -330,6 +358,17 @@ POST/PATCH/DELETE /audit-logs/                 → 405, no write route exists
 GET  /audit-logs/summary/                      → 200 totals + per-action counts
 assign → one "Assigned" row, FK diff by name, _context carries notes
 failed login → "Sign-in failed" row, no actor, attempted password absent
+
+POST /asset-requests/  (employee)              → 201
+POST /asset-requests/  duplicate pending       → 400
+POST /asset-requests/  no asset and no category→ 400
+POST /asset-requests/  (auditor)               → 403 read-only
+POST /asset-requests/{id}/approve/ (employee)  → 403
+POST /asset-requests/{id}/approve/ (dept head) → 200, asset assigned
+POST approve a category request with no choice → 409 "Choose which asset…"
+POST approve/reject an already-decided one     → 409
+list scoping: employee 3 · head 3 · manager 3 · auditor 0
+audit trail reads: Requested → Approved
 ```
 
 **Frontend** — all 21 files serve over HTTP; every JS file and inline block

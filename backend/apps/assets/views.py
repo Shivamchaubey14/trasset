@@ -17,22 +17,28 @@ from common.responses import ok
 from common.roles import Roles
 from common.viewsets import BaseModelViewSet
 
-from .constants import TERMINAL_STATUSES, AssetStatus
+from .constants import TERMINAL_STATUSES, AssetStatus, RequestStatus
 from .filters import AssetFilter
-from .models import Asset, Attachment
+from .models import Asset, AssetRequest, Attachment
 from .serializers import (
     AssetAssignmentSerializer,
     AssetDetailSerializer,
     AssetListSerializer,
+    AssetRequestCreateSerializer,
+    AssetRequestSerializer,
+    AssetRequestStatsSerializer,
     AssetStatsSerializer,
     AssetWriteSerializer,
     AssignSerializer,
     AttachmentSerializer,
     CheckinSerializer,
     DepreciationScheduleSerializer,
+    RequestApproveSerializer,
+    RequestRejectSerializer,
     RetireSerializer,
 )
 from .services import assignment as assignment_service
+from .services import requests as request_service
 
 MONEY = DecimalField(max_digits=14, decimal_places=2)
 
@@ -265,6 +271,151 @@ class AssetViewSet(BaseModelViewSet):
             )
         asset.delete()
         return ok(None, f"{asset.asset_tag} deleted successfully")
+
+
+@extend_schema(tags=["Requests"])
+class AssetRequestViewSet(BaseModelViewSet):
+    """
+    Employee asset requests and the approvals inbox (FR-4.4).
+
+    Visibility is scoped by role rather than by a filter the client sends:
+    employees see only their own requests, department heads see their
+    department's, and managers see everything. That scoping lives in
+    ``get_queryset`` so it cannot be bypassed by crafting a query string.
+    """
+
+    queryset = AssetRequest.objects.all()
+    resource_name = "Request"
+    permission_classes = [IsAuthenticated, HasRolePermission]
+
+    # Anyone signed in may raise a request; the decision endpoints are guarded
+    # separately by action_roles below.
+    read_roles = Roles.ALL
+    write_roles = Roles.ALL
+    action_roles = {
+        "approve": Roles.APPROVERS,
+        "reject": Roles.APPROVERS,
+        "destroy": (Roles.SUPER_ADMIN,),
+        "update": (Roles.SUPER_ADMIN,),
+        "partial_update": (Roles.SUPER_ADMIN,),
+    }
+
+    filterset_fields = ("status", "requester", "category", "asset")
+    search_fields = ("reason", "requester__full_name", "asset__asset_tag", "asset__name")
+    ordering_fields = ("created_at", "status", "needed_by")
+    ordering = ("-created_at",)
+
+    def get_queryset(self):
+        queryset = AssetRequest.objects.select_related(
+            "requester", "decided_by", "category",
+            "asset", "asset__category", "asset__assigned_to",
+            "fulfilled_asset", "fulfilled_asset__category",
+        )
+        user = self.request.user
+        role = getattr(getattr(user, "role", None), "name", None)
+
+        if role in Roles.MANAGERS:
+            return queryset
+        if role == Roles.DEPARTMENT_HEAD and user.department_id:
+            # Their own, plus anything raised by someone in their department.
+            return queryset.filter(
+                Q(requester=user) | Q(requester__department_id=user.department_id)
+            )
+        return queryset.filter(requester=user)
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return AssetRequestCreateSerializer
+        return AssetRequestSerializer
+
+    def perform_create(self, serializer):
+        asset_request = serializer.save()
+        # Logged explicitly as "Requested" rather than a generic create.
+        request_service.record_created(asset_request)
+
+    # -----------------------------------------------------------------
+    # Decisions
+    # -----------------------------------------------------------------
+    @extend_schema(
+        summary="Approve a request",
+        description=(
+            "Approves and hands the asset over in one transaction. If the asset "
+            "was taken in the meantime the assignment raises 409 and the whole "
+            "approval rolls back, leaving the request pending."
+        ),
+        request=RequestApproveSerializer,
+        responses={200: AssetRequestSerializer},
+    )
+    @action(detail=True, methods=["post"])
+    def approve(self, request, pk=None):
+        asset_request = self.get_object()
+        serializer = RequestApproveSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        updated = request_service.approve(
+            asset_request,
+            actor=request.user,
+            asset=serializer.validated_data.get("asset_id"),
+            notes=serializer.validated_data.get("notes", ""),
+        )
+        return ok(
+            AssetRequestSerializer(updated, context=self.get_serializer_context()).data,
+            f"Request approved — {updated.fulfilled_asset.asset_tag} assigned to "
+            f"{updated.requester.full_name}",
+        )
+
+    @extend_schema(
+        summary="Reject a request",
+        request=RequestRejectSerializer,
+        responses={200: AssetRequestSerializer},
+    )
+    @action(detail=True, methods=["post"])
+    def reject(self, request, pk=None):
+        asset_request = self.get_object()
+        serializer = RequestRejectSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        updated = request_service.reject(
+            asset_request, actor=request.user,
+            notes=serializer.validated_data["notes"],
+        )
+        return ok(
+            AssetRequestSerializer(updated, context=self.get_serializer_context()).data,
+            "Request rejected",
+        )
+
+    @extend_schema(
+        summary="Cancel your own request",
+        request=None,
+        responses={200: AssetRequestSerializer},
+    )
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, pk=None):
+        asset_request = self.get_object()
+        updated = request_service.cancel(asset_request, actor=request.user)
+        return ok(
+            AssetRequestSerializer(updated, context=self.get_serializer_context()).data,
+            "Request cancelled",
+        )
+
+    @extend_schema(
+        summary="Request counts",
+        description="Totals for the cards above the list, within what the caller may see.",
+        responses={200: AssetRequestStatsSerializer},
+    )
+    @action(detail=False, methods=["get"])
+    def stats(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        return ok(
+            queryset.aggregate(
+                total=Count("id"),
+                pending=Count("id", filter=Q(status=RequestStatus.PENDING)),
+                approved=Count("id", filter=Q(status=RequestStatus.APPROVED)),
+                rejected=Count("id", filter=Q(status=RequestStatus.REJECTED)),
+                cancelled=Count("id", filter=Q(status=RequestStatus.CANCELLED)),
+            ),
+            "Request statistics retrieved successfully",
+        )
 
 
 @extend_schema(tags=["Assets"])

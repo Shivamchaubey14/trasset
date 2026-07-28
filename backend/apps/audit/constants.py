@@ -15,6 +15,11 @@ class AuditAction(models.TextChoices):
     CHECKIN = "checkin", "Checked in"
     RETIRE = "retire", "Retired"
 
+    REQUEST = "request", "Requested"
+    APPROVE = "approve", "Approved"
+    REJECT = "reject", "Rejected"
+    CANCEL = "cancel", "Cancelled"
+
     LOGIN = "login", "Signed in"
     LOGIN_FAILED = "login_failed", "Sign-in failed"
     LOGOUT = "logout", "Signed out"
@@ -31,6 +36,10 @@ ACTION_COLORS = {
     AuditAction.ASSIGN: "#253D4E",
     AuditAction.CHECKIN: "#3BB77E",
     AuditAction.RETIRE: "#7B8794",
+    AuditAction.REQUEST: "#FDC040",
+    AuditAction.APPROVE: "#3BB77E",
+    AuditAction.REJECT: "#E5484D",
+    AuditAction.CANCEL: "#7B8794",
     AuditAction.LOGIN: "#3BB77E",
     AuditAction.LOGIN_FAILED: "#E5484D",
     AuditAction.LOGOUT: "#7B8794",

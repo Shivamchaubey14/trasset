@@ -24,12 +24,16 @@ from common.roles import Roles
 
 DEMO_PASSWORD = "Trasset@2026"
 
+# (email, name, role, department)
+# The head and the employee share a department on purpose: a Department Head
+# only sees requests from their own department, so without this the approvals
+# inbox would look empty in the demo.
 DEMO_USERS = [
-    ("admin@trasset.local", "Aditi Sharma", Roles.SUPER_ADMIN),
-    ("manager@trasset.local", "Rohan Mehta", Roles.ASSET_MANAGER),
-    ("head@trasset.local", "Priya Nair", Roles.DEPARTMENT_HEAD),
-    ("employee@trasset.local", "Karan Verma", Roles.EMPLOYEE),
-    ("auditor@trasset.local", "Neha Kulkarni", Roles.AUDITOR),
+    ("admin@trasset.local", "Aditi Sharma", Roles.SUPER_ADMIN, None),
+    ("manager@trasset.local", "Rohan Mehta", Roles.ASSET_MANAGER, "Information Technology"),
+    ("head@trasset.local", "Priya Nair", Roles.DEPARTMENT_HEAD, "Information Technology"),
+    ("employee@trasset.local", "Karan Verma", Roles.EMPLOYEE, "Information Technology"),
+    ("auditor@trasset.local", "Neha Kulkarni", Roles.AUDITOR, "Finance & Accounts"),
 ]
 
 DEMO_CATEGORIES = [
@@ -152,8 +156,10 @@ class Command(BaseCommand):
         self._create_admin(options["admin_email"], options["admin_password"], roles)
 
         if options["demo"]:
-            self._create_demo_users(roles)
+            # Masters first — demo users are placed into departments, so those
+            # have to exist before the users are created.
             self._create_masters()
+            self._create_demo_users(roles)
             self._create_assets(options["assets"])
             self._backfill_assignment_history()
 
@@ -180,12 +186,17 @@ class Command(BaseCommand):
 
     def _create_demo_users(self, roles):
         self.stdout.write("\nDemo users:")
-        for email, name, role_slug in DEMO_USERS:
+        departments = {d.name: d for d in Department.objects.all()}
+
+        for email, name, role_slug, department_name in DEMO_USERS:
+            department = departments.get(department_name) if department_name else None
+
             user, created = User.objects.get_or_create(
                 email=email,
                 defaults={
                     "full_name": name,
                     "role": roles[role_slug],
+                    "department": department,
                     "is_active": True,
                     "is_staff": role_slug == Roles.SUPER_ADMIN,
                     "is_superuser": role_slug == Roles.SUPER_ADMIN,
@@ -197,8 +208,20 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS(
                     f"  + {role_slug:<16} {email} / {DEMO_PASSWORD}"
                 ))
+            elif department and user.department_id is None:
+                # Backfill for databases seeded before departments were assigned.
+                user.department = department
+                user.save(update_fields=["department", "updated_at"])
+                self.stdout.write(f"  ~ {role_slug:<16} {email} (department set)")
             else:
                 self.stdout.write(f"  = {role_slug:<16} {email} (already exists)")
+
+        # Give each seeded department a head so the master screen looks real.
+        head = User.objects.filter(email="head@trasset.local").first()
+        it = departments.get("Information Technology")
+        if head and it and it.head_user_id is None:
+            it.head_user = head
+            it.save(update_fields=["head_user", "updated_at"])
 
     def _create_masters(self):
         self.stdout.write("\nMaster data:")
