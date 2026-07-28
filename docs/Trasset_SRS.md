@@ -428,7 +428,7 @@ Response `201`: full asset object including auto-generated `asset_tag` and compu
 | `--color-primary` | Nest Green | `#3BB77E` | Primary actions, active nav, success, brand |
 | `--color-accent` | Cream Yolk | `#FDC040` | Highlights, warnings, secondary CTAs, badges |
 | `--color-ink` | Ink | `#253D4E` | Text, headings, sidebar background |
-| `--color-bg` | Cloud | `#EEF2F6` | App background |
+| `--color-bg` | Cloud | `#E7EDF2` | App background |
 | `--color-surface` | White | `#FFFFFF` | Cards, panels |
 | `--surface-subtle` | Mist | `#F5F8FA` | Card headers/footers, table headers |
 | `--color-muted` | Slate | `#7B8794` | Secondary text, borders |
@@ -468,7 +468,7 @@ has ten series — it reads as an error everywhere else.
 ```css
 :root {
   --color-primary:#3BB77E; --color-accent:#FDC040; --color-ink:#253D4E;
-  --color-bg:#EEF2F6; --color-surface:#FFFFFF; --surface-subtle:#F5F8FA;
+  --color-bg:#E7EDF2; --color-surface:#FFFFFF; --surface-subtle:#F5F8FA;
   --color-muted:#7B8794; --color-danger:#E5484D;
   /* Chart-only supporting hues */
   --color-teal:#2F9BB5; --color-indigo:#6C6FD4;
