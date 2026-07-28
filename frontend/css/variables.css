@@ -145,6 +145,36 @@
   --z-toast: 1100;
 }
 
+/*
+  Hindi.
+
+  Quicksand and Lexend carry no Devanagari glyphs — Hindi set in them renders
+  as empty boxes. Noto Sans Devanagari takes over for both roles when the
+  document is in Hindi, so the brand fonts still define the English identity
+  while the Hindi is actually readable.
+
+  Devanagari also needs a little more vertical room than Latin at the same
+  size, hence the line-height bump.
+*/
+html[lang="hi"] {
+  --font-head: 'Noto Sans Devanagari', 'Nirmala UI', 'Mangal', sans-serif;
+  --font-body: 'Noto Sans Devanagari', 'Nirmala UI', 'Mangal', sans-serif;
+  --lh-body: 1.65;
+  --lh-tight: 1.4;
+}
+
+/*
+  The switch fades the page rather than swapping text in view — a hard swap
+  shows a frame of half-English, half-Hindi, which reads as a glitch.
+*/
+body {
+  transition: opacity 180ms var(--ease), transform 180ms var(--ease);
+}
+body.lang-switching {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
 /* Respect users who ask for less motion (NFR-9). */
 @media (prefers-reduced-motion: reduce) {
   *,

@@ -18,27 +18,41 @@ window.Trasset = window.Trasset || {};
    * `roles` limits visibility; omit it to show the item to everyone.
    */
   var NAV = [
-    { section: 'Overview' },
-    { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: 'dashboard.html', ready: true },
+    { section: 'Overview', key: 'nav.overview' },
+    { id: 'dashboard', label: 'Dashboard', key: 'nav.dashboard', icon: 'dashboard',
+      href: 'dashboard.html', ready: true },
 
-    { section: 'Manage' },
-    { id: 'assets', label: 'Assets', icon: 'box', href: 'assets.html', ready: true },
-    { id: 'requests', label: 'Requests', icon: 'inbox', href: 'requests.html', ready: true },
-    { id: 'maintenance', label: 'Maintenance', icon: 'wrench', href: 'maintenance.html', ready: true },
-    { id: 'procurement', label: 'Procurement', icon: 'cart', href: 'procurement.html', ready: true },
-    { id: 'reports', label: 'Reports', icon: 'chart', href: 'reports.html', ready: true },
+    { section: 'Manage', key: 'nav.manage' },
+    { id: 'assets', label: 'Assets', key: 'nav.assets', icon: 'box',
+      href: 'assets.html', ready: true },
+    { id: 'requests', label: 'Requests', key: 'nav.requests', icon: 'inbox',
+      href: 'requests.html', ready: true },
+    { id: 'maintenance', label: 'Maintenance', key: 'nav.maintenance', icon: 'wrench',
+      href: 'maintenance.html', ready: true },
+    { id: 'procurement', label: 'Procurement', key: 'nav.procurement', icon: 'cart',
+      href: 'procurement.html', ready: true },
+    { id: 'reports', label: 'Reports', key: 'nav.reports', icon: 'chart',
+      href: 'reports.html', ready: true },
 
-    { section: 'Administration' },
-    { id: 'masters', label: 'Master Data', icon: 'layers', href: 'masters.html', ready: true },
-    { id: 'users', label: 'Users', icon: 'users', href: 'users.html', ready: true,
-      roles: ['super_admin'] },
-    { id: 'audit', label: 'Audit Log', icon: 'shield', href: 'audit.html', ready: true,
-      roles: ['super_admin', 'auditor'] },
-    { id: 'settings', label: 'Settings', icon: 'settings', href: 'settings.html', ready: true }
+    { section: 'Administration', key: 'nav.administration' },
+    { id: 'masters', label: 'Master Data', key: 'nav.masters', icon: 'layers',
+      href: 'masters.html', ready: true },
+    { id: 'users', label: 'Users', key: 'nav.users', icon: 'users',
+      href: 'users.html', ready: true, roles: ['super_admin'] },
+    { id: 'audit', label: 'Audit Log', key: 'nav.audit', icon: 'shield',
+      href: 'audit.html', ready: true, roles: ['super_admin', 'auditor'] },
+    { id: 'settings', label: 'Settings', key: 'nav.settings', icon: 'settings',
+      href: 'settings.html', ready: true }
   ];
+
+  /** Short-hand for a translated string with the English as fallback. */
+  function t(key, fallback) {
+    return T.i18n ? T.i18n.t(key, fallback) : fallback;
+  }
 
   //: Guards against binding the notification polling twice on a re-render.
   var notificationsBound = false;
+  var currentNav = null;
 
   function brandMark(size) {
     var s = size || 34;
@@ -61,7 +75,9 @@ window.Trasset = window.Trasset || {};
 
     NAV.forEach(function (item) {
       if (item.section) {
-        html += '<div class="nav-section">' + ui.esc(item.section) + '</div>';
+        html += '<div class="nav-section">' +
+                  ui.esc(t(item.key, item.section)) +
+                '</div>';
         return;
       }
       if (item.roles && item.roles.indexOf(role) === -1) { return; }
@@ -75,8 +91,10 @@ window.Trasset = window.Trasset || {};
            (item.ready ? '' : ' tabindex="-1" aria-disabled="true"') +
            (item.id === activeId ? ' aria-current="page"' : '') + '>' +
           ui.icon(item.icon, 19) +
-          '<span class="nav-label">' + ui.esc(item.label) + '</span>' +
-          (item.ready ? '' : '<span class="badge badge-soon">soon</span>') +
+          '<span class="nav-label">' + ui.esc(t(item.key, item.label)) + '</span>' +
+          (item.ready
+            ? ''
+            : '<span class="badge badge-soon">' + ui.esc(t('nav.soon', 'soon')) + '</span>') +
         '</a>';
     });
 
@@ -85,7 +103,8 @@ window.Trasset = window.Trasset || {};
 
   function sidebarHtml(activeId, user) {
     var role = user ? user.role_name : null;
-    var roleLabel = (user && user.role && user.role.label) || ui.fmt.title(role || '');
+    var roleLabel = t('role.' + role,
+      (user && user.role && user.role.label) || ui.fmt.title(role || ''));
 
     return '' +
       '<aside class="sidebar" id="sidebar">' +
@@ -121,19 +140,26 @@ window.Trasset = window.Trasset || {};
 
     return '' +
       '<header class="topbar">' +
-        '<button class="icon-btn topbar-toggle" id="sidebarToggle" aria-label="Open navigation">' +
+        '<button class="icon-btn topbar-toggle" id="sidebarToggle" ' +
+                'aria-label="' + ui.esc(t('topbar.openNav', 'Open navigation')) + '">' +
           ui.icon('menu', 21) +
         '</button>' +
 
         '<div class="global-search">' +
           '<span class="global-search-icon">' + ui.icon('search', 17) + '</span>' +
-          '<label class="sr-only" for="globalSearch">Search assets by tag, name or serial</label>' +
-          '<input class="input" id="globalSearch" type="search" ' +
-                 'placeholder="Search assets by tag, name or serial…" autocomplete="off">' +
+          '<label class="sr-only" for="globalSearch">' +
+            ui.esc(t('topbar.search', 'Search assets by tag, name or serial')) +
+          '</label>' +
+          '<input class="input" id="globalSearch" type="search" autocomplete="off" ' +
+                 'placeholder="' +
+                 ui.esc(t('topbar.search', 'Search assets by tag, name or serial…')) + '">' +
           '<span class="search-kbd">/</span>' +
         '</div>' +
 
         '<div class="topbar-actions">' +
+          // Available on every screen, not buried in settings — someone who
+          // cannot read the UI cannot navigate to a page to fix that.
+          '<span id="langMount"></span>' +
           '<div class="dropdown" id="notifDropdown">' +
             '<button class="icon-btn" id="notifBtn" aria-label="Notifications" ' +
                     'aria-haspopup="true" aria-expanded="false">' +
@@ -142,9 +168,11 @@ window.Trasset = window.Trasset || {};
             '<div class="dropdown-menu" id="notifMenu" role="menu" ' +
                  'style="width:380px;max-width:calc(100vw - 32px)">' +
               '<div class="dropdown-header flex justify-between items-center">' +
-                '<span>Notifications</span>' +
+                '<span>' + ui.esc(t('topbar.notifications', 'Notifications')) + '</span>' +
                 '<button class="btn-link text-tiny" id="markAllReadBtn" ' +
-                        'style="display:none">Mark all read</button>' +
+                        'style="display:none">' +
+                  ui.esc(t('topbar.markAllRead', 'Mark all read')) +
+                '</button>' +
               '</div>' +
               '<div id="notifList" style="max-height:380px;overflow-y:auto"></div>' +
             '</div>' +
@@ -163,14 +191,17 @@ window.Trasset = window.Trasset || {};
                 ui.esc(user ? user.email : '') +
               '</div>' +
               '<a class="dropdown-item" href="settings.html" role="menuitem">' +
-                ui.icon('user', 17) + '<span>My profile</span>' +
+                ui.icon('user', 17) +
+                '<span>' + ui.esc(t('topbar.myProfile', 'My profile')) + '</span>' +
               '</a>' +
               '<a class="dropdown-item" href="settings.html#password" role="menuitem">' +
-                ui.icon('lock', 17) + '<span>Change password</span>' +
+                ui.icon('lock', 17) +
+                '<span>' + ui.esc(t('topbar.changePassword', 'Change password')) + '</span>' +
               '</a>' +
               '<div class="dropdown-divider"></div>' +
               '<button class="dropdown-item is-danger" id="logoutBtn" role="menuitem">' +
-                ui.icon('logout', 17) + '<span>Sign out</span>' +
+                ui.icon('logout', 17) +
+                '<span>' + ui.esc(t('topbar.signOut', 'Sign out')) + '</span>' +
               '</button>' +
             '</div>' +
           '</div>' +
@@ -248,9 +279,10 @@ window.Trasset = window.Trasset || {};
     if (unread > 0) {
       $bell.append('<span class="badge-count">' +
                      (unread > 99 ? '99+' : unread) + '</span>');
-      $bell.attr('aria-label', unread + ' unread notifications');
+      $bell.attr('aria-label',
+        unread + ' ' + t('topbar.unread', 'unread notifications'));
     } else {
-      $bell.attr('aria-label', 'Notifications');
+      $bell.attr('aria-label', t('topbar.notifications', 'Notifications'));
     }
     $('#markAllReadBtn').toggle(unread > 0);
   }
@@ -266,8 +298,11 @@ window.Trasset = window.Trasset || {};
       $('#notifList').html(
         '<div class="empty-state" style="padding:28px 16px">' +
           '<div class="empty-state-icon">' + ui.icon('bell', 22) + '</div>' +
-          '<p class="text-small" style="margin:0">Nothing new. ' +
-            'You will hear about assignments, requests and maintenance here.</p>' +
+          '<p class="text-small" style="margin:0">' +
+            ui.esc(t('topbar.noNotifications',
+              'Nothing new. You will hear about assignments, requests and ' +
+              'maintenance here.')) +
+          '</p>' +
         '</div>'
       );
       return;
@@ -350,7 +385,8 @@ window.Trasset = window.Trasset || {};
   function applyUser(user) {
     if (!user) { return; }
     var initials = user.initials || ui.fmt.initials(user.full_name);
-    var roleLabel = (user.role && user.role.label) || ui.fmt.title(user.role_name);
+    var roleLabel = t('role.' + user.role_name,
+      (user.role && user.role.label) || ui.fmt.title(user.role_name));
 
     $('#topbarAvatar').text(initials);
     $('#topbarName').text(user.full_name).attr('title', user.full_name);
@@ -361,6 +397,37 @@ window.Trasset = window.Trasset || {};
   }
 
   /**
+   * Repaint the chrome in the current language.
+   *
+   * The topbar is patched in place rather than re-rendered: rebuilding it
+   * would drop the dropdown handlers, the notification poll and the unread
+   * badge. The nav is only links, so replacing it wholesale is safe.
+   */
+  function retranslate() {
+    var user = T.api.profile.get();
+
+    $('.sidebar-nav').html(navHtml(currentNav, user ? user.role_name : null));
+
+    $('label[for="globalSearch"]')
+      .text(t('topbar.search', 'Search assets by tag, name or serial'));
+    $('#globalSearch')
+      .attr('placeholder', t('topbar.search',
+        'Search assets by tag, name or serial…'));
+    $('#sidebarToggle').attr('aria-label', t('topbar.openNav', 'Open navigation'));
+
+    $('#notifMenu .dropdown-header > span')
+      .text(t('topbar.notifications', 'Notifications'));
+    $('#markAllReadBtn').text(t('topbar.markAllRead', 'Mark all read'));
+    $('#profileMenu [href="settings.html"] span')
+      .text(t('topbar.myProfile', 'My profile'));
+    $('#profileMenu [href="settings.html#password"] span')
+      .text(t('topbar.changePassword', 'Change password'));
+    $('#logoutBtn span').text(t('topbar.signOut', 'Sign out'));
+
+    applyUser(user);
+  }
+
+  /**
    * Render the shell into the page.
    * @param {string} activeId nav id to highlight
    */
@@ -368,10 +435,18 @@ window.Trasset = window.Trasset || {};
     var user = T.api.profile.get();
     var $app = $('#app');
 
+    currentNav = activeId;
+
     $app.prepend(sidebarHtml(activeId, user));
     $app.find('.main').prepend(topbarHtml(user));
 
     bindShell();
+
+    if (T.i18n) {
+      T.i18n.mount('#langMount');
+      // Page-level scripts translate their own content on the same event.
+      $(document).on('trasset:lang', retranslate);
+    }
 
     // Wait for the session before asking for notifications, or the first call
     // races the token refresh on a page load.

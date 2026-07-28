@@ -751,6 +751,49 @@
 /* --------------------------------------------------------------------------
    Misc
    -------------------------------------------------------------------------- */
+/* --------------------------------------------------------------------------
+   Language toggle
+
+   Labelled with the language you would switch *to*. A control labelled with
+   the current state reads as a status, and people press it expecting nothing
+   to happen.
+   -------------------------------------------------------------------------- */
+.lang-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--ink-light);
+  font-size: var(--fs-small);
+  font-weight: 500;
+  line-height: 1;
+  transition: all var(--dur-fast) var(--ease);
+}
+.lang-toggle:hover {
+  border-color: var(--color-primary);
+  color: var(--primary-darker);
+  background: var(--primary-soft);
+}
+.lang-toggle-globe { display: flex; color: var(--color-muted); }
+.lang-toggle:hover .lang-toggle-globe { color: var(--color-primary); }
+.lang-toggle-text { font-family: var(--font-body); }
+
+/* On the Ink sign-in panel the outline version disappears, so invert it. */
+.lang-toggle-inverse {
+  background: rgba(255, 255, 255, .08);
+  border-color: rgba(255, 255, 255, .22);
+  color: rgba(255, 255, 255, .88);
+}
+.lang-toggle-inverse:hover {
+  background: rgba(255, 255, 255, .16);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+.lang-toggle-inverse .lang-toggle-globe { color: rgba(255, 255, 255, .6); }
+
 .divider { height: 1px; background: var(--border); }
 
 .chart-box { position: relative; height: 280px; }

@@ -339,10 +339,18 @@
 }
 
 .auth-main {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--space-6) var(--space-5);
+}
+
+/* Language control, offered before anything has to be read or typed. */
+.auth-lang {
+  position: absolute;
+  top: var(--space-5);
+  right: var(--space-5);
 }
 .auth-card { width: 100%; max-width: 400px; }
 .auth-brand {
