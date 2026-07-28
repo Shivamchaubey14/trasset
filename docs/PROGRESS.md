@@ -7,6 +7,10 @@
 **Started:** 2026-07-27
 **Last updated:** 2026-07-28
 **Plan:** [`Trasset_Build_Plan.md`](Trasset_Build_Plan.md) · **Contract:** [`Trasset_SRS.md`](Trasset_SRS.md)
+
+> **Scope now spans two releases.** v1.0 is the web app (Days 1–30, in progress).
+> v1.1 is a React Native mobile app (Days 31–60), specified in SRS §12. Mobile
+> work has not started and is not blocked on anything except finishing v1.0.
 **Repo:** https://github.com/Shivamchaubey14/trasset (public) · branches `main`, `dev`
 
 ---
