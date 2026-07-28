@@ -24,6 +24,7 @@
 | Phase 2 — Maintenance, Procurement, Reports | 13–18 | ✅ Complete (Days 13–18) |
 | Phase 3 — Frontend | 19–26 | 🟡 Days 19–25 done · Day 26 done except browser QA |
 | Phase 4 — Integration, Testing & Launch | 27–30 | 🟡 Days 27, 28 done · Days 29, 30 open |
+| Hindi/English toggle (added on request) | — | 🟡 Engine + chrome done · page content pending |
 
 **Backend test suite:** 559 tests, all passing · **Coverage:** 88.9% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
@@ -44,7 +45,31 @@
 
 ## ▶ Next up — start here
 
-**Day 26 is blocked on one thing only: somebody opening the app in a browser.**
+**1. Finish the Hindi/English toggle** (user request, in progress — commit `b7977ef`).
+
+Done and pushed: the translation engine `frontend/js/i18n.js` (`t`, `apply`,
+`set`, `toggle`, `mount`, a Hindi dictionary, `localStorage` under
+`trasset.lang`, and a `trasset:lang` event); the control mounted top-right on
+the sign-in page and in the top bar of every app page; `html[lang="hi"]`
+switching both font roles to Noto Sans Devanagari; the 180 ms fade on switch;
+and `data-i18n` on the login page, the shell nav and top bar, and all 11 page
+titles and subtitles.
+
+What is left — the app is bilingual in its chrome but still English in its
+content:
+- Dynamic strings built in JavaScript: `js/ui.js` empty states, the pagination
+  line, toasts and validation messages. Route them through `T.i18n.t()`.
+- Per-page content on all 11 screens — table headers, filter and tab labels,
+  modal titles, form labels, button text.
+- Server-supplied display strings (status labels, role labels, category names).
+  Role labels are already mapped through `role.*` keys; statuses need the same.
+- Extend the dictionary in `js/i18n.js` as each of those lands.
+
+Rule that keeps this safe: **the English stays in the markup as the fallback**,
+so a missing key degrades to English, never to a raw key name.
+
+**2. Then Day 26 — blocked on one thing only: somebody opening the app in a
+browser.** The Hindi switch is part of what needs looking at.
 
 Everything on Day 26 that could be done without a browser is done (see below).
 What remains needs a human at a screen:
@@ -63,13 +88,15 @@ Run both servers, open `http://127.0.0.1:5500`, and note anything that looks
 wrong. Small visual fixes are cheap now and get more expensive once Phase 4
 starts.
 
-**Then Phase 4:**
-- **Day 27** — walk every journey per role against SRS §11.4.
-- **Day 28** — security and performance: the SRS §9 checklist, load-test the
-  list endpoints against the < 400 ms target, dependency scan.
+**3. Then the rest of Phase 4:**
+- **Day 27** — ✅ done: every journey walked per role against SRS §11.4.
+- **Day 28** — ✅ done: SRS §9 security checklist, list endpoints load-tested at
+  10,000 assets, `pip-audit` clean.
 - **Day 29** — deploy: Nginx, Gunicorn, MySQL, Redis, Celery worker and beat,
   TLS, nightly backups.
 - **Day 30** — docs, seed real master data, tag v1.0.
+
+**4. Then v1.1** — the React Native mobile app, Days 31–60, specified in SRS §12.
 
 Reusable groundwork: `BaseModelViewSet`, the envelope, the table/toolbar/modal
 patterns in `js/masters.js`, `js/assets.js`, `js/audit.js` and `js/requests.js`,
