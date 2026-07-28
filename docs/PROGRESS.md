@@ -17,12 +17,12 @@
 |-------|------|--------|
 | Phase 0 — Foundation | 1–5 | ✅ Complete |
 | Phase 1 — Core Asset Engine | 6–12 | ✅ Complete (Days 6–12) |
-| Phase 2 — Maintenance, Procurement, Reports | 13–18 | 🟡 Days 13, 15 done · Days 14, 16–18 open |
-| Phase 3 — Frontend | 19–26 | 🟡 Days 19–23 done · Day 25 mostly done · audit, requests + maintenance screens done |
+| Phase 2 — Maintenance, Procurement, Reports | 13–18 | 🟡 Days 13, 14, 15 done · Days 16–18 open |
+| Phase 3 — Frontend | 19–26 | 🟡 Days 19–23 done · Day 25 mostly done · every nav item now live except Reports |
 | Phase 4 — Integration, Testing & Launch | 27–30 | ⬜ Not started |
 
-**Backend test suite:** 328 tests, all passing · **Coverage:** 86.4% (target ≥ 70%, NFR-12)
-**OpenAPI schema:** 49 endpoints, 0 errors, 0 warnings (NFR-13)
+**Backend test suite:** 371 tests, all passing · **Coverage:** 87.1% (target ≥ 70%, NFR-12)
+**OpenAPI schema:** 55 endpoints, 0 errors, 0 warnings (NFR-13)
 **Query counts:** every list endpoint asserted flat — cost does not grow with rows (NFR-1)
 
 > **Note on sequencing.** The plan runs backend-first (Days 1–18) then frontend
@@ -34,25 +34,28 @@
 
 ## ▶ Next up — start here
 
-**Day 14 — Procurement (purchase orders)** 🟢 — clears the last greyed-out nav item.
+**Day 16 — Reports & exports** 🟢 (Day 15's dashboard API is already done)
 
-1. `PurchaseOrder` (po_number unique, vendor, po_date, expected_delivery,
-   status, total_amount, created_by) + `PurchaseOrderItem` (description,
-   quantity, unit_cost, category). Auto-generate the PO number the same way
-   asset tags work — see `apps/assets/services/tagging.py`.
-2. CRUD endpoints; `total_amount` derived from the line items rather than
-   trusted from the client.
-3. `POST /purchase-orders/{id}/receive/` optionally auto-creates assets from the
-   line items (FR-7.2) — quantity 3 of "Dell Latitude" creates 3 assets, each
-   with its own generated tag, in one transaction. Guard against receiving twice.
-4. Warranty-expiry flagging already exists on the asset side (FR-7.3); surface
-   it in the procurement view if useful.
-5. Frontend `procurement.html` with a line-item editor and a receive flow.
+1. Four report endpoints under `/reports/`, all filterable by date, department,
+   location and category:
+   - `asset-register` — the full inventory with current value
+   - `depreciation` — cost, accumulated depreciation, book value per asset
+   - `maintenance-cost` — spend by asset, category and vendor
+   - `assignment` — who has held what, and for how long (the
+     `AssetAssignment.days_held` field already carries this)
+2. CSV and XLSX export via `openpyxl` (already in requirements), plus PDF for
+   the register. **Note:** WeasyPrint/ReportLab are *not* installed — pick one
+   and add it, or drop PDF to v1.1 and say so.
+3. Exports must stream rather than build the whole file in memory — a 100k-row
+   register is in scope per NFR-5.
+4. Apply the `export` throttle scope, which is configured but currently unused.
+5. Frontend `reports.html` with filters and one-click download; flip the last
+   nav item in `js/shell.js`.
 
-**DoD:** POs CRUD; receiving can generate assets; warranty flags computed.
+**DoD:** Each report returns correct data and downloads as CSV/XLSX.
 
-**Then Days 16–18** — reports and exports, bulk import, then notifications and
-the Celery jobs, which is the last of the backend feature work.
+**Then Day 17** (bulk import) and **Day 18** (notifications + Celery), which
+finish the backend feature work.
 
 Reusable groundwork: `BaseModelViewSet`, the envelope, the table/toolbar/modal
 patterns in `js/masters.js`, `js/assets.js`, `js/audit.js` and `js/requests.js`,
@@ -170,6 +173,34 @@ audit row.
 - Verified against hand calculations: ₹78,000 cost / ₹8,000 salvage / 4 years
   gives ₹17,500 a year and lands exactly on salvage.
 - **Still pending:** the monthly recalculation Celery task (Day 18).
+
+### Day 14 — Procurement (purchase orders) ✅
+- `PurchaseOrder` + `PurchaseOrderItem` with `PO-2026-000001` numbering. The
+  sequence generator in `apps/assets/services/tagging.py` was generalised into
+  `next_sequence(prefix, year)` so PO numbers reuse the same locked-counter
+  mechanism as asset tags — one implementation, separate sequences per prefix
+  (asserted by test).
+- **`total_amount` is derived from the line items, never accepted from the
+  client** — a caller claiming an order is worth ₹1 is ignored. Tested.
+- **Receiving creates one asset per unit (FR-7.2).** Quantity 3 of "Dell
+  Latitude 5440" becomes three separate asset records, each with its own tag,
+  because they are three physical things that get assigned and maintained
+  independently. Assets inherit the order's vendor, location, department and
+  unit cost, and the order's `warranty_months` is stamped as an expiry date
+  (FR-7.3).
+- **Partial receipt is a real state.** Suppliers ship part of an order, so
+  `receive` takes per-line quantities and the order sits in *Partially received*
+  with the outstanding balance visible. Omitting `lines` receives everything left.
+- Lines can be flagged `create_assets=False` for consumables — 20 HDMI cables
+  are received without polluting the asset register.
+- Guards: can't receive against a draft or a closed order, can't receive more
+  than outstanding, can't edit line items once goods have arrived (it would lose
+  the received quantities), can't delete an order with receipts against it.
+- `.distinct()` on the queryset because search spans line items, which would
+  otherwise return an order once per matching line.
+- Procurement screen with an inline line-item editor that totals as you type,
+  expandable line detail per order, and a receive dialog that says up front how
+  many assets it will create.
 
 ### Day 13 — Maintenance management ✅
 - `MaintenanceRecord` with type, schedule, technician/vendor, cost estimate vs

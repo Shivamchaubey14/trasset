@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Procurement · Trasset</title>
+
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Lexend:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/layout.css">
+
+  <style>
+    tr.is-overdue td:first-child { box-shadow: inset 3px 0 0 var(--color-danger); }
+    tr.is-partial td:first-child { box-shadow: inset 3px 0 0 var(--color-accent); }
+
+    /* Line-item editor */
+    .line-row {
+      display: grid;
+      grid-template-columns: 2fr 1.3fr 70px 110px 90px 34px;
+      gap: var(--space-2);
+      align-items: start;
+      padding: var(--space-2) 0;
+      border-bottom: 1px dashed var(--border);
+    }
+    .line-row:last-of-type { border-bottom: none; }
+    .line-head {
+      display: grid;
+      grid-template-columns: 2fr 1.3fr 70px 110px 90px 34px;
+      gap: var(--space-2);
+      font-size: var(--fs-tiny);
+      font-weight: 600;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      padding-bottom: var(--space-2);
+      border-bottom: 1px solid var(--border);
+    }
+    .line-total {
+      display: flex; align-items: center; justify-content: flex-end;
+      height: 40px; font-variant-numeric: tabular-nums; font-weight: 500;
+    }
+    .line-remove {
+      height: 40px; width: 34px;
+      display: grid; place-items: center;
+      color: var(--color-muted); border-radius: var(--radius-sm);
+    }
+    .line-remove:hover { background: var(--danger-soft); color: var(--color-danger); }
+
+    .order-total {
+      display: flex; justify-content: flex-end; align-items: baseline;
+      gap: var(--space-3);
+      padding-top: var(--space-4); margin-top: var(--space-2);
+      border-top: 2px solid var(--border);
+    }
+    .order-total .amount {
+      font-family: var(--font-head); font-weight: 700; font-size: 22px;
+    }
+
+    /* Expandable line detail in the table */
+    .po-detail { background: #FAFBFC; }
+    .po-detail td { padding: 0 !important; }
+    .po-lines { padding: var(--space-4) var(--space-4) var(--space-4) 44px; }
+    .po-line {
+      display: grid;
+      grid-template-columns: 2fr 1.2fr 120px 120px 130px;
+      gap: var(--space-3);
+      padding: 7px 0;
+      border-bottom: 1px dashed var(--border);
+      font-size: var(--fs-small);
+    }
+    .po-line:last-child { border-bottom: none; }
+
+    @media (max-width: 900px) {
+      .line-row, .line-head { grid-template-columns: 1fr 1fr; }
+      .line-head { display: none; }
+      .po-line { grid-template-columns: 1fr; gap: 2px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="boot" id="boot">
+  <div class="boot-inner">
+    <div class="spinner-lg"></div>
+    <p class="text-muted text-small">Loading purchase orders…</p>
+  </div>
+</div>
+
+<a href="#main" class="skip-link">Skip to content</a>
+
+<div class="app" id="app">
+  <main class="main">
+    <div class="content" id="main">
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Procurement</h1>
+          <p class="page-subtitle">
+            What's on order, what's arrived, and what it turned into.
+          </p>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-secondary" id="clearFiltersBtn" style="display:none">
+            <span class="btn-label">Clear filters</span>
+          </button>
+          <button class="btn btn-primary" id="newOrderBtn">
+            <span class="btn-label">New order</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="kpi-grid mb-5" id="statGrid"></div>
+
+      <div class="card">
+        <div class="toolbar">
+          <div class="search-box input-group">
+            <span class="input-group-icon" id="searchIcon"></span>
+            <label class="sr-only" for="searchInput">Search orders</label>
+            <input class="input" type="search" id="searchInput"
+                   placeholder="Search by PO number, vendor or item…" autocomplete="off">
+          </div>
+          <select class="select" id="statusFilter" aria-label="Filter by status">
+            <option value="">All statuses</option>
+            <option value="draft">Draft</option>
+            <option value="ordered">Ordered</option>
+            <option value="partially_received">Partially received</option>
+            <option value="received">Received</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <select class="select" id="vendorFilter" aria-label="Filter by vendor">
+            <option value="">All vendors</option>
+          </select>
+          <select class="select" id="dueFilter" aria-label="Filter by delivery">
+            <option value="">Any delivery</option>
+            <option value="overdue">Overdue</option>
+            <option value="open">Still expecting goods</option>
+          </select>
+          <div class="toolbar-spacer"></div>
+          <span class="text-small text-muted" id="resultCount"></span>
+        </div>
+
+        <div class="card-body is-flush">
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th class="is-sortable" data-sort="po_date">
+                    PO <span class="sort-icon"></span>
+                  </th>
+                  <th>Vendor</th>
+                  <th>Items</th>
+                  <th class="is-sortable" data-sort="expected_delivery">
+                    Expected <span class="sort-icon"></span>
+                  </th>
+                  <th class="is-sortable" data-sort="status">
+                    Status <span class="sort-icon"></span>
+                  </th>
+                  <th class="is-sortable" style="text-align:right" data-sort="total_amount">
+                    Value <span class="sort-icon"></span>
+                  </th>
+                  <th style="text-align:right;width:160px">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="pagination" id="paginationBar" style="display:none">
+          <span class="pagination-info" id="paginationInfo"></span>
+          <span id="paginationControls"></span>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="js/vendor/jquery.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/shell.js"></script>
+<script src="js/asset-form.js"></script>
+<script src="js/procurement.js"></script>
+</body>
+</html>
