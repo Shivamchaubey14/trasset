@@ -17,12 +17,12 @@
 |-------|------|--------|
 | Phase 0 — Foundation | 1–5 | ✅ Complete |
 | Phase 1 — Core Asset Engine | 6–12 | ✅ Complete (Days 6–12) |
-| Phase 2 — Maintenance, Procurement, Reports | 13–18 | 🟡 Days 13, 14, 15 done · Days 16–18 open |
-| Phase 3 — Frontend | 19–26 | 🟡 Days 19–23 done · Day 25 mostly done · every nav item now live except Reports |
+| Phase 2 — Maintenance, Procurement, Reports | 13–18 | 🟡 Days 13–16 done · Days 17, 18 open |
+| Phase 3 — Frontend | 19–26 | 🟡 Days 19–23 done · Day 25 mostly done · **every sidebar screen is now live** |
 | Phase 4 — Integration, Testing & Launch | 27–30 | ⬜ Not started |
 
-**Backend test suite:** 371 tests, all passing · **Coverage:** 87.1% (target ≥ 70%, NFR-12)
-**OpenAPI schema:** 55 endpoints, 0 errors, 0 warnings (NFR-13)
+**Backend test suite:** 414 tests, all passing · **Coverage:** 88.1% (target ≥ 70%, NFR-12)
+**OpenAPI schema:** 57 endpoints, 0 errors, 0 warnings (NFR-13)
 **Query counts:** every list endpoint asserted flat — cost does not grow with rows (NFR-1)
 
 > **Note on sequencing.** The plan runs backend-first (Days 1–18) then frontend
@@ -34,28 +34,26 @@
 
 ## ▶ Next up — start here
 
-**Day 16 — Reports & exports** 🟢 (Day 15's dashboard API is already done)
+**Day 17 — Bulk import** 🟢
 
-1. Four report endpoints under `/reports/`, all filterable by date, department,
-   location and category:
-   - `asset-register` — the full inventory with current value
-   - `depreciation` — cost, accumulated depreciation, book value per asset
-   - `maintenance-cost` — spend by asset, category and vendor
-   - `assignment` — who has held what, and for how long (the
-     `AssetAssignment.days_held` field already carries this)
-2. CSV and XLSX export via `openpyxl` (already in requirements), plus PDF for
-   the register. **Note:** WeasyPrint/ReportLab are *not* installed — pick one
-   and add it, or drop PDF to v1.1 and say so.
-3. Exports must stream rather than build the whole file in memory — a 100k-row
-   register is in scope per NFR-5.
-4. Apply the `export` throttle scope, which is configured but currently unused.
-5. Frontend `reports.html` with filters and one-click download; flip the last
-   nav item in `js/shell.js`.
+1. `POST /assets/import/` accepting CSV/XLSX, validating **row by row** and
+   returning a per-row report: which rows would be created, which failed, and
+   why. Reuse `AssetWriteSerializer` so import and API validation cannot drift.
+2. A `?dry_run=true` mode that validates without writing — the UI should let
+   someone see the damage before committing.
+3. `GET /assets/import/template/` returning a CSV template with the right
+   headers and one example row. Look up categories, locations, departments and
+   vendors **by name**, not id — nobody types database ids into a spreadsheet.
+4. Import the whole file in one transaction so a bad row halfway through cannot
+   leave a half-populated register.
+5. Frontend import wizard: upload → validation report → confirm. The reports
+   screen already has the download plumbing to copy from.
 
-**DoD:** Each report returns correct data and downloads as CSV/XLSX.
+**DoD:** A sample file imports with a clear validation report; bad rows are
+rejected with reasons.
 
-**Then Day 17** (bulk import) and **Day 18** (notifications + Celery), which
-finish the backend feature work.
+**Then Day 18** — notifications and the Celery jobs, which is the last of the
+backend feature work before Phase 4.
 
 Reusable groundwork: `BaseModelViewSet`, the envelope, the table/toolbar/modal
 patterns in `js/masters.js`, `js/assets.js`, `js/audit.js` and `js/requests.js`,
@@ -173,6 +171,34 @@ audit row.
 - Verified against hand calculations: ₹78,000 cost / ₹8,000 salvage / 4 years
   gives ₹17,500 a year and lands exactly on salvage.
 - **Still pending:** the monthly recalculation Celery task (Day 18).
+
+### Day 16 — Reports & exports ✅
+- Four reports — asset register, depreciation, maintenance cost, assignment —
+  each a class in `apps/reports/reports.py` declaring its queryset, columns and
+  totals. Everything else (filtering, pagination, CSV, XLSX) is shared, so a
+  fifth report is a class, not another endpoint.
+- All four accept `date_from`, `date_to`, `department`, `location` and
+  `category` (FR-11.4). Each report maps those onto its own field paths, so
+  filtering maintenance by department reaches through to the asset.
+- **The frontend is report-agnostic.** The table is built from the column
+  metadata the API returns, so adding a report on the backend makes it appear in
+  the UI with no frontend change.
+- Exports (FR-10.2): **CSV streams** row by row via `StreamingHttpResponse` —
+  nothing larger than one row is ever held. **XLSX** uses openpyxl's
+  `write_only` workbook, which flushes to a temp file as rows are appended;
+  memory stays flat for a 100k-row register (NFR-5).
+- CSV carries a UTF-8 BOM so Excel on Windows doesn't mangle the rupee sign and
+  accented names. XLSX gets real dates and numbers with formats, and totals go
+  on a **separate Summary sheet** as numbers, so they can be summed and can't be
+  mistaken for a data row.
+- The `export` throttle scope — configured since Day 2 but never used — is now
+  applied to download requests.
+- **PDF is deferred to v1.1** by decision. `?export=pdf` returns a 400 naming
+  the valid choices rather than silently handing back CSV; there is a test for it.
+
+**Note on the query parameter:** it is `?export=csv`, not `?format=csv`. DRF
+reserves `format` for content negotiation and returns **404** when no renderer
+matches the value — which is exactly what happened first time, across 19 tests.
 
 ### Day 14 — Procurement (purchase orders) ✅
 - `PurchaseOrder` + `PurchaseOrderItem` with `PO-2026-000001` numbering. The

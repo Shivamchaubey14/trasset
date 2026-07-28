@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reports · Trasset</title>
+
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Lexend:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/layout.css">
+
+  <style>
+    .report-picker {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: var(--space-3);
+      margin-bottom: var(--space-5);
+    }
+    .report-card {
+      text-align: left;
+      padding: var(--space-4);
+      background: var(--color-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      transition: all var(--dur) var(--ease);
+    }
+    .report-card:hover {
+      border-color: var(--color-primary);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+    .report-card.is-active {
+      border-color: var(--color-primary);
+      background: var(--primary-soft);
+      box-shadow: 0 0 0 1px var(--color-primary) inset;
+    }
+    .report-card-title {
+      display: flex; align-items: center; gap: var(--space-2);
+      font-family: var(--font-head); font-weight: 700; font-size: 15px;
+      margin-bottom: 5px;
+    }
+    .report-card-desc { font-size: var(--fs-small); color: var(--color-muted); }
+
+    .totals-strip {
+      display: flex; flex-wrap: wrap; gap: var(--space-5);
+      padding: var(--space-4) var(--space-5);
+      background: #FAFBFC; border-bottom: 1px solid var(--border);
+    }
+    .total-item .label {
+      font-size: var(--fs-tiny); font-weight: 600; letter-spacing: .05em;
+      text-transform: uppercase; color: var(--color-muted);
+    }
+    .total-item .value {
+      font-family: var(--font-head); font-weight: 700; font-size: 19px;
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+</head>
+<body>
+
+<div class="boot" id="boot">
+  <div class="boot-inner">
+    <div class="spinner-lg"></div>
+    <p class="text-muted text-small">Loading reports…</p>
+  </div>
+</div>
+
+<a href="#main" class="skip-link">Skip to content</a>
+
+<div class="app" id="app">
+  <main class="main">
+    <div class="content" id="main">
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Reports</h1>
+          <p class="page-subtitle">
+            Filter, review on screen, then download as CSV or Excel.
+          </p>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-secondary" id="exportCsvBtn">
+            <span class="btn-label">CSV</span>
+          </button>
+          <button class="btn btn-primary" id="exportXlsxBtn">
+            <span class="btn-label">Excel</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="report-picker" id="reportPicker"></div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 id="reportTitle">…</h3>
+            <div class="card-subtitle" id="reportDescription"></div>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <label class="sr-only" for="dateFrom">From date</label>
+          <input class="input" type="date" id="dateFrom" style="width:auto"
+                 aria-label="From date">
+          <label class="sr-only" for="dateTo">To date</label>
+          <input class="input" type="date" id="dateTo" style="width:auto"
+                 aria-label="To date">
+          <select class="select" id="categoryFilter" aria-label="Filter by category">
+            <option value="">All categories</option>
+          </select>
+          <select class="select" id="departmentFilter" aria-label="Filter by department">
+            <option value="">All departments</option>
+          </select>
+          <select class="select" id="locationFilter" aria-label="Filter by location">
+            <option value="">All locations</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" id="clearFiltersBtn">Clear</button>
+          <div class="toolbar-spacer"></div>
+          <span class="text-small text-muted" id="resultCount"></span>
+        </div>
+
+        <div class="totals-strip" id="totalsStrip" style="display:none"></div>
+
+        <div class="card-body is-flush">
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr id="tableHead"></tr></thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="pagination" id="paginationBar" style="display:none">
+          <span class="pagination-info" id="paginationInfo"></span>
+          <span id="paginationControls"></span>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="js/vendor/jquery.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/shell.js"></script>
+<script src="js/asset-form.js"></script>
+<script src="js/reports.js"></script>
+</body>
+</html>

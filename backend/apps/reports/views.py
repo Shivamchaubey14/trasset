@@ -3,6 +3,7 @@
 One request returns every KPI and chart dataset the dashboard needs, computed
 with database aggregates rather than per-row Python (NFR-1).
 """
+import math
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -10,7 +11,8 @@ from django.conf import settings
 from django.db.models import Count, DecimalField, Q, Sum
 from django.db.models.functions import Coalesce, TruncMonth
 from django.utils import timezone
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from rest_framework.exceptions import NotFound
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
@@ -19,7 +21,14 @@ from apps.assets.models import Asset
 from apps.masters.models import Category
 from common.responses import ok
 
-from .serializers import DashboardStatsSerializer
+from . import exporters
+from .reports import REPORTS
+from .serializers import (
+    DashboardStatsSerializer,
+    ReportDefinitionSerializer,
+    ReportFilterSerializer,
+    ReportSerializer,
+)
 
 MONEY = DecimalField(max_digits=14, decimal_places=2)
 ZERO = Decimal("0.00")
@@ -270,3 +279,153 @@ class DashboardStatsView(APIView):
             }
             for asset in rows
         ]
+
+
+@extend_schema(
+    tags=["Reports"],
+    summary="Run a report",
+    description=(
+        "Returns a paginated report as JSON, or downloads it with "
+        "`?export=csv` / `?export=xlsx` (FR-11.3, FR-11.4).\n\n"
+        "Available reports: `asset-register`, `depreciation`, "
+        "`maintenance-cost`, `assignment`.\n\n"
+        "All four accept `date_from`, `date_to`, `department`, `location` and "
+        "`category`. PDF export is deferred to v1.1."
+    ),
+    parameters=[
+        OpenApiParameter("date_from", str, description="Inclusive start date."),
+        OpenApiParameter("date_to", str, description="Inclusive end date."),
+        OpenApiParameter("department", int),
+        OpenApiParameter("location", int),
+        OpenApiParameter("category", int),
+        OpenApiParameter(
+            "export", str, enum=["json", "csv", "xlsx"],
+            description="csv or xlsx downloads the report. PDF is deferred to v1.1.",
+        ),
+        OpenApiParameter("page", int),
+        OpenApiParameter("page_size", int, description="Max 500."),
+    ],
+    responses={200: ReportSerializer},
+)
+class ReportView(APIView):
+    """
+    One view serving every report (FR-11.3).
+
+    Auditors need reports as much as managers do — read-only compliance is the
+    whole point of the role — so every signed-in user can run them. The data a
+    report exposes is the same data the corresponding list endpoint already
+    shows.
+    """
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = ReportSerializer  # documentation only
+    resource_name = "Report"
+
+    def get_throttles(self):
+        """Exports are expensive, so they carry their own scope (SEC-7)."""
+        if self.request.query_params.get("export", "json") in ("csv", "xlsx"):
+            self.throttle_scope = "export"
+        return super().get_throttles()
+
+    # operation_id belongs on the method, not the class — spectacular rejects it
+    # at class level, and /reports/ and /reports/{key}/ would otherwise collide.
+    @extend_schema(operation_id="reports_run")
+    def get(self, request, report_key):
+        report_class = REPORTS.get(report_key)
+        if report_class is None:
+            raise NotFound(
+                f"'{report_key}' is not a report. Available: "
+                f"{', '.join(sorted(REPORTS))}."
+            )
+
+        filters = ReportFilterSerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
+        options = filters.validated_data
+
+        report = report_class(filters=options)
+
+        export_format = options.get("export", "json")
+        if export_format in ("csv", "xlsx"):
+            # Bypasses the envelope deliberately — a download is a file, not JSON.
+            return exporters.export(report, export_format)
+
+        return ok(self._paginate(report, options), f"{report.title} generated successfully")
+
+    @staticmethod
+    def _paginate(report, options):
+        queryset = report.queryset()
+        page = options.get("page", 1)
+        page_size = options.get("page_size", 50)
+
+        count = queryset.count()
+        total_pages = max(1, math.ceil(count / page_size))
+        offset = (page - 1) * page_size
+
+        rows = list(report.rows(queryset[offset:offset + page_size]))
+
+        return {
+            "key": report.key,
+            "title": report.title,
+            "description": report.description,
+            "columns": [
+                {"key": column.key, "header": column.header, "kind": column.kind}
+                for column in report.columns
+            ],
+            "totals": report.totals(queryset),
+            "count": count,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "results": _jsonable(rows),
+        }
+
+
+def _jsonable(rows):
+    """Dates and Decimals need to survive the trip through JSON."""
+    from datetime import date as date_cls
+    from datetime import datetime as datetime_cls
+
+    output = []
+    for row in rows:
+        clean = {}
+        for key, value in row.items():
+            if isinstance(value, Decimal):
+                clean[key] = str(value)
+            elif isinstance(value, (date_cls, datetime_cls)):
+                clean[key] = value.isoformat()
+            else:
+                clean[key] = value
+        output.append(clean)
+    return output
+
+
+@extend_schema(
+    tags=["Reports"],
+    summary="List available reports",
+    description="What can be run, and what each one shows.",
+    responses={200: ReportDefinitionSerializer(many=True)},
+)
+class ReportIndexView(APIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ReportDefinitionSerializer  # documentation only
+    resource_name = "Report"
+    resource_name_plural = "Reports"
+    envelope_plural = True
+
+    @extend_schema(operation_id="reports_list")
+    def get(self, request):
+        return ok(
+            [
+                {
+                    "key": report.key,
+                    "title": report.title,
+                    "description": report.description,
+                    "columns": [
+                        {"key": c.key, "header": c.header, "kind": c.kind}
+                        for c in report.columns
+                    ],
+                }
+                for report in REPORTS.values()
+            ],
+            "Reports retrieved successfully",
+        )

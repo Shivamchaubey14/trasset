@@ -26,7 +26,7 @@ window.Trasset = window.Trasset || {};
     { id: 'requests', label: 'Requests', icon: 'inbox', href: 'requests.html', ready: true },
     { id: 'maintenance', label: 'Maintenance', icon: 'wrench', href: 'maintenance.html', ready: true },
     { id: 'procurement', label: 'Procurement', icon: 'cart', href: 'procurement.html', ready: true },
-    { id: 'reports', label: 'Reports', icon: 'chart', href: 'reports.html', ready: false },
+    { id: 'reports', label: 'Reports', icon: 'chart', href: 'reports.html', ready: true },
 
     { section: 'Administration' },
     { id: 'masters', label: 'Master Data', icon: 'layers', href: 'masters.html', ready: true },
