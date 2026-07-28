@@ -24,10 +24,23 @@ class SoftDeleteQuerySet(models.QuerySet):
         return self.filter(is_deleted=True)
 
     def delete(self):
-        """Soft-delete in bulk rather than issuing a real DELETE."""
-        return self.update(is_deleted=True, deleted_at=timezone.now())
+        """
+        Soft-delete in bulk rather than issuing a real DELETE.
+
+        Returns the same ``(count, {label: count})`` shape as Django's own
+        ``QuerySet.delete()``. It would be easy to return the raw integer from
+        ``update()`` instead, but then any caller written against Django's
+        contract — ``deleted, _ = qs.delete()`` — blows up with a confusing
+        unpacking error.
+
+        Note this applies to ``all_objects`` too: *delete means soft-delete
+        everywhere in this codebase*. Use :meth:`hard_delete` to actually purge.
+        """
+        count = self.update(is_deleted=True, deleted_at=timezone.now())
+        return count, {self.model._meta.label: count}
 
     def hard_delete(self):
+        """Really remove the rows. There is no undo."""
         return super().delete()
 
 

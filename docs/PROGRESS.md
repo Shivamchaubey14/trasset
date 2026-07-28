@@ -23,9 +23,11 @@
 | Phase 1 — Core Asset Engine | 6–12 | ✅ Complete (Days 6–12) |
 | Phase 2 — Maintenance, Procurement, Reports | 13–18 | ✅ Complete (Days 13–18) |
 | Phase 3 — Frontend | 19–26 | 🟡 Days 19–25 done · Day 26 done except browser QA |
-| Phase 4 — Integration, Testing & Launch | 27–30 | ⬜ Not started |
+| Phase 4 — Integration, Testing & Launch | 27–30 | 🟡 Days 27, 28 done · Days 29, 30 open |
 
-**Backend test suite:** 498 tests, all passing · **Coverage:** 88.7% (target ≥ 70%, NFR-12)
+**Backend test suite:** 559 tests, all passing · **Coverage:** 88.9% (target ≥ 70%, NFR-12)
+**Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
+**Dependencies:** `pip-audit` clean — no known vulnerabilities
 **OpenAPI schema:** 65 endpoints, 0 errors, 0 warnings (NFR-13)
 
 > **Backend feature work is complete.** Every functional requirement in SRS §3
@@ -185,6 +187,64 @@ audit row.
 - Verified against hand calculations: ₹78,000 cost / ₹8,000 salvage / 4 years
   gives ₹17,500 a year and lands exactly on salvage.
 - **Still pending:** the monthly recalculation Celery task (Day 18).
+
+### Day 28 — Security & performance hardening ✅
+- **Dependency audit had never been run.** `pip-audit` found **17 known
+  vulnerabilities**: 5 in Django 5.1.6, 1 in simplejwt 5.4.0, and 11 in Pillow
+  11.1.0. Upgraded to Django 5.1.15, simplejwt 5.5.1 and Pillow 12.3.0 — audit
+  now clean, all tests still passing. `requirements.txt` records that these are
+  **security floors, not preferences**.
+- `tests/test_security_checklist.py` — 32 tests asserting the SRS §9
+  configuration itself, including production settings loaded directly so a
+  regression in `prod.py` fails here rather than during a deploy: DEBUG off,
+  HSTS, secure cookies, CORS not wildcarded, Argon2 (checked against *base*
+  settings, since test settings swap in MD5), token rotation and blacklisting,
+  upload allowlist excluding executables, throttling, bounded pagination.
+- Bypass attempts, since Day 28 asks explicitly: a soft-deleted asset cannot be
+  read, listed, reported or acted on; role escalation via `PATCH /auth/me/` is
+  ignored; a scoped queryset cannot be widened by a crafted filter; a
+  blacklisted refresh token cannot be reused; and a 500 leaks neither the
+  exception message nor a traceback.
+- **NFR-1 measured at the specified scale**, not at demo scale. Seeded 10,000
+  assets and measured median and p95 over 10 runs per endpoint. Everything
+  passed — worst p95 288 ms on the asset list, dashboard 229 ms, register
+  report 205 ms. The seed data was removed afterwards.
+
+**A real bug this uncovered:** `Asset.all_objects.filter(...).delete()`
+soft-deletes rather than purging *and* returned a bare integer instead of
+Django's `(count, {label: count})`. Any caller written the normal way —
+`deleted, _ = qs.delete()` — crashes with a confusing unpacking error a long
+way from the cause. It bit the cleanup step of the performance script. Fixed to
+return Django's shape, documented that delete means soft-delete everywhere
+including `all_objects`, and covered by tests.
+
+### Day 27 — End-to-end journeys ✅
+- `tests/test_journeys.py` — 27 tests walking whole tasks the way a person
+  performs them, rather than endpoints in isolation.
+- **Asset manager:** create → issue → breaks → maintenance → returns to the
+  same holder → check in → dispose, then asserting the system agrees with
+  itself afterwards: history has exactly the right two rows, the audit trail
+  carries all four verbs, and the recipient was notified.
+- **Employee:** request → approval → the asset actually moves → it appears in
+  their own list. Plus: an employee is 403 on six manager-only endpoints, and
+  sees zero of another person's requests or notifications.
+- **Department head:** approves within their department, sees nothing from
+  another one, cannot create assets.
+- **Auditor:** reads the whole estate and exports all four reports in both
+  formats, yet is 403 on seven distinct write attempts.
+- **Super admin:** stands up categories, locations and a user who can then sign
+  in; deactivating a holder keeps their assignment history.
+- **Procurement:** order → place → receive → three tagged assets exist and one
+  can be issued immediately.
+- **SRS §11.4 reconciliation**, which had never been tested: the dashboard KPIs
+  are computed by entirely separate code from the asset register report. Six
+  tests assert they agree — on count, book value, purchase value, the status
+  breakdown summing to the total, and after a soft delete moves both numbers
+  together. If they disagreed, one of them was lying to somebody making a
+  decision.
+- Cross-cutting invariants: a failed 409 leaves no history, audit or
+  notification behind; an assignment is visible from all five angles; every
+  error uses the standard envelope; pagination is uniform across eight lists.
 
 ### Day 26 (partial) — Documents tab & accessibility ✅
 Everything on Day 26 that does not require a browser.
