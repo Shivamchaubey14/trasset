@@ -45,7 +45,34 @@
 
 ## ▶ Next up — start here
 
-**1. Finish the Hindi/English toggle** (user request, in progress — commit `b7977ef`).
+> **From 2026-07-29 the mobile application is the main workstream**, at the
+> user's direction. Deployment is incremental from here — "we will deploy as the
+> things get done" — rather than the single Day 29 cutover the plan assumed.
+
+**1. Phase 5 — mobile API groundwork (Days 31–35).** Start here. This is backend
+work inside the existing Django project, so it needs no new toolchain:
+
+- **Day 31** — mobile sessions and device registry (BE-1, BE-2).
+- **Day 32** — idempotency keys on the mutating endpoints (BE-3).
+- **Day 33** — delta sync, asset-tag lookup, per-device throttle (BE-4, BE-5).
+- **Day 34** — push dispatch (BE-6).
+- **Day 35** — stock-take API (BE-7, BE-8).
+
+Then Phase 6 (Days 36–41) sets up the React Native app itself. Contract is
+SRS §12; each day's Objective / Tasks / Definition of Done is in
+`Trasset_Build_Plan.md`.
+
+**2. Carried over from v1.0 — open, not abandoned:**
+
+- **Day 29** deploy and **Day 30** docs + `v1.0` tag. Deploying is now
+  incremental, so pull these forward whenever a piece is ready rather than
+  waiting.
+- **Browser QA of the whole web UI** — still nobody has driven it (see below).
+- **Hindi page content** — the toggle works and the chrome is bilingual, but
+  table headers, filters, modals, forms and the JS-built strings are still
+  English. Detail in item 3.
+
+**3. Finish the Hindi/English toggle** (user request, in progress — commit `b7977ef`).
 
 Done and pushed: the translation engine `frontend/js/i18n.js` (`t`, `apply`,
 `set`, `toggle`, `mount`, a Hindi dictionary, `localStorage` under
@@ -68,8 +95,8 @@ content:
 Rule that keeps this safe: **the English stays in the markup as the fallback**,
 so a missing key degrades to English, never to a raw key name.
 
-**2. Then Day 26 — blocked on one thing only: somebody opening the app in a
-browser.** The Hindi switch is part of what needs looking at.
+**4. Browser QA — Day 26's one remaining blocker: somebody opening the app in a
+browser.** The Hindi switch is now part of what needs looking at.
 
 Everything on Day 26 that could be done without a browser is done (see below).
 What remains needs a human at a screen:
@@ -88,15 +115,14 @@ Run both servers, open `http://127.0.0.1:5500`, and note anything that looks
 wrong. Small visual fixes are cheap now and get more expensive once Phase 4
 starts.
 
-**3. Then the rest of Phase 4:**
+**5. The rest of Phase 4:**
 - **Day 27** — ✅ done: every journey walked per role against SRS §11.4.
 - **Day 28** — ✅ done: SRS §9 security checklist, list endpoints load-tested at
   10,000 assets, `pip-audit` clean.
 - **Day 29** — deploy: Nginx, Gunicorn, MySQL, Redis, Celery worker and beat,
-  TLS, nightly backups.
+  TLS, nightly backups. Now incremental — stand the environment up early and
+  ship to it as pieces finish.
 - **Day 30** — docs, seed real master data, tag v1.0.
-
-**4. Then v1.1** — the React Native mobile app, Days 31–60, specified in SRS §12.
 
 Reusable groundwork: `BaseModelViewSet`, the envelope, the table/toolbar/modal
 patterns in `js/masters.js`, `js/assets.js`, `js/audit.js` and `js/requests.js`,
