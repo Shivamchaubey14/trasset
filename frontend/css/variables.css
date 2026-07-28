@@ -8,10 +8,19 @@
   --color-primary: #3BB77E;   /* Nest Green  */
   --color-accent:  #FDC040;   /* Cream Yolk  */
   --color-ink:     #253D4E;   /* Ink         */
-  --color-bg:      #F4F6F8;   /* Cloud       */
+  --color-bg:      #EEF2F6;   /* Cloud       */
   --color-surface: #FFFFFF;
   --color-muted:   #7B8794;   /* Slate       */
   --color-danger:  #E5484D;   /* Coral       */
+
+  /*
+    A white card on a near-white page reads as one flat sheet. Cloud sits far
+    enough below white for a card to register as its own surface, and this
+    subtle tint separates a card's header and footer from its body without
+    introducing a second colour.
+  */
+  --surface-subtle: #F5F8FA;
+  --surface-zebra:  #FBFCFD;   /* alternate table rows */
 
   /* --- Derived tints (kept as literals so they stay stable) --- */
   --primary-dark:  #2f9c69;
@@ -40,15 +49,29 @@
   --status-lost:        var(--color-danger);
   --status-disposed:    var(--color-muted);
 
-  /* --- Chart series (palette-consistent, SRS §7.3) --- */
-  --chart-1: #3BB77E;
-  --chart-2: #253D4E;
-  --chart-3: #FDC040;
-  --chart-4: #7B8794;
-  --chart-5: #5FC9A0;
-  --chart-6: #4A6B85;
-  --chart-7: #E5484D;
-  --chart-8: #B8C2CC;
+  /*
+    --- Chart series (SRS §7.3) ---
+    The three brand colours alone run out at about four categories, and tints
+    of them stop being distinguishable. Four supporting hues extend the set to
+    ten. Ordered so neighbours differ in hue and lightness, since a chart legend
+    is read by adjacency.
+  */
+  --chart-1: #3BB77E;   /* Nest Green  */
+  --chart-2: #253D4E;   /* Ink         */
+  --chart-3: #FDC040;   /* Cream Yolk  */
+  --chart-4: #6C6FD4;   /* Indigo      */
+  --chart-5: #2F9BB5;   /* Teal        */
+  --chart-6: #E08A3C;   /* Amber       */
+  --chart-7: #5A7D8C;   /* Steel       */
+  --chart-8: #7B8794;   /* Slate       */
+  --chart-9: #5FC9A0;   /* Mint        */
+  --chart-10: #E5484D;  /* Coral       */
+
+  /* Named so non-chart code can reach them without counting positions. */
+  --color-teal:   #2F9BB5;
+  --color-indigo: #6C6FD4;
+  --color-amber:  #E08A3C;
+  --color-steel:  #5A7D8C;
 
   /* --- Typography --- */
   --font-head: 'Quicksand', 'Trebuchet MS', system-ui, sans-serif;

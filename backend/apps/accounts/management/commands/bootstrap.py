@@ -55,13 +55,15 @@ DEMO_CATEGORIES = [
         {"key": "mileage_km", "label": "Mileage (km)", "type": "number",
          "required": False, "options": []},
     ]),
-    ("Furniture", "chair", "#7B8794", []),
-    ("Software Licenses", "key", "#3BB77E", [
+    # One colour per category, drawn from the chart series — repeated colours
+    # make the by-category chart unreadable.
+    ("Furniture", "chair", "#5A7D8C", []),
+    ("Software Licenses", "key", "#6C6FD4", [
         {"key": "seats", "label": "Seats", "type": "number", "required": False, "options": []},
         {"key": "renewal_date", "label": "Renewal date", "type": "date",
          "required": False, "options": []},
     ]),
-    ("Networking", "wifi", "#253D4E", []),
+    ("Networking", "wifi", "#2F9BB5", []),
 ]
 
 DEMO_LOCATIONS = [

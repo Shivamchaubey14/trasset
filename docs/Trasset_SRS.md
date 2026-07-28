@@ -428,12 +428,37 @@ Response `201`: full asset object including auto-generated `asset_tag` and compu
 | `--color-primary` | Nest Green | `#3BB77E` | Primary actions, active nav, success, brand |
 | `--color-accent` | Cream Yolk | `#FDC040` | Highlights, warnings, secondary CTAs, badges |
 | `--color-ink` | Ink | `#253D4E` | Text, headings, sidebar background |
-| `--color-bg` | Cloud | `#F4F6F8` | App background |
+| `--color-bg` | Cloud | `#EEF2F6` | App background |
 | `--color-surface` | White | `#FFFFFF` | Cards, panels |
+| `--surface-subtle` | Mist | `#F5F8FA` | Card headers/footers, table headers |
 | `--color-muted` | Slate | `#7B8794` | Secondary text, borders |
 | `--color-danger` | Coral | `#E5484D` | Errors, destructive actions |
 
 **Status colours:** Available → Nest Green · Assigned → Ink · Under Maintenance → Cream Yolk · Retired/Lost/Disposed → Slate/Coral.
+
+**Surface separation.** Cloud sits far enough below White that a card reads as
+its own surface; a near-white background makes the whole page read as one flat
+sheet. Mist separates a card's header and footer from its body without
+introducing a second colour.
+
+### 7.1.1 Chart series palette
+
+The three brand colours run out at about four categories, and tints of them stop
+being distinguishable. Four supporting hues extend the set to ten. They are for
+**charts and category colours only** — the brand identity, buttons, status
+colours and navigation remain Nest Green, Cream Yolk and Ink.
+
+| # | Name | Hex | | # | Name | Hex |
+|---|------|-----|---|---|------|-----|
+| 1 | Nest Green | `#3BB77E` | | 6 | Amber | `#E08A3C` |
+| 2 | Ink | `#253D4E` | | 7 | Steel | `#5A7D8C` |
+| 3 | Cream Yolk | `#FDC040` | | 8 | Slate | `#7B8794` |
+| 4 | Indigo | `#6C6FD4` | | 9 | Mint | `#5FC9A0` |
+| 5 | Teal | `#2F9BB5` | | 10 | Coral | `#E5484D` |
+
+Ordered so neighbours differ in both hue and lightness, since a chart legend is
+read by adjacency. Coral sits last so it is only reached when a chart genuinely
+has ten series — it reads as an error everywhere else.
 
 ### 7.2 Typography
 - **Quicksand** (Bold 700, rounded geometric) → brand wordmark, page titles, headings, KPI numbers.
@@ -443,7 +468,11 @@ Response `201`: full asset object including auto-generated `asset_tag` and compu
 ```css
 :root {
   --color-primary:#3BB77E; --color-accent:#FDC040; --color-ink:#253D4E;
-  --color-bg:#F4F6F8; --color-surface:#FFFFFF; --color-muted:#7B8794; --color-danger:#E5484D;
+  --color-bg:#EEF2F6; --color-surface:#FFFFFF; --surface-subtle:#F5F8FA;
+  --color-muted:#7B8794; --color-danger:#E5484D;
+  /* Chart-only supporting hues */
+  --color-teal:#2F9BB5; --color-indigo:#6C6FD4;
+  --color-amber:#E08A3C; --color-steel:#5A7D8C;
   --font-head:'Quicksand',sans-serif; --font-body:'Lexend',sans-serif;
   --radius:12px; --shadow:0 2px 12px rgba(37,61,78,.08); --space:16px;
 }

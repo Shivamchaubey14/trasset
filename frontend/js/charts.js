@@ -25,11 +25,14 @@ window.Trasset = window.Trasset || {};
     surface: token('--color-surface', '#FFFFFF')
   };
 
+  // Ten distinguishable series: the three brand colours plus four supporting
+  // hues, ordered so neighbours differ in both hue and lightness.
   var series = [
     token('--chart-1', '#3BB77E'), token('--chart-2', '#253D4E'),
-    token('--chart-3', '#FDC040'), token('--chart-4', '#7B8794'),
-    token('--chart-5', '#5FC9A0'), token('--chart-6', '#4A6B85'),
-    token('--chart-7', '#E5484D'), token('--chart-8', '#B8C2CC')
+    token('--chart-3', '#FDC040'), token('--chart-4', '#6C6FD4'),
+    token('--chart-5', '#2F9BB5'), token('--chart-6', '#E08A3C'),
+    token('--chart-7', '#5A7D8C'), token('--chart-8', '#7B8794'),
+    token('--chart-9', '#5FC9A0'), token('--chart-10', '#E5484D')
   ];
 
   function applyDefaults() {

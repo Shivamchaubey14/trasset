@@ -105,6 +105,23 @@
     }).join(''));
   }
 
+  /**
+   * Colour a total by what it means, so the eye can tell a cost from a count
+   * without reading the label.
+   */
+  function totalAccent(key) {
+    if (/depreciation|variance|rejected|overdue|expired/i.test(key)) {
+      return 'var(--color-danger)';
+    }
+    if (/current_value|book|actual|approved|completed|checkins/i.test(key)) {
+      return 'var(--color-primary)';
+    }
+    if (/cost|value|estimated/i.test(key)) {
+      return 'var(--color-accent)';
+    }
+    return 'var(--color-ink)';
+  }
+
   function renderTotals(totals) {
     var $strip = $('#totalsStrip');
     var keys = Object.keys(totals || {});
@@ -119,9 +136,12 @@
                   : looksLikeMoney ? fmt.money(value)
                   : fmt.number(value);
 
-      return '<div class="total-item">' +
-               '<div class="label">' + ui.esc(fmt.title(key)) + '</div>' +
-               '<div class="value">' + ui.esc(display) + '</div>' +
+      return '<div class="total-item' + (looksLikeMoney ? ' is-money' : '') + '" ' +
+                  'style="--total-accent:' + totalAccent(key) + '">' +
+               '<span class="label">' + ui.esc(fmt.title(key)) + '</span>' +
+               '<span class="value" title="' + ui.esc(display) + '">' +
+                 ui.esc(display) +
+               '</span>' +
              '</div>';
     }).join('')).show();
   }

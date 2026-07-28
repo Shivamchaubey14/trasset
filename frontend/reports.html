@@ -48,18 +48,46 @@
     }
     .report-card-desc { font-size: var(--fs-small); color: var(--color-muted); }
 
+    /* Totals read as tiles, not as a run-on line of text. Each carries a
+       tint and a left rule so the eye can separate them at a glance. */
     .totals-strip {
-      display: flex; flex-wrap: wrap; gap: var(--space-5);
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: var(--space-3);
       padding: var(--space-4) var(--space-5);
-      background: #FAFBFC; border-bottom: 1px solid var(--border);
+      background: var(--color-bg);
+      border-bottom: 1px solid var(--border);
+    }
+    .total-item {
+      position: relative;
+      padding: var(--space-3) var(--space-4);
+      background: var(--color-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+    .total-item::before {
+      content: '';
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 3px;
+      background: var(--total-accent, var(--color-muted));
     }
     .total-item .label {
       font-size: var(--fs-tiny); font-weight: 600; letter-spacing: .05em;
       text-transform: uppercase; color: var(--color-muted);
+      display: block; margin-bottom: 3px;
     }
     .total-item .value {
-      font-family: var(--font-head); font-weight: 700; font-size: 19px;
-      font-variant-numeric: tabular-nums;
+      font-family: var(--font-head); font-weight: 700; font-size: 20px;
+      font-variant-numeric: tabular-nums; color: var(--color-ink);
+      display: block; line-height: 1.2;
+    }
+    .total-item.is-money .value { color: var(--total-accent, var(--color-ink)); }
+
+    @media (max-width: 560px) {
+      .totals-strip { grid-template-columns: 1fr 1fr; }
     }
   </style>
 </head>
