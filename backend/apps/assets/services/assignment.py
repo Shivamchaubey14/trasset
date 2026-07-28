@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from apps.audit.constants import AuditAction
 from apps.audit.services import domain_action
+from apps.notifications import services as notifications
 from common.exceptions import Conflict
 
 from ..constants import TERMINAL_STATUSES, AssetStatus, AssignmentAction
@@ -74,6 +75,8 @@ def assign(asset, user, actor=None, notes=""):
         action=AssignmentAction.CHECKOUT,
         notes=notes,
     )
+
+    notifications.asset_assigned(asset, user=user, actor=actor)
     return asset
 
 
@@ -128,6 +131,8 @@ def checkin(asset, actor=None, notes="", location=None):
                 notes=notes,
                 days_held=held_days,
             )
+
+            notifications.asset_checked_in(locked, user=holder, actor=actor)
             return locked
 
     raise Conflict(

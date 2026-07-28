@@ -17,6 +17,7 @@ from apps.assets.constants import AssetStatus
 from apps.assets.models import Asset
 from apps.audit.constants import AuditAction
 from apps.audit.services import domain_action
+from apps.notifications import services as notifications
 from common.exceptions import Conflict
 
 from .constants import MaintenanceStatus
@@ -101,6 +102,9 @@ def start(record, actor=None):
     }):
         asset.save()
 
+    # The holder loses the asset today, so they should hear about it.
+    record.asset = asset
+    notifications.maintenance_scheduled(record, actor=actor)
     return record
 
 
@@ -149,6 +153,8 @@ def complete(record, actor=None, actual_cost=None, completed_date=None, notes=""
         }):
             asset.save()
 
+    record.asset = asset
+    notifications.maintenance_completed(record, actor=actor)
     return record
 
 

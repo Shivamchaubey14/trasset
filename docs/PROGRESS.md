@@ -17,12 +17,16 @@
 |-------|------|--------|
 | Phase 0 — Foundation | 1–5 | ✅ Complete |
 | Phase 1 — Core Asset Engine | 6–12 | ✅ Complete (Days 6–12) |
-| Phase 2 — Maintenance, Procurement, Reports | 13–18 | 🟡 Days 13–17 done · Day 18 open |
-| Phase 3 — Frontend | 19–26 | 🟡 Days 19–23 done · Day 25 mostly done · **every sidebar screen is now live** |
+| Phase 2 — Maintenance, Procurement, Reports | 13–18 | ✅ Complete (Days 13–18) |
+| Phase 3 — Frontend | 19–26 | 🟡 Days 19–23, 25 done · Day 24 done · Day 26 (polish/QA) open |
 | Phase 4 — Integration, Testing & Launch | 27–30 | ⬜ Not started |
 
-**Backend test suite:** 456 tests, all passing · **Coverage:** 88.6% (target ≥ 70%, NFR-12)
-**OpenAPI schema:** 60 endpoints, 0 errors, 0 warnings (NFR-13)
+**Backend test suite:** 498 tests, all passing · **Coverage:** 88.7% (target ≥ 70%, NFR-12)
+**OpenAPI schema:** 65 endpoints, 0 errors, 0 warnings (NFR-13)
+
+> **Backend feature work is complete.** Every functional requirement in SRS §3
+> has an implementation, except the `[L]`-priority printable label sheets
+> (FR-9.3) and recurring maintenance schedules (FR-6.4), both deferred to v1.1.
 **Query counts:** every list endpoint asserted flat — cost does not grow with rows (NFR-1)
 
 > **Note on sequencing.** The plan runs backend-first (Days 1–18) then frontend
@@ -34,31 +38,30 @@
 
 ## ▶ Next up — start here
 
-**Day 18 — Notifications & scheduled jobs** 🟢🟡 — the last of the backend feature work.
+**Day 26 — Frontend polish, then Phase 4** 🔵
 
-1. `Notification` model per SRS §4.1 (user, type, title, message, is_read,
-   related object, created_at) with `GET /notifications/` and
-   `POST /notifications/{id}/read/`, plus a mark-all-read.
-2. Fire in-app notifications from the events that already exist: asset assigned
-   to you, your request approved or rejected, a request awaiting your approval,
-   maintenance booked on an asset you hold.
-3. Celery + Redis. **Redis is not installed locally** — either install it, or
-   keep `CELERY_TASK_ALWAYS_EAGER` for dev and only wire the real broker at
-   deploy. The beat schedule in `config/celery.py` already names three tasks
-   that do not exist yet:
-   - `apps.assets.tasks.recalculate_all_depreciation` (monthly, FR-8.4)
-   - `apps.notifications.tasks.scan_expiring_warranties` (daily, FR-7.3)
-   - `apps.notifications.tasks.scan_due_maintenance` (daily, FR-6.5)
-4. Email dispatch for the same events, respecting `User.email_notifications`,
-   which exists but is currently never read.
-5. Wire the notifications dropdown in the top bar — it currently renders a
-   permanent empty state.
+The backend is feature-complete, so what remains is quality rather than
+capability. In rough priority order:
 
-**DoD:** Triggering an assignment creates a notification; a scheduled task runs
-and produces reminders and emails in dev.
+1. **Click through the whole app in a browser.** This is the standing gap: the
+   UI has been verified by syntax-checking every script and exercising the exact
+   API calls each page makes, but no human has driven it. Do this before
+   polishing anything, since it will generate the actual punch list.
+2. Accessibility and responsive pass (NFR-9): keyboard focus order, ARIA labels
+   on icon-only buttons, contrast, and behaviour down to 768px. The components
+   were built with this in mind but nothing has been verified.
+3. Settings screen is missing the notification-preference toggle now that
+   `email_notifications` actually does something.
+4. Asset detail has no Documents tab, though the attachment API and its
+   validation are done.
 
-**After that, Phase 4** — Day 27 end-to-end journeys per role, Day 28 security
-and performance, Day 29 deployment, Day 30 docs and handover.
+**Then Phase 4:**
+- **Day 27** — walk every journey per role against SRS §11.4.
+- **Day 28** — security and performance: the SRS §9 checklist, load-test the
+  list endpoints against the < 400 ms target, dependency scan.
+- **Day 29** — deploy: Nginx, Gunicorn, MySQL, Redis, Celery worker and beat,
+  TLS, nightly backups.
+- **Day 30** — docs, seed real master data, tag v1.0.
 
 Reusable groundwork: `BaseModelViewSet`, the envelope, the table/toolbar/modal
 patterns in `js/masters.js`, `js/assets.js`, `js/audit.js` and `js/requests.js`,
@@ -176,6 +179,44 @@ audit row.
 - Verified against hand calculations: ₹78,000 cost / ₹8,000 salvage / 4 years
   gives ₹17,500 a year and lands exactly on salvage.
 - **Still pending:** the monthly recalculation Celery task (Day 18).
+
+### Day 18 — Notifications & scheduled jobs ✅
+- `Notification` model with type-driven icon and colour, so the UI has no
+  mapping table of its own. The related object is stored as plain type/id
+  rather than a generic FK — a notification must outlive the thing it refers
+  to, and must never keep a row alive by pointing at it.
+- Wired into the events that already existed: asset assigned, asset checked in,
+  request submitted (to the right approvers), request approved, request
+  rejected, maintenance started, maintenance completed.
+- **Nobody is notified about their own action.** A manager assigning to
+  themselves does not need telling.
+- **Notifying never breaks the action.** Failures are logged and swallowed —
+  nobody should fail to issue a laptop because the mail server is down. There
+  is a test that patches the notification layer to explode and asserts the
+  assignment still succeeds.
+- Approvers are resolved by scope: managers hear about every request, a
+  department head only about their own department's.
+- Email (FR-12.2) goes out for the events that warrant it, not all of them — an
+  email per check-in would train people to ignore Trasset's mail. Respects
+  `User.email_notifications`, which existed but was never read until now.
+- Emails are queued with `transaction.on_commit`, so a rolled-back action
+  cannot leave someone holding mail about something that never happened.
+  Delivery is idempotent via `emailed_at`, so a retried task cannot double-send.
+- Celery tasks, all three named by the existing beat schedule:
+  `recalculate_all_depreciation` (monthly, FR-8.4), `scan_expiring_warranties`
+  (daily, FR-7.3), `scan_due_maintenance` (daily, FR-6.5), plus a
+  `purge_read_notifications` housekeeping task.
+- The scans are **safe to run twice** — they check whether the same reminder
+  already went out today. Beat firing twice does not spam anyone.
+- Depreciation recalculation skips rows whose value has not moved and runs with
+  auditing suspended, so a monthly job does not rewrite the whole table or bury
+  the audit trail under thousands of machine updates.
+- Notifications dropdown wired: unread badge, 60-second poll, mark-one-read on
+  click-through, mark-all-read.
+
+**Verified against real Redis**, not just eager mode: worker connected,
+all five tasks registered, scans dispatched through the broker, notifications
+created, and the resulting email tasks queued and delivered.
 
 ### Day 17 — Bulk import ✅
 - `POST /assets/import/` takes CSV or XLSX and returns a **per-row report**:

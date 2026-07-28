@@ -37,6 +37,9 @@ window.Trasset = window.Trasset || {};
     { id: 'settings', label: 'Settings', icon: 'settings', href: 'settings.html', ready: true }
   ];
 
+  //: Guards against binding the notification polling twice on a re-render.
+  var notificationsBound = false;
+
   function brandMark(size) {
     var s = size || 34;
     // Rounded-square mark echoing the brand card's app icon.
@@ -136,11 +139,14 @@ window.Trasset = window.Trasset || {};
                     'aria-haspopup="true" aria-expanded="false">' +
               ui.icon('bell', 20) +
             '</button>' +
-            '<div class="dropdown-menu" id="notifMenu" role="menu">' +
-              '<div class="dropdown-header">Notifications</div>' +
-              '<div class="empty-state" style="padding:24px 16px">' +
-                '<p class="text-small" style="margin:0">You have no notifications yet.</p>' +
+            '<div class="dropdown-menu" id="notifMenu" role="menu" ' +
+                 'style="width:380px;max-width:calc(100vw - 32px)">' +
+              '<div class="dropdown-header flex justify-between items-center">' +
+                '<span>Notifications</span>' +
+                '<button class="btn-link text-tiny" id="markAllReadBtn" ' +
+                        'style="display:none">Mark all read</button>' +
               '</div>' +
+              '<div id="notifList" style="max-height:380px;overflow-y:auto"></div>' +
             '</div>' +
           '</div>' +
 
@@ -232,6 +238,114 @@ window.Trasset = window.Trasset || {};
     });
   }
 
+  /* ------------------------------------------------------------------------
+     Notifications (FR-12.1)
+     ---------------------------------------------------------------------- */
+  function renderBadge(unread) {
+    var $bell = $('#notifBtn');
+    $bell.find('.badge-count').remove();
+
+    if (unread > 0) {
+      $bell.append('<span class="badge-count">' +
+                     (unread > 99 ? '99+' : unread) + '</span>');
+      $bell.attr('aria-label', unread + ' unread notifications');
+    } else {
+      $bell.attr('aria-label', 'Notifications');
+    }
+    $('#markAllReadBtn').toggle(unread > 0);
+  }
+
+  function refreshCount() {
+    return T.api.get('/notifications/count/')
+      .then(function (data) { renderBadge(data.unread); return data; })
+      .catch(function () { /* the badge is not worth a toast */ });
+  }
+
+  function renderNotifications(rows) {
+    if (!rows.length) {
+      $('#notifList').html(
+        '<div class="empty-state" style="padding:28px 16px">' +
+          '<div class="empty-state-icon">' + ui.icon('bell', 22) + '</div>' +
+          '<p class="text-small" style="margin:0">Nothing new. ' +
+            'You will hear about assignments, requests and maintenance here.</p>' +
+        '</div>'
+      );
+      return;
+    }
+
+    $('#notifList').html(rows.map(function (row) {
+      return '<a class="dropdown-item" href="' + ui.esc(row.link || '#') + '" ' +
+                'data-notif="' + row.id + '" ' +
+                'style="align-items:flex-start;' +
+                (row.is_read ? '' : 'background:var(--primary-soft)') + '">' +
+        '<span style="color:' + ui.esc(row.color) + ';margin-top:2px;flex-shrink:0">' +
+          ui.icon(row.icon, 17) +
+        '</span>' +
+        '<span style="min-width:0">' +
+          '<span class="fw-500" style="display:block">' + ui.esc(row.title) + '</span>' +
+          (row.message
+            ? '<span class="text-small text-muted" style="display:block">' +
+                ui.esc(row.message.length > 90
+                  ? row.message.slice(0, 90) + '…' : row.message) +
+              '</span>'
+            : '') +
+          '<span class="text-tiny text-muted">' +
+            ui.esc(ui.fmt.relative(row.created_at)) +
+          '</span>' +
+        '</span>' +
+      '</a>';
+    }).join(''));
+  }
+
+  function loadNotifications() {
+    $('#notifList').html(
+      '<div style="padding:16px">' +
+        '<div class="skeleton skeleton-text w-75 mb-3"></div>' +
+        '<div class="skeleton skeleton-text w-60"></div>' +
+      '</div>'
+    );
+
+    return T.api.get('/notifications/', { page_size: 10 })
+      .then(function (data) { renderNotifications(data.results || []); })
+      .catch(function () {
+        $('#notifList').html(
+          '<div class="empty-state" style="padding:24px 16px">' +
+            '<p class="text-small" style="margin:0">Could not load notifications.</p>' +
+          '</div>'
+        );
+      });
+  }
+
+  function bindNotifications() {
+    // Load on open rather than on page load — the badge count is enough until
+    // someone actually looks.
+    $('#notifBtn').on('click', function () {
+      if ($('#notifMenu').hasClass('is-open')) { loadNotifications(); }
+    });
+
+    $('#markAllReadBtn').on('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      T.api.post('/notifications/read-all/', {})
+        .then(function () {
+          renderBadge(0);
+          loadNotifications();
+        })
+        .catch(function (error) { ui.apiError(error, 'Could not mark them read'); });
+    });
+
+    // Follow the link, but mark it read on the way out.
+    $('#notifList').on('click', '[data-notif]', function () {
+      var id = $(this).data('notif');
+      T.api.post('/notifications/' + id + '/read/', {}).then(refreshCount);
+    });
+
+    refreshCount();
+    // Poll gently. Not websockets — this is a five-minute-old-news problem.
+    setInterval(refreshCount, 60000);
+  }
+
   /** Repaint the parts of the chrome that depend on the profile. */
   function applyUser(user) {
     if (!user) { return; }
@@ -258,7 +372,16 @@ window.Trasset = window.Trasset || {};
     $app.find('.main').prepend(topbarHtml(user));
 
     bindShell();
-    $(document).on('trasset:user', function (event, freshUser) { applyUser(freshUser); });
+
+    // Wait for the session before asking for notifications, or the first call
+    // races the token refresh on a page load.
+    $(document).on('trasset:user', function (event, freshUser) {
+      applyUser(freshUser);
+      if (!notificationsBound) {
+        notificationsBound = true;
+        bindNotifications();
+      }
+    });
   }
 
   /** Hide the boot overlay once the page has its data. */

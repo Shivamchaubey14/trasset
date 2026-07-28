@@ -233,6 +233,8 @@ SPECTACULAR_SETTINGS = {
         "AssetStatusEnum": "apps.assets.constants.AssetStatus.choices",
         "DepreciationMethodEnum": "apps.assets.constants.DepreciationMethod.choices",
         "AssignmentActionEnum": "apps.assets.constants.AssignmentAction.choices",
+        "MaintenanceTypeEnum": "apps.maintenance.constants.MaintenanceType.choices",
+        "NotificationTypeEnum": "apps.notifications.constants.NotificationType.choices",
     },
     "SWAGGER_UI_SETTINGS": {
         "persistAuthorization": True,
@@ -281,6 +283,11 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TIMEZONE = "UTC"
+# Explicit since Celery 6 stops inferring it from broker_connection_retry.
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+# A task that hangs should fail rather than hold a worker forever.
+CELERY_TASK_SOFT_TIME_LIMIT = 300
+CELERY_TASK_TIME_LIMIT = 360
 
 # ---------------------------------------------------------------------------
 # Trasset domain settings

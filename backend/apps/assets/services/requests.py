@@ -16,6 +16,7 @@ from django.utils import timezone
 
 from apps.audit.constants import AuditAction
 from apps.audit.services import record as audit_record
+from apps.notifications import services as notifications
 from common.exceptions import Conflict
 
 from ..constants import RequestStatus
@@ -77,6 +78,10 @@ def approve(asset_request, actor, asset=None, notes=""):
         "asset": target.asset_tag,
         "notes": notes,
     }})
+
+    # The assign above already told them the asset is theirs; this says the
+    # request they raised was granted, which is a different thing to know.
+    notifications.request_approved(asset_request, actor=actor)
     return asset_request
 
 
@@ -96,6 +101,8 @@ def reject(asset_request, actor, notes=""):
         "requester": asset_request.requester.full_name,
         "reason": notes,
     }})
+
+    notifications.request_rejected(asset_request, actor=actor)
     return asset_request
 
 
@@ -135,4 +142,32 @@ def record_created(asset_request):
             "requested": asset_request.target_label,
             "reason": asset_request.reason,
         }},
+    )
+
+    notifications.request_submitted(asset_request, approvers=_approvers_for(asset_request))
+
+
+def _approvers_for(asset_request):
+    """
+    Who should see this request.
+
+    Managers see everything; a department head sees their own department's, so
+    they are told about exactly what they are able to act on.
+    """
+    from django.db.models import Q
+
+    from apps.accounts.models import User
+    from common.roles import Roles
+
+    requester_department = asset_request.requester.department_id
+
+    query = Q(role__name__in=Roles.MANAGERS)
+    if requester_department:
+        query |= Q(role__name=Roles.DEPARTMENT_HEAD, department_id=requester_department)
+
+    return list(
+        User.objects.filter(is_active=True)
+        .filter(query)
+        .exclude(pk=asset_request.requester_id)
+        .select_related("role")
     )
