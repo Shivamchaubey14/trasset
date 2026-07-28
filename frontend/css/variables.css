@@ -22,6 +22,15 @@
   --surface-subtle: #F5F8FA;
   --surface-zebra:  #FBFCFD;   /* alternate table rows */
 
+  /*
+    Table headers need to read as labels, not as another row of data. A tint
+    close to white does not achieve that, so the header sits a clear step down
+    from the rows and its text is smaller, bolder and tracked. Measured at
+    5.9:1 against the header fill, so it still meets AA (NFR-9).
+  */
+  --table-head-bg:   #E4EAF0;
+  --table-head-text: #46596C;
+
   /* --- Derived tints (kept as literals so they stay stable) --- */
   --primary-dark:  #2f9c69;
   --primary-darker:#268257;

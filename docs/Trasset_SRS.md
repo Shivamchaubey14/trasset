@@ -430,7 +430,9 @@ Response `201`: full asset object including auto-generated `asset_tag` and compu
 | `--color-ink` | Ink | `#253D4E` | Text, headings, sidebar background |
 | `--color-bg` | Cloud | `#E7EDF2` | App background |
 | `--color-surface` | White | `#FFFFFF` | Cards, panels |
-| `--surface-subtle` | Mist | `#F5F8FA` | Card headers/footers, table headers |
+| `--surface-subtle` | Mist | `#F5F8FA` | Card headers and footers |
+| `--table-head-bg` | Column | `#E4EAF0` | Table header row |
+| `--table-head-text` | Column Ink | `#46596C` | Table header labels |
 | `--color-muted` | Slate | `#7B8794` | Secondary text, borders |
 | `--color-danger` | Coral | `#E5484D` | Errors, destructive actions |
 
@@ -484,7 +486,7 @@ h1,h2,h3,.brand{font-family:var(--font-head);font-weight:700;}
 - **Grid:** fixed left sidebar (240px, Ink background, white/green active states) + fluid content.
 - **Cards:** white surface, 12px radius, soft shadow, 20–24px padding.
 - **Buttons:** primary = Nest Green fill / white text; secondary = outline Ink; accent = Cream Yolk; destructive = Coral. 10px radius, 500 weight, subtle hover lift.
-- **Tables:** zebra rows, sticky header, status pills (rounded, coloured by status), row actions on hover, per-column sort, pagination footer.
+- **Tables:** zebra rows, sticky header, status pills (rounded, coloured by status), row actions on hover, per-column sort, pagination footer. The header row is separated from the data on four axes at once — fill, size, weight and letter-spacing — because any one alone still reads as another row of data.
 - **Forms:** floating/top labels, clear focus ring in Nest Green, inline validation in Coral.
 - **Charts:** doughnut (status), bar (by category), line (value over time) — palette-consistent, using a lightweight lib (Chart.js).
 - **Empty states & skeleton loaders** for every list.

@@ -405,18 +405,24 @@
   text-align: left;
   vertical-align: middle;
 }
+/*
+  The header is separated from the data four ways at once — fill, size, weight
+  and tracking — because any one of them alone reads as "just another row".
+*/
 .table thead th {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: var(--surface-subtle);
-  font-size: var(--fs-small);
-  font-weight: 600;
-  color: var(--ink-light);
+  background: var(--table-head-bg);
+  padding-top: 11px;
+  padding-bottom: 11px;
+  font-size: var(--fs-tiny);
+  font-weight: 700;
+  color: var(--table-head-text);
   text-transform: uppercase;
-  letter-spacing: .04em;
+  letter-spacing: .07em;
   white-space: nowrap;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 2px solid var(--border-strong);
 }
 .table tbody tr {
   border-bottom: 1px solid var(--border);
@@ -428,11 +434,14 @@
 
 /* Sortable column headers */
 .table th.is-sortable { cursor: pointer; user-select: none; }
-.table th.is-sortable:hover { color: var(--color-ink); }
+.table th.is-sortable:hover {
+  color: var(--color-ink);
+  background: var(--border);
+}
 .table th.is-sortable .sort-icon {
   display: inline-block;
   margin-left: 5px;
-  opacity: .35;
+  opacity: .45;
   transition: opacity var(--dur-fast) var(--ease);
 }
 .table th.is-sorted-asc .sort-icon,

@@ -29,17 +29,18 @@
       border-bottom: 1px dashed var(--border);
     }
     .line-row:last-of-type { border-bottom: none; }
+    /* Acts as a table header, so it follows the same treatment. */
     .line-head {
       display: grid;
       grid-template-columns: 2fr 1.3fr 70px 110px 90px 34px;
       gap: var(--space-2);
       font-size: var(--fs-tiny);
-      font-weight: 600;
-      letter-spacing: .05em;
+      font-weight: 700;
+      letter-spacing: .07em;
       text-transform: uppercase;
-      color: var(--color-muted);
+      color: var(--table-head-text);
       padding-bottom: var(--space-2);
-      border-bottom: 1px solid var(--border);
+      border-bottom: 2px solid var(--border-strong);
     }
     .line-total {
       display: flex; align-items: center; justify-content: flex-end;
