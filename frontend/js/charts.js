@@ -19,7 +19,8 @@ window.Trasset = window.Trasset || {};
     primary: token('--color-primary', '#3BB77E'),
     accent:  token('--color-accent', '#FDC040'),
     ink:     token('--color-ink', '#253D4E'),
-    muted:   token('--color-muted', '#7B8794'),
+    muted:   token('--color-muted', '#5C6877'),
+    slate:   token('--color-slate', '#7B8794'),
     danger:  token('--color-danger', '#E5484D'),
     border:  token('--border', '#E3E8EE'),
     surface: token('--color-surface', '#FFFFFF')

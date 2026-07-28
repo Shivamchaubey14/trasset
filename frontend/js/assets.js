@@ -32,7 +32,7 @@
     { key: 'under_maintenance', label: 'In maintenance', icon: 'wrench',
       accent: 'var(--color-accent)', soft: 'var(--accent-soft)' },
     { key: 'retired', label: 'Retired / lost', icon: 'clock',
-      accent: 'var(--color-muted)', soft: '#EEF1F4' }
+      accent: 'var(--color-slate)', soft: '#EEF1F4' }
   ];
 
   var state = {

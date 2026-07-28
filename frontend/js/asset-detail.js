@@ -361,7 +361,8 @@
               {
                 label: 'Salvage floor',
                 data: rows.map(function () { return parseFloat(data.salvage_value); }),
-                borderColor: T.charts.palette.muted,
+                // Brand Slate: a decorative reference line, not text.
+                borderColor: T.charts.palette.slate,
                 borderDash: [6, 5],
                 borderWidth: 1.5,
                 pointRadius: 0,

@@ -10,7 +10,14 @@
   --color-ink:     #253D4E;   /* Ink         */
   --color-bg:      #E7EDF2;   /* Cloud       */
   --color-surface: #FFFFFF;
-  --color-muted:   #7B8794;   /* Slate       */
+  /*
+    Brand Slate is #7B8794, but at 3.7:1 on white it fails WCAG AA for normal
+    text — and it carries every piece of secondary copy in the app. So the two
+    roles are split: --color-slate stays the brand swatch for status colours
+    and charts, while --color-muted is a darkened version used for text.
+  */
+  --color-slate:   #7B8794;   /* Slate — brand swatch, status, charts */
+  --color-muted:   #5C6877;   /* Secondary text — clears AA on every surface */
   --color-danger:  #E5484D;   /* Coral       */
 
   /*
@@ -54,9 +61,10 @@
   --status-available:   var(--color-primary);
   --status-assigned:    var(--color-ink);
   --status-maintenance: var(--color-accent);
-  --status-retired:     var(--color-muted);
+  /* Status colours stay on the brand swatch, not the darkened text tone. */
+  --status-retired:     var(--color-slate);
   --status-lost:        var(--color-danger);
-  --status-disposed:    var(--color-muted);
+  --status-disposed:    var(--color-slate);
 
   /*
     --- Chart series (SRS §7.3) ---

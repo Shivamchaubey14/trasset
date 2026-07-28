@@ -433,7 +433,8 @@ Response `201`: full asset object including auto-generated `asset_tag` and compu
 | `--surface-subtle` | Mist | `#F5F8FA` | Card headers and footers |
 | `--table-head-bg` | Column | `#E4EAF0` | Table header row |
 | `--table-head-text` | Column Ink | `#46596C` | Table header labels |
-| `--color-muted` | Slate | `#7B8794` | Secondary text, borders |
+| `--color-slate` | Slate | `#7B8794` | Status colours, chart series |
+| `--color-muted` | Slate Text | `#5C6877` | Secondary text |
 | `--color-danger` | Coral | `#E5484D` | Errors, destructive actions |
 
 **Status colours:** Available → Nest Green · Assigned → Ink · Under Maintenance → Cream Yolk · Retired/Lost/Disposed → Slate/Coral.
@@ -442,6 +443,13 @@ Response `201`: full asset object including auto-generated `asset_tag` and compu
 its own surface; a near-white background makes the whole page read as one flat
 sheet. Mist separates a card's header and footer from its body without
 introducing a second colour.
+
+**Slate has two roles.** As a fill — status pills for Retired and Disposed, and
+chart series — it stays the brand `#7B8794`. As *text* it fails WCAG AA badly:
+3.0–3.7:1 depending on the surface behind it, against the 4.5:1 NFR-9 requires,
+and it carries every piece of secondary copy in the product. Secondary text
+therefore uses `#5C6877`, the lightest tone that clears 4.5:1 on **all five**
+surfaces (White, Mist, Zebra, Cloud and Table head — worst case 4.68:1).
 
 ### 7.1.1 Chart series palette
 
@@ -471,7 +479,9 @@ has ten series — it reads as an error everywhere else.
 :root {
   --color-primary:#3BB77E; --color-accent:#FDC040; --color-ink:#253D4E;
   --color-bg:#E7EDF2; --color-surface:#FFFFFF; --surface-subtle:#F5F8FA;
-  --color-muted:#7B8794; --color-danger:#E5484D;
+  --color-slate:#7B8794;  /* fills   */
+  --color-muted:#5C6877;  /* text    */
+  --color-danger:#E5484D;
   /* Chart-only supporting hues */
   --color-teal:#2F9BB5; --color-indigo:#6C6FD4;
   --color-amber:#E08A3C; --color-steel:#5A7D8C;
