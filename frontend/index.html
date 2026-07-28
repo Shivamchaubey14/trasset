@@ -92,8 +92,11 @@
         </button>
       </form>
 
-      <!-- Development convenience. Remove this block before production. -->
-      <div class="demo-hint" id="demoHint">
+      <!--
+        Development convenience only. Hidden unless the page is served from
+        localhost, so a deployed copy never advertises credentials.
+      -->
+      <div class="demo-hint hidden" id="demoHint">
         <div class="demo-hint-title">Demo accounts · click to fill</div>
         <div class="demo-accounts" id="demoAccounts"></div>
       </div>
@@ -160,12 +163,24 @@
     $('#passwordIcon').html(ui.icon('lock', 17));
     $('#togglePassword').html(ui.icon('eye', 17));
 
-    $('#demoAccounts').html(DEMO_ACCOUNTS.map(function (a) {
-      return '<button type="button" class="demo-account" data-email="' + ui.esc(a.email) + '">' +
-               '<span class="role">' + ui.esc(a.role) + '</span>' +
-               '<span class="email">' + ui.esc(a.email) + '</span>' +
-             '</button>';
-    }).join(''));
+    // Only ever render the demo shortcuts on a local machine.
+    if (isLocalhost()) {
+      $('#demoHint').removeClass('hidden');
+      $('#demoAccounts').html(DEMO_ACCOUNTS.map(function (a) {
+        return '<button type="button" class="demo-account" data-email="' + ui.esc(a.email) + '">' +
+                 '<span class="role">' + ui.esc(a.role) + '</span>' +
+                 '<span class="email">' + ui.esc(a.email) + '</span>' +
+               '</button>';
+      }).join(''));
+    } else {
+      $('#demoHint').remove();
+    }
+  }
+
+  function isLocalhost() {
+    var host = window.location.hostname;
+    return host === 'localhost' || host === '127.0.0.1' || host === '' ||
+           host === '::1' || /^192\.168\./.test(host);
   }
 
   function showAlert(message, kind) {
