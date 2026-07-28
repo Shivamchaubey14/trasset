@@ -96,9 +96,15 @@ window.Trasset = window.Trasset || {};
             '<span class="avatar avatar-sm">' +
               ui.esc(user ? (user.initials || ui.fmt.initials(user.full_name)) : '?') +
             '</span>' +
+            // title attributes so a truncated name is still readable on hover.
             '<span class="sidebar-user-info">' +
-              '<span class="sidebar-user-name">' + ui.esc(user ? user.full_name : '—') + '</span>' +
-              '<span class="sidebar-user-role">' + ui.esc(roleLabel) + '</span>' +
+              '<span class="sidebar-user-name" title="' +
+                ui.esc(user ? user.full_name : '') + '">' +
+                ui.esc(user ? user.full_name : '—') +
+              '</span>' +
+              '<span class="sidebar-user-role" title="' + ui.esc(roleLabel) + '">' +
+                ui.esc(roleLabel) +
+              '</span>' +
             '</span>' +
           '</a>' +
         '</div>' +
@@ -229,11 +235,13 @@ window.Trasset = window.Trasset || {};
   function applyUser(user) {
     if (!user) { return; }
     var initials = user.initials || ui.fmt.initials(user.full_name);
+    var roleLabel = (user.role && user.role.label) || ui.fmt.title(user.role_name);
+
     $('#topbarAvatar').text(initials);
-    $('#topbarName').text(user.full_name);
+    $('#topbarName').text(user.full_name).attr('title', user.full_name);
     $('#profileMenuEmail').text(user.email);
-    $('.sidebar-user-name').text(user.full_name);
-    $('.sidebar-user-role').text((user.role && user.role.label) || ui.fmt.title(user.role_name));
+    $('.sidebar-user-name').text(user.full_name).attr('title', user.full_name);
+    $('.sidebar-user-role').text(roleLabel).attr('title', roleLabel);
     $('.sidebar-user .avatar').text(initials);
   }
 

@@ -113,21 +113,37 @@
   transition: background var(--dur-fast) var(--ease);
 }
 .sidebar-user:hover { background: rgba(255, 255, 255, .08); text-decoration: none; }
-.sidebar-user-info { min-width: 0; flex: 1; }
-.sidebar-user-name {
-  font-size: var(--fs-small);
-  font-weight: 600;
-  color: #fff;
+/*
+  Stack name over role. These are <span>s, so without an explicit block/flex
+  context they run together on one line — and text-overflow is ignored on an
+  inline box, letting a long name spill out of the sidebar.
+*/
+.sidebar-user-info {
+  min-width: 0;      /* lets the flex item shrink below its content width */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.sidebar-user-name,
+.sidebar-user-role {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.sidebar-user-name {
+  font-size: var(--fs-small);
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.35;
+}
 .sidebar-user-role {
   font-size: var(--fs-tiny);
   color: rgba(255, 255, 255, .5);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
 }
 
 /* --------------------------------------------------------------------------
@@ -212,7 +228,15 @@
   transition: background var(--dur-fast) var(--ease);
 }
 .topbar-profile:hover { background: var(--ink-soft); }
-.topbar-profile-name { font-size: var(--fs-small); font-weight: 500; }
+.topbar-profile-name {
+  font-size: var(--fs-small);
+  font-weight: 500;
+  /* Cap it so a long name can't stretch the top bar. */
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* --------------------------------------------------------------------------
    Content
