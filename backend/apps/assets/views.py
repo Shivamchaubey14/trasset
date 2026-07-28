@@ -306,10 +306,17 @@ class AssetRequestViewSet(BaseModelViewSet):
     ordering = ("-created_at",)
 
     def get_queryset(self):
+        # Both `asset` and `fulfilled_asset` are serialised with the full
+        # AssetListSerializer, which reaches category, location, department and
+        # assignee. Every one of those needs joining or each row costs extra
+        # queries — measured at 6 → 15 queries before this was complete.
         queryset = AssetRequest.objects.select_related(
             "requester", "decided_by", "category",
-            "asset", "asset__category", "asset__assigned_to",
+            "asset", "asset__category", "asset__location",
+            "asset__department", "asset__assigned_to",
             "fulfilled_asset", "fulfilled_asset__category",
+            "fulfilled_asset__location", "fulfilled_asset__department",
+            "fulfilled_asset__assigned_to",
         )
         user = self.request.user
         role = getattr(getattr(user, "role", None), "name", None)

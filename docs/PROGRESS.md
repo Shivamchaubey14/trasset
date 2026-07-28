@@ -16,13 +16,14 @@
 | Phase | Days | Status |
 |-------|------|--------|
 | Phase 0 — Foundation | 1–5 | ✅ Complete |
-| Phase 1 — Core Asset Engine | 6–12 | 🟡 Days 6–11 done · Day 12 open |
+| Phase 1 — Core Asset Engine | 6–12 | ✅ Complete (Days 6–12) |
 | Phase 2 — Maintenance, Procurement, Reports | 13–18 | 🟡 Day 15 dashboard API done · rest open |
 | Phase 3 — Frontend | 19–26 | 🟡 Days 19–23 done · Day 25 mostly done · audit + requests screens done |
 | Phase 4 — Integration, Testing & Launch | 27–30 | ⬜ Not started |
 
-**Backend test suite:** 224 tests, all passing · **Coverage:** 83.3% (target ≥ 70%, NFR-12)
+**Backend test suite:** 292 tests, all passing · **Coverage:** 85.1% (target ≥ 70%, NFR-12)
 **OpenAPI schema:** 43 endpoints, 0 errors, 0 warnings (NFR-13)
+**Query counts:** every list endpoint asserted flat — cost does not grow with rows (NFR-1)
 
 > **Note on sequencing.** The plan runs backend-first (Days 1–18) then frontend
 > (19–26). At the user's request the frontend was pulled forward once auth,
@@ -33,26 +34,26 @@
 
 ## ▶ Next up — start here
 
-**Day 12 — Backend test & hardening pass** 🟡
+**Day 13 — Maintenance management** 🟢
 
-1. Review query counts on every list endpoint — `assets` is asserted flat at 4
-   queries; do the same for `asset-requests`, `audit-logs` and `users`, which
-   have nested serializers and haven't been measured.
-2. Confirm the indexes in SRS §4.3 all exist against the live MySQL schema, not
-   just in the model definitions.
-3. Throttling is declared but never exercised by a test — add one that asserts
-   the `write` scope actually returns 429.
-4. Coverage is 83.3%; the weakest files are `common/validators.py` (56%) and
-   `common/permissions.py` (65%). Upload validation in particular is a security
-   control (SEC-8) with no test behind it.
-5. Swagger should be read end to end once — it is generated clean, but nobody
-   has checked the descriptions actually make sense to a consumer.
+1. `MaintenanceRecord` model: asset, type, scheduled date, completed date,
+   technician, vendor, cost estimate, actual cost, status
+   (scheduled / in_progress / completed / cancelled), notes.
+2. CRUD endpoints plus `POST /maintenance/{id}/complete/`. Scheduling flips the
+   asset to `Under Maintenance`; completing captures the actual cost and
+   restores the **previous** status — so an asset that was Assigned goes back to
+   Assigned, not to Available. Store the prior status on the record.
+3. Guards: only `Available` or `Assigned` assets can enter maintenance
+   (`Asset.can_be_maintained` already encodes this); completing a completed
+   record → 409.
+4. Give the transitions their own audit verbs via `audit.services.domain_action()`.
+5. Frontend `maintenance.html` — schedule form, list with status, and a complete
+   action capturing actual cost. Flip the nav item in `js/shell.js`.
 
-**DoD:** Test suite green, Swagger reflects all endpoints, no obvious N+1 on
-list endpoints.
+**DoD:** Maintenance lifecycle updates asset status correctly; costs recorded.
 
-**Then Day 13** (maintenance) and **Day 14** (procurement), which clear the last
-two greyed-out nav items.
+**Then Day 14** (procurement), which clears the last greyed-out nav item, and
+**Day 16–17** (reports and import/export).
 
 Reusable groundwork: `BaseModelViewSet`, the envelope, the table/toolbar/modal
 patterns in `js/masters.js`, `js/assets.js`, `js/audit.js` and `js/requests.js`,
@@ -170,6 +171,43 @@ audit row.
 - Verified against hand calculations: ₹78,000 cost / ₹8,000 salvage / 4 years
   gives ₹17,500 a year and lands exactly on salvage.
 - **Still pending:** the monthly recalculation Celery task (Day 18).
+
+### Day 12 — Backend test & hardening pass ✅
+Not a paperwork exercise — it found three real problems.
+
+- **N+1 on `/asset-requests/`.** `AssetRequestSerializer` nests a full
+  `AssetListSerializer` for both `asset` and `fulfilled_asset`, each reaching
+  category, location, department and assignee, but only some were joined.
+  Measured 6 queries at 1 row growing to 15 — now flat.
+- **The throttle tests were testing nothing.** DRF binds `throttle_classes` and
+  `SimpleRateThrottle.THROTTLE_RATES` at *import* time, so `override_settings`
+  never reaches views that are already imported. The first version of the test
+  file "passed" while no throttling was active at all. Test settings now keep
+  the throttle class wired with `None` rates (DRF treats that as unlimited) and
+  the tests patch `THROTTLE_RATES` directly. 429 is now genuinely observed on
+  the `auth` and `write` scopes, including the asset lifecycle actions.
+- **Three dead permission classes removed** — `IsAssetManager`,
+  `IsManagerOrReadOnly` and `IsOwnerOrManager` were defined but never used.
+  `IsOwnerOrManager` was the risky one: it only implemented
+  `has_object_permission`, so used alone it would have left list endpoints
+  returning everyone's rows. A comment now records why per-owner access is done
+  by narrowing `get_queryset` instead.
+
+Also added:
+- `tests/test_performance.py` — every list endpoint asserts its query count does
+  **not grow with row count**, which is the invariant that actually regresses.
+  Exact-count assertions were deliberately avoided as too brittle.
+- `tests/test_validators.py` — upload validation (SEC-8) went from 0 tests to
+  27, covering executables, double extensions (`invoice.pdf.exe`), SVG,
+  content-type mismatch, and the size ceiling at and over the limit.
+  `common/validators.py` 56% → **100%**.
+- `tests/test_permission_internals.py` — anonymous and role-less users, the
+  per-action override, and the auditor read-only guard holding even when a view
+  declares `write_roles = ALL`. `common/permissions.py` 66% → **100%**.
+- All SRS §4.3 indexes verified present in the live MySQL schema by reading
+  `INFORMATION_SCHEMA`, not just trusting the model `Meta`.
+
+Coverage 83.3% → **85.1%**; 224 → **292 tests**.
 
 ### Day 11 — Asset requests & approvals ✅
 - `AssetRequest` names **either** a specific asset or a category, so someone can

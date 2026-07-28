@@ -14,8 +14,22 @@ DEBUG = False
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 REST_FRAMEWORK = {**REST_FRAMEWORK}  # noqa: F405
-REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = ()
-REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {}
+
+# Keep the throttle class wired up — DRF binds `throttle_classes` and
+# `THROTTLE_RATES` at import time, so a test cannot switch it on later with
+# override_settings. Instead every scope gets a rate of None, which DRF treats
+# as "unlimited", so the suite runs freely. tests/test_throttling.py patches
+# THROTTLE_RATES with real limits to prove the control actually fires.
+REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = (
+    "rest_framework.throttling.ScopedRateThrottle",
+)
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
+    "auth": None,
+    "write": None,
+    "export": None,
+    "user": None,
+    "anon": None,
+}
 
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 
