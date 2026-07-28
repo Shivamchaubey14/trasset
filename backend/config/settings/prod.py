@@ -32,9 +32,14 @@ EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 CELERY_TASK_ALWAYS_EAGER = False
 
 # --- Never leak stack traces (NFR-8); log errors instead ---
+# Create the directory here: logging is configured during django.setup(), and a
+# missing path makes the whole process fail to boot rather than degrade.
+LOG_DIR = BASE_DIR / "logs"  # noqa: F405
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
 LOGGING["handlers"]["file"] = {  # noqa: F405
     "class": "logging.handlers.RotatingFileHandler",
-    "filename": str(BASE_DIR / "logs" / "trasset.log"),  # noqa: F405
+    "filename": str(LOG_DIR / "trasset.log"),
     "maxBytes": 10 * 1024 * 1024,
     "backupCount": 10,
     "formatter": "verbose",

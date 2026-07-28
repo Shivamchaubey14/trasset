@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Assets · Trasset</title>
+
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Lexend:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/layout.css">
+</head>
+<body>
+
+<div class="boot" id="boot">
+  <div class="boot-inner">
+    <div class="spinner-lg"></div>
+    <p class="text-muted text-small">Loading the register…</p>
+  </div>
+</div>
+
+<a href="#main" class="skip-link">Skip to content</a>
+
+<div class="app" id="app">
+  <main class="main">
+    <div class="content" id="main">
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Assets</h1>
+          <p class="page-subtitle">
+            Everything the organisation owns, and who is holding it.
+          </p>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-secondary" id="clearFiltersBtn" style="display:none">
+            <span class="btn-label">Clear filters</span>
+          </button>
+          <button class="btn btn-primary" id="addBtn">
+            <span class="btn-label">Add asset</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="kpi-grid mb-5" id="statGrid"></div>
+
+      <div class="card">
+        <div class="toolbar">
+          <div class="search-box input-group">
+            <span class="input-group-icon" id="searchIcon"></span>
+            <label class="sr-only" for="searchInput">Search assets</label>
+            <input class="input" type="search" id="searchInput"
+                   placeholder="Search by tag, name, serial or model…" autocomplete="off">
+          </div>
+
+          <select class="select" id="statusFilter" aria-label="Filter by status">
+            <option value="">All statuses</option>
+          </select>
+          <select class="select" id="categoryFilter" aria-label="Filter by category">
+            <option value="">All categories</option>
+          </select>
+          <select class="select" id="locationFilter" aria-label="Filter by location">
+            <option value="">All locations</option>
+          </select>
+          <select class="select" id="warrantyFilter" aria-label="Filter by warranty">
+            <option value="">Any warranty</option>
+            <option value="expiring">Expiring in 30 days</option>
+            <option value="expired">Expired</option>
+            <option value="active">Still covered</option>
+            <option value="none">No warranty</option>
+          </select>
+
+          <div class="toolbar-spacer"></div>
+          <span class="text-small text-muted" id="resultCount"></span>
+        </div>
+
+        <div class="card-body is-flush">
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th class="is-sortable" data-sort="asset_tag">Tag <span class="sort-icon"></span></th>
+                  <th class="is-sortable" data-sort="name">Asset <span class="sort-icon"></span></th>
+                  <th class="is-sortable" data-sort="status">Status <span class="sort-icon"></span></th>
+                  <th>Assigned to</th>
+                  <th>Location</th>
+                  <th class="is-sortable" data-sort="current_value" style="text-align:right">
+                    Value <span class="sort-icon"></span>
+                  </th>
+                  <th class="is-sortable" data-sort="warranty_expiry">Warranty <span class="sort-icon"></span></th>
+                  <th style="text-align:right;width:130px">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="pagination" id="paginationBar" style="display:none">
+          <span class="pagination-info" id="paginationInfo"></span>
+          <span id="paginationControls"></span>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="js/vendor/jquery.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/shell.js"></script>
+<script src="js/asset-form.js"></script>
+<script src="js/assets.js"></script>
+</body>
+</html>

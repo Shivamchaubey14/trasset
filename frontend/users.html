@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Users · Trasset</title>
+
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Lexend:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/layout.css">
+</head>
+<body>
+
+<div class="boot" id="boot">
+  <div class="boot-inner">
+    <div class="spinner-lg"></div>
+    <p class="text-muted text-small">Loading users…</p>
+  </div>
+</div>
+
+<a href="#main" class="skip-link">Skip to content</a>
+
+<div class="app" id="app">
+  <main class="main">
+    <div class="content" id="main">
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Users</h1>
+          <p class="page-subtitle">
+            Every person with access, and the role that decides what they can do.
+          </p>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-primary" id="addBtn">
+            <span class="btn-label">Add user</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="kpi-grid mb-5" id="roleGrid"></div>
+
+      <div class="card">
+        <div class="toolbar">
+          <div class="search-box input-group">
+            <span class="input-group-icon" id="searchIcon"></span>
+            <label class="sr-only" for="searchInput">Search users</label>
+            <input class="input" type="search" id="searchInput"
+                   placeholder="Search by name, email or phone…" autocomplete="off">
+          </div>
+          <select class="select" id="roleFilter" aria-label="Filter by role">
+            <option value="">All roles</option>
+          </select>
+          <select class="select" id="activeFilter" aria-label="Filter by state">
+            <option value="">All states</option>
+            <option value="true">Active only</option>
+            <option value="false">Deactivated only</option>
+          </select>
+          <div class="toolbar-spacer"></div>
+          <span class="text-small text-muted" id="resultCount"></span>
+        </div>
+
+        <div class="card-body is-flush">
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th class="is-sortable" data-sort="full_name">
+                    User <span class="sort-icon"></span>
+                  </th>
+                  <th>Role</th>
+                  <th>Department</th>
+                  <th class="is-sortable" data-sort="last_login">
+                    Last sign-in <span class="sort-icon"></span>
+                  </th>
+                  <th>State</th>
+                  <th style="text-align:right;width:110px">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="pagination" id="paginationBar" style="display:none">
+          <span class="pagination-info" id="paginationInfo"></span>
+          <span id="paginationControls"></span>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="js/vendor/jquery.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/shell.js"></script>
+<script src="js/users.js"></script>
+</body>
+</html>

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Audit Log · Trasset</title>
+
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Lexend:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/layout.css">
+
+  <style>
+    /* Expandable change detail inside a table row */
+    .change-toggle {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: var(--fs-small); color: var(--color-primary); font-weight: 500;
+    }
+    .change-toggle svg { transition: transform var(--dur) var(--ease); }
+    .change-toggle.is-open svg { transform: rotate(180deg); }
+
+    .change-detail { background: #FAFBFC; }
+    .change-detail td { padding: 0 !important; }
+    .change-inner { padding: var(--space-4) var(--space-4) var(--space-4) 56px; }
+
+    .change-row {
+      display: grid;
+      grid-template-columns: 170px 1fr auto 1fr;
+      gap: var(--space-3);
+      align-items: baseline;
+      padding: 7px 0;
+      border-bottom: 1px dashed var(--border);
+      font-size: var(--fs-small);
+    }
+    .change-row:last-child { border-bottom: none; }
+    .change-field { font-weight: 600; color: var(--ink-light); }
+    .change-from { color: var(--color-muted); text-decoration: line-through; word-break: break-word; }
+    .change-arrow { color: var(--color-muted); }
+    .change-to { color: var(--color-ink); font-weight: 500; word-break: break-word; }
+
+    .context-box {
+      margin-top: var(--space-3); padding: var(--space-3);
+      background: var(--primary-soft); border-radius: var(--radius-sm);
+      font-size: var(--fs-small);
+    }
+
+    @media (max-width: 768px) {
+      .change-row { grid-template-columns: 1fr; gap: 2px; }
+      .change-arrow { display: none; }
+      .change-inner { padding-left: var(--space-4); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="boot" id="boot">
+  <div class="boot-inner">
+    <div class="spinner-lg"></div>
+    <p class="text-muted text-small">Loading the trail…</p>
+  </div>
+</div>
+
+<a href="#main" class="skip-link">Skip to content</a>
+
+<div class="app" id="app">
+  <main class="main">
+    <div class="content" id="main">
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Audit Log</h1>
+          <p class="page-subtitle">
+            Who did what, when, and from where. Append-only — entries can never
+            be edited or removed.
+          </p>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-secondary" id="clearFiltersBtn" style="display:none">
+            <span class="btn-label">Clear filters</span>
+          </button>
+          <button class="btn btn-secondary" id="refreshBtn">
+            <span class="btn-label">Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="kpi-grid mb-5" id="summaryGrid"></div>
+
+      <div class="card">
+        <div class="toolbar">
+          <div class="search-box input-group">
+            <span class="input-group-icon" id="searchIcon"></span>
+            <label class="sr-only" for="searchInput">Search the trail</label>
+            <input class="input" type="search" id="searchInput"
+                   placeholder="Search by record, type or person…" autocomplete="off">
+          </div>
+
+          <select class="select" id="actionFilter" aria-label="Filter by action">
+            <option value="">All actions</option>
+          </select>
+          <select class="select" id="entityFilter" aria-label="Filter by record type">
+            <option value="">All record types</option>
+            <option value="Asset">Asset</option>
+            <option value="User">User</option>
+            <option value="Category">Category</option>
+            <option value="Location">Location</option>
+            <option value="Department">Department</option>
+            <option value="Vendor">Vendor</option>
+          </select>
+
+          <label class="sr-only" for="dateFrom">From date</label>
+          <input class="input" type="date" id="dateFrom" style="width:auto"
+                 aria-label="From date">
+          <label class="sr-only" for="dateTo">To date</label>
+          <input class="input" type="date" id="dateTo" style="width:auto"
+                 aria-label="To date">
+
+          <div class="toolbar-spacer"></div>
+          <span class="text-small text-muted" id="resultCount"></span>
+        </div>
+
+        <div class="card-body is-flush">
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th class="is-sortable" data-sort="created_at">
+                    When <span class="sort-icon"></span>
+                  </th>
+                  <th>Who</th>
+                  <th class="is-sortable" data-sort="action">
+                    Action <span class="sort-icon"></span>
+                  </th>
+                  <th>Record</th>
+                  <th>Changes</th>
+                  <th>IP</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="pagination" id="paginationBar" style="display:none">
+          <span class="pagination-info" id="paginationInfo"></span>
+          <span id="paginationControls"></span>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="js/vendor/jquery.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/shell.js"></script>
+<script src="js/audit.js"></script>
+</body>
+</html>

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard · Trasset</title>
+
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Lexend:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/layout.css">
+</head>
+<body>
+
+<div class="boot" id="boot">
+  <div class="boot-inner">
+    <div class="spinner-lg"></div>
+    <p class="text-muted text-small">Loading your workspace…</p>
+  </div>
+</div>
+
+<a href="#main" class="skip-link">Skip to content</a>
+
+<div class="app" id="app">
+  <main class="main">
+    <div class="content" id="main">
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Dashboard</h1>
+          <p class="page-subtitle" id="welcomeLine">Here's how your asset register is doing.</p>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-secondary" id="refreshBtn">
+            <span class="btn-label">Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI cards -->
+      <div class="kpi-grid mb-5" id="kpiGrid"></div>
+
+      <!-- Charts -->
+      <div class="grid-2-1 mb-4">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Register value over time</h3>
+              <div class="card-subtitle">Cumulative purchase value, last 12 months</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="chart-box"><canvas id="valueChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>By status</h3>
+              <div class="card-subtitle">Current lifecycle state</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="chart-box"><canvas id="statusChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2 mb-4">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>By category</h3>
+              <div class="card-subtitle">Top categories by asset count</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="chart-box"><canvas id="categoryChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Assets added</h3>
+              <div class="card-subtitle">New records per month</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="chart-box"><canvas id="addedChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lists -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Recently added</h3>
+              <div class="card-subtitle">Newest entries in the register</div>
+            </div>
+          </div>
+          <div class="card-body is-flush">
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Asset</th>
+                    <th>Status</th>
+                    <th class="text-right">Value</th>
+                  </tr>
+                </thead>
+                <tbody id="recentBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Warranties expiring</h3>
+              <div class="card-subtitle">Within the next 30 days</div>
+            </div>
+          </div>
+          <div class="card-body is-flush">
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Asset</th>
+                    <th>Expires</th>
+                    <th class="text-right">Remaining</th>
+                  </tr>
+                </thead>
+                <tbody id="warrantyBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="js/vendor/jquery.min.js"></script>
+<script src="js/vendor/chart.umd.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/shell.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/dashboard.js"></script>
+</body>
+</html>

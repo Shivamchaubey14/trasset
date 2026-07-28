@@ -13,6 +13,8 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+from apps.audit.constants import AuditAction
+from apps.audit.services import record as audit_record
 from common.exceptions import UnprocessableEntity
 from common.permissions import HasRolePermission, IsSuperAdmin
 from common.responses import ok
@@ -50,7 +52,23 @@ class LoginView(TokenObtainPairView):
     resource_name = "Session"
 
     def post(self, request, *args, **kwargs):
-        response = super().post(request, *args, **kwargs)
+        email = (request.data.get("email") or "").strip().lower()
+        try:
+            response = super().post(request, *args, **kwargs)
+        except Exception:
+            # Failed sign-ins matter as much as successful ones (SEC-9). The
+            # actor is unknown, so record the attempted address instead.
+            audit_record(
+                AuditAction.LOGIN_FAILED,
+                entity_type="User",
+                label=email,
+                changes={"_context": {"email": email}},
+            )
+            raise
+
+        user = User.objects.filter(email=email).first()
+        audit_record(AuditAction.LOGIN, instance=user, user=user,
+                     entity_type="User", label=email)
         response.envelope_message = "Logged in successfully"
         return response
 
@@ -91,6 +109,8 @@ class LogoutView(GenericAPIView):
             raise UnprocessableEntity(
                 detail="That refresh token is invalid or already expired."
             ) from exc
+
+        audit_record(AuditAction.LOGOUT, instance=request.user, entity_type="User")
         return ok(None, "Logged out successfully")
 
 
@@ -130,6 +150,10 @@ class PasswordChangeView(GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+
+        # The password itself is never logged — only that it changed (SEC-1).
+        audit_record(AuditAction.PASSWORD_CHANGE, instance=request.user,
+                     entity_type="User")
         return ok(None, "Password changed successfully")
 
 
@@ -188,7 +212,10 @@ class PasswordResetConfirmView(GenericAPIView):
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        user = serializer.save()
+
+        audit_record(AuditAction.PASSWORD_RESET, instance=user, user=user,
+                     entity_type="User")
         return ok(None, "Password reset successfully. You can now log in.")
 
 

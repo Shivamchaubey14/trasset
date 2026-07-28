@@ -5,8 +5,9 @@
 > Update this file at the end of every working session.
 
 **Started:** 2026-07-27
-**Last updated:** 2026-07-27
+**Last updated:** 2026-07-28
 **Plan:** [`Trasset_Build_Plan.md`](Trasset_Build_Plan.md) · **Contract:** [`Trasset_SRS.md`](Trasset_SRS.md)
+**Repo:** https://github.com/Shivamchaubey14/trasset (public) · branches `main`, `dev`
 
 ---
 
@@ -15,31 +16,46 @@
 | Phase | Days | Status |
 |-------|------|--------|
 | Phase 0 — Foundation | 1–5 | ✅ Complete |
-| Phase 1 — Core Asset Engine | 6–12 | 🟡 In progress (Day 6 done, Day 9 partly done) |
-| Phase 2 — Maintenance, Procurement, Reports | 13–18 | ⬜ Not started |
-| Phase 3 — Frontend | 19–26 | ⬜ Not started |
+| Phase 1 — Core Asset Engine | 6–12 | 🟡 Days 6–10 done · Days 11, 12 open |
+| Phase 2 — Maintenance, Procurement, Reports | 13–18 | 🟡 Day 15 dashboard API done · rest open |
+| Phase 3 — Frontend | 19–26 | 🟡 Days 19–23 done · Day 25 partly done · audit screen done |
 | Phase 4 — Integration, Testing & Launch | 27–30 | ⬜ Not started |
 
-**Backend test suite:** 89 tests, all passing · **Coverage:** 79.8% (target ≥ 70%, NFR-12)
+**Backend test suite:** 191 tests, all passing · **Coverage:** 82.4% (target ≥ 70%, NFR-12)
+**OpenAPI schema:** 37 endpoints, 0 errors, 0 warnings (NFR-13)
+
+> **Note on sequencing.** The plan runs backend-first (Days 1–18) then frontend
+> (19–26). At the user's request the frontend was pulled forward once auth,
+> users and masters were live, so those screens are real rather than mocked.
+> Asset screens still wait on the Day 7 asset API.
 
 ---
 
 ## ▶ Next up — start here
 
-**Day 7 — Asset CRUD API** 🟢
+**Day 11 — Asset requests & approvals** 🟢
 
-1. Asset serializers: lightweight list vs. nested detail (category / location / vendor / assignee).
-2. `AssetViewSet` with create / list / retrieve / update / soft-delete.
-3. Filtering by status, category, location, department, assignee and date ranges;
-   search by tag / name / serial; ordering.
-4. Image + attachment upload endpoints with validation.
-5. Uncomment `path("", include("apps.assets.urls"))` in `backend/config/api_urls.py`.
+1. `AssetRequest` model: requester, asset (or category if the user is asking for
+   "a laptop"), reason, status (pending / approved / rejected / cancelled),
+   decided_by, decided_at, decision notes.
+2. Endpoints: `POST /asset-requests/` (employee), `GET` list scoped by role —
+   employees see their own, managers see all — plus
+   `POST /asset-requests/{id}/approve/` and `/reject/`.
+3. Approval triggers the existing `assignment.assign()` service inside the same
+   transaction, so an approved request produces a real check-out and its audit
+   row. Guard the transitions: a decided request can't be decided twice → 409.
+4. Frontend: a "Requests" screen — employees get a request form and their own
+   list, managers get an approvals inbox. Add the nav item to `js/shell.js`.
 
-**DoD:** Assets fully CRUD via API with filters, search and pagination; validation
-errors are structured.
+**DoD:** Full request → approve → auto-assign loop works with correct
+permissions, and every step lands in the audit trail.
 
-Groundwork already in place: the `Asset` and `Attachment` models, the tag
-generator, the depreciation service and `common/viewsets.BaseModelViewSet`.
+**Then Day 12** (backend hardening pass) and **Day 13** (maintenance).
+
+Reusable groundwork: `BaseModelViewSet`, the envelope, the table/toolbar/modal
+patterns in `js/masters.js`, `js/assets.js` and `js/audit.js`, `js/asset-form.js`
+for any dialog that mutates an asset, and `audit.services.domain_action()` to
+give a new business verb its own audit row.
 
 ---
 
@@ -50,120 +66,299 @@ generator, the depreciation service and `common/viewsets.BaseModelViewSet`.
 - Python 3.13 virtualenv at `backend/venv`; dependencies pinned in `requirements.txt`.
 - Django project with split settings — `config/settings/{base,dev,prod,test}.py`,
   all secrets read from `.env` via `django-environ` (SEC-10).
-- MySQL database `trasset` created (utf8mb4) and connected; initial migrate green.
+- MySQL database `trasset` created (utf8mb4) and connected.
 - All eight app packages scaffolded per SRS §10.2 plus `common/` and `tests/`.
 - `.gitignore`, `README.md`, `.env.example`.
 
 **Note:** `mysqlclient` has no wheel for Python 3.13 on Windows, so
 `config/__init__.py` falls back to PyMySQL via `install_as_MySQLdb()`.
-`requirements.txt` still installs `mysqlclient` on Linux for the production deploy.
+`requirements.txt` still installs `mysqlclient` on Linux for production.
 
 ### Day 2 — Common layer & conventions ✅
 - `common/renderers.py` — `EnvelopeJSONRenderer` wraps every response in
-  `{success, message, data, errors}` (SRS §5.1) and derives the message from the
+  `{success, message, data, errors}` (SRS §5.1), deriving the message from the
   view + HTTP method, overridable per response.
-- `common/exceptions.py` — envelope error handler, plus `Conflict` (409),
-  `UnprocessableEntity` (422) and `ServiceError`; unhandled errors are logged
+- `common/exceptions.py` — envelope error handler plus `Conflict` (409),
+  `UnprocessableEntity` (422), `ServiceError`; unhandled errors are logged
   server-side and return a generic body (NFR-8).
 - `common/pagination.py` — `StandardPagination` (25 default, 200 max) returning
   `count / page / page_size / total_pages / next / previous / results`.
 - `common/permissions.py` + `common/roles.py` — role matrix driven by
   `read_roles` / `write_roles` / `action_roles` on each view (SEC-3).
-- `common/models.py` — `TimeStampedModel`, `SoftDeleteModel` with
-  `objects` / `all_objects` managers.
+- `common/models.py` — `TimeStampedModel`, `SoftDeleteModel`.
 - `common/validators.py` — upload type/size validation (SEC-8), hex colour validator.
 - `common/viewsets.py` — `BaseModelViewSet` / `BaseReadOnlyViewSet` with write throttling.
-- `drf-spectacular` wired to `/api/schema/`, `/api/docs/`, `/api/redoc/`.
+- `drf-spectacular` at `/api/schema/`, `/api/docs/`, `/api/redoc/`.
 - `GET /api/v1/health/` liveness probe.
 
 ### Day 3 — Accounts: models & auth ✅
 - Custom `User` (email login, one role, department, avatar, timezone,
-  notification preference, lockout counters) and `Role` model.
+  notification preference, lockout counters) and `Role`.
 - Five roles seeded by data migration `accounts/0003_seed_roles.py`.
 - Argon2 password hashing (SEC-1).
-- Endpoints: `/auth/login/`, `/auth/refresh/`, `/auth/logout/` (blacklist),
-  `/auth/me/` (GET + PATCH), `/auth/password/change/`, `/auth/password/reset/`,
+- `/auth/login/`, `/auth/refresh/`, `/auth/logout/` (blacklist), `/auth/me/`
+  (GET + PATCH), `/auth/password/change/`, `/auth/password/reset/`,
   `/auth/password/reset/confirm/`.
-- Login returns the token pair **and** the user profile, so the UI can render the
-  shell without a second round trip.
-- Password reset gives the same answer for known and unknown emails, so it can't
-  be used to enumerate accounts.
-- Django admin registered for `User` and `Role`.
+- Login returns the token pair **and** the profile, so the UI paints in one round trip.
+- Password reset answers identically for known and unknown emails — no account enumeration.
 
 ### Day 4 — RBAC & user management ✅
 - `HasRolePermission` enforces the SRS §2.3 matrix server-side; the auditor
   read-only guard applies everywhere regardless of what a view declares.
-- `UserViewSet` (Super Admin only) with filter/search/order; `DELETE` deactivates
-  rather than destroys, and self-deactivation returns 422.
-- Extra actions: `POST /users/{id}/activate/`, `POST /users/{id}/unlock/`.
-- `RoleViewSet` — read-only list of the five roles.
-- Account lockout after 5 failed logins for 15 minutes (FR-1.5), configurable via env.
-- Throttle scopes: `auth` on every auth endpoint, `write` on all unsafe methods (SEC-7).
+- `UserViewSet` (Super Admin only); `DELETE` deactivates rather than destroys,
+  self-deactivation returns 422.
+- `POST /users/{id}/activate/`, `POST /users/{id}/unlock/`.
+- `RoleViewSet` — read-only, pagination disabled (returns a bare array).
+- Account lockout after 5 failed logins for 15 minutes (FR-1.5).
+- Throttle scopes: `auth` on auth endpoints, `write` on all unsafe methods (SEC-7).
 
 ### Day 5 — Master data models & APIs ✅
 - `Category` (icon, hex colour, `custom_fields` JSON), `Location` (address + geo),
-  `Department` (head user, code), `Vendor` (contact details, tax number).
-- Full CRUD ViewSets with search, filter, ordering and live `asset_count`
-  annotations; departments also report `member_count`.
-- `custom_fields` validated and normalised on write — keys unique and
-  identifier-safe, types restricted to text/number/date/select/boolean, `select`
-  requires options, labels auto-derived (FR-3.8).
-- Deletion of a master record is restricted to Super Admin.
-- Django admin for all four, with a colour swatch on categories.
-- `manage.py bootstrap --demo` seeds an admin, one user per role, and starter
-  categories / locations / departments / vendors.
+  `Department` (head user, code), `Vendor`.
+- CRUD ViewSets with search, filter, ordering and live `asset_count`; departments
+  also report `member_count`.
+- `custom_fields` validated and normalised on write (FR-3.8).
+- Master deletion restricted to Super Admin; protected FKs surface as 409.
+- `manage.py bootstrap --demo` seeds users, masters and 42 demo assets.
 
 ### Day 6 — Asset model & tag generation ✅
-- `Asset` model per SRS §4.1: identity, category/location/department/vendor/assignee,
-  financials, warranty, image, `custom_data`, soft delete, `created_by`.
-- Composite indexes from SRS §4.3 (`status+category`, `status+is_deleted`,
-  `department+status`, `warranty_expiry`).
-- `AssetTagCounter` + `next_asset_tag()` generate `TRA-YYYY-000001` sequentially,
-  restarting each year, with `SELECT … FOR UPDATE` so concurrent creates can't collide.
+- `Asset` per SRS §4.1 with the composite indexes from §4.3.
+- `AssetTagCounter` + `next_asset_tag()` produce `TRA-YYYY-000001` sequentially,
+  restarting each year, with `SELECT … FOR UPDATE` against concurrent creates.
 - `Attachment` model with type/size validation (FR-3.7).
-- State-machine helpers (`can_be_assigned`, `can_be_maintained`, `is_terminal`)
-  and warranty helpers (`warranty_expiring_soon`, `warranty_expired`).
+- State-machine and warranty helper properties.
 
-### Day 9 (partial) — Depreciation engine 🟡
-- `apps/assets/services/depreciation.py` implements straight-line and
-  declining-balance per SRS §11.1, in `Decimal`, floored at salvage value.
-- `Asset.current_value` recomputed on every save; `Asset.depreciation_schedule()`
-  returns the year-by-year table.
-- Fully unit-tested (both methods, salvage floor, edge cases, schedule continuity).
+### Day 7 — Asset CRUD API ✅
+- `AssetListSerializer` (flat, cheap) vs `AssetDetailSerializer` (nested
+  category / location / department / vendor / assignee / attachments).
+- `AssetWriteSerializer` takes `*_id` fields per SRS §5.3 and returns the nested
+  detail shape; validates duplicate tag and serial, salvage ≤ cost, warranty ≥
+  purchase date, and a category's **required custom fields** (FR-3.8).
+- Status is not directly writable — the serializer redirects callers to the
+  assign / checkin / retire endpoints so history can't be bypassed.
+- `AssetFilter`: multi-select status, category, location, department, vendor,
+  assignee, `unassigned`, purchase/created/warranty date ranges, value band, a
+  derived `warranty` filter (expiring / expired / active / none) and `active_only`.
+- Search across tag, name, serial, model and manufacturer; ordering on 8 columns.
+- `GET /assets/stats/` returns the summary cards and respects the active filters.
+- `AttachmentViewSet` with type/size validation; deleting drops the stored file.
+- A list page costs a flat 4 queries regardless of row count (asserted in tests).
 
-**Still to do on Day 9:** expose `GET /assets/{id}/depreciation/` (needs Day 7's
-viewset) and the monthly recalculation Celery task (Day 18).
+### Day 8 — Assignment (check-out / check-in) ✅
+- `AssetAssignment` model — immutable by construction: `save()` refuses updates
+  and `delete()` raises, so history can only ever be appended (FR-4.3).
+- `services/assignment.py` runs every transition in a transaction and re-reads
+  the asset with `SELECT … FOR UPDATE`, so two managers racing on the same asset
+  can't both win.
+- `POST /assets/{id}/assign/` · `/checkin/` · `/retire/`, all returning the
+  updated asset; `GET /assets/{id}/history/` returns the timeline.
+- Guards return **409 Conflict** with a sentence that says what to do:
+  already assigned, under maintenance, terminal status, not currently assigned,
+  already retired, deleting while still assigned.
+- Retiring an assigned asset auto-closes the assignment so no dangling holder
+  is left behind.
+- Check-in records `days_held` and can move the asset to a new location.
+
+### Day 9 — Depreciation engine ✅
+- `apps/assets/services/depreciation.py` — straight-line and declining balance
+  per SRS §11.1, in `Decimal`, floored at salvage.
+- `Asset.current_value` recomputed on save; `GET /assets/{id}/depreciation/`
+  returns the year-by-year schedule.
+- Verified against hand calculations: ₹78,000 cost / ₹8,000 salvage / 4 years
+  gives ₹17,500 a year and lands exactly on salvage.
+- **Still pending:** the monthly recalculation Celery task (Day 18).
+
+### Day 10 — Audit logging ✅
+- `AuditLog` per SRS §4.1, append-only by construction: `save()` refuses updates
+  and `delete()` raises, and the viewset exposes no write routes (405 on
+  POST/PATCH/DELETE). Application-level guarantee — production should also
+  restrict DB grants on the table.
+- `AuditContextMiddleware` binds the request; the **user is resolved lazily**
+  rather than cached, because DRF authenticates inside the view and
+  `request.user` at middleware time would be the anonymous session user.
+- `pre_save` snapshots the stored row so `post_save` can diff it. One extra
+  SELECT per update on tracked models; nothing on create.
+- Foreign keys are logged by display name, so a row reads
+  `location: Head Office → Store Room` rather than `2 → 4`.
+- `domain_action()` context manager gives a save a business verb, so assigning
+  writes one **Assigned** row instead of a generic Updated — used by
+  `assignment.assign/checkin/retire`.
+- Soft deletes are translated into a Deleted row rather than an `is_deleted`
+  field change.
+- Auth events recorded too (SEC-9): sign-in, **failed sign-in** (no actor, email
+  only), sign-out, password change and reset. Passwords are in `EXCLUDED_FIELDS`
+  and asserted absent from the trail by test.
+- Saves that change nothing write no row.
+- `suspend()` context manager keeps seeding and migrations out of the trail;
+  `bootstrap` uses it.
+- `GET /audit-logs/` (Admin + Auditor only) with filters for action, entity type,
+  entity id, user and date range, plus search and `/summary/` counts.
+- Audit screen with expandable per-row diffs, action pills coloured from the
+  palette, and summary cards.
+
+### Day 9.1 — QR codes ✅ (pulled forward)
+- `GET /assets/{id}/qr/` returns a PNG encoding the asset's detail URL
+  (FR-9.1), cacheable for a day since tags never change.
+- `asset-detail.html?tag=TRA-…` resolves a scanned tag to the asset (FR-9.2).
+
+### Day 15 — Dashboard stats API ✅
+- `GET /dashboard/stats/` returns every KPI and chart dataset in one call:
+  totals, book value, accumulated depreciation, status counts, warranty windows,
+  by-category breakdown, 12-month cumulative value, monthly additions, recent
+  assets and expiring warranties.
+- Built from database aggregates, not per-row Python (NFR-1).
+- Readable by every role — auditors and employees see the same figures.
+
+### Day 19 — Design system & shell ✅
+- `css/variables.css` — the full brand palette, type scale, 8px spacing,
+  elevation, motion and layout tokens. Nothing else hard-codes a colour.
+- `css/base.css` — reset, focus-visible rings, skip link, utilities.
+- `css/components.css` — buttons (5 variants), cards, KPI tiles, status pills,
+  avatars, forms with inline validation, tables (zebra + sticky header + hover
+  actions + sortable), pagination, tabs, modals, toasts, skeletons, empty
+  states, dropdowns.
+- `css/layout.css` — 240px Ink sidebar with green active state, sticky top bar
+  with global search, responsive drawer below 1024px, print styles.
+- `js/shell.js` renders the sidebar and top bar on every page from one nav model.
+  Screens not built yet appear greyed with a "soon" badge rather than 404-ing.
+- Quicksand + Lexend from Google Fonts; jQuery and Chart.js vendored locally so
+  the app works offline.
+
+### Day 20 — API client & auth flow ✅
+- `js/api.js` — attaches the JWT, unwraps the envelope, refreshes on 401 with a
+  single-flight promise so parallel 401s trigger one refresh, and normalises
+  errors into `ApiError` with field-level detail.
+- Access token in memory only; refresh token in `localStorage` so a reload keeps
+  the session. Trade-off documented in the file.
+- `js/auth.js` — route guard, session helpers (`isManager`, `isAdmin`,
+  `canWrite`), logout, and redirect-if-already-signed-in.
+- `index.html` — split-panel login with brand aside, inline validation,
+  show/hide password, session-expiry notice, and click-to-fill demo accounts.
+
+### Day 21 — Dashboard UI ✅
+- Six KPI tiles in Quicksand numerals, each colour-coded to the palette.
+- Four Chart.js charts: cumulative value line with gradient fill, status
+  doughnut, category bar, monthly additions bar — all reading their colours from
+  the CSS custom properties.
+- Recently-added and warranty-expiring tables; warranties under 7 days flip from
+  Cream Yolk to Coral.
+- Skeleton loaders on first paint, empty states, and a refresh action.
+
+### Day 25 (partial) — Masters & users UI ✅
+- `masters.html` / `js/masters.js` — one tabbed screen covering categories,
+  locations, departments and vendors. Table, search, state filter, sorting,
+  pagination and a modal form are all driven by a per-entity config, so adding a
+  master means adding a config entry, not another screen.
+- Colour picker paired with a hex field for categories; user picker for
+  department heads.
+- `users.html` / `js/users.js` — role summary tiles, user table with avatars and
+  relative last-sign-in, create/edit modal, deactivate/reactivate. Non-admins get
+  a plain "Super Admin only" panel instead of a bare 403.
+- `settings.html` — profile editing and password change, both wired to the API.
+- Write controls are hidden for auditors and employees; the API enforces the same
+  rules independently (SEC-3).
+
+**Still to do on Day 25:** asset request flow, approvals inbox, and the
+notifications dropdown (needs the Day 11 and Day 18 backends).
+
+### Day 22 — Asset list UI ✅
+- Six summary cards that re-aggregate as filters change, so the numbers always
+  describe what's on screen.
+- Table with sortable columns, status pills, category colour dots, assignee
+  avatars and warranty pills that turn Cream Yolk near expiry and Slate once past.
+- Filters for status, category, location and warranty state, plus debounced
+  search and a "Clear filters" button that only appears when something is set.
+- Row actions adapt to state: Available offers Assign, Assigned offers Check in.
+- Add/Edit modal in `js/asset-form.js`, shared with the detail page.
+- **Category-driven custom fields** — changing category swaps the extra inputs
+  live and preserves whatever was already typed (FR-3.8).
+- Top-bar global search now hands off here via `assets.html?q=…`.
+
+### Day 23 — Asset detail UI ✅
+- Header with live status pill and state-aware actions (Assign / Check in /
+  Edit / Retire / Delete), each hidden unless the role permits it.
+- Overview panel, valuation card with a retained-value progress bar, and an
+  assignment card showing the holder and how long they've had it.
+- Tabs: **History** as a timeline with check-out/check-in dots, actor, notes and
+  days held; **Specifications** rendering custom fields against their category
+  labels; **Depreciation** with a Chart.js book-value curve against a dashed
+  salvage floor, plus the year-by-year table.
+- QR label fetched with the bearer token and inlined as a blob, with a print
+  action and print CSS that strips the chrome.
 
 ---
 
 ## Verified working
 
+**Backend** (live server, real requests)
 ```
 GET  /api/v1/health/                          → 200 enveloped
 POST /api/v1/auth/login/                      → 200 tokens + profile
 GET  /api/v1/auth/me/                         → 200 profile
-GET  /api/v1/categories/?page_size=2          → 200 paginated, asset_count annotated
+GET  /api/v1/dashboard/stats/                 → 200 KPIs + 4 chart datasets
+GET  /api/v1/categories/?page=1&page_size=15  → 200 paginated, asset_count annotated
+GET  /api/v1/roles/                           → 200 bare array (pagination off)
 POST /api/v1/categories/  (manager)           → 201
+PATCH/DELETE category                          → 200 / 200
+DELETE category with 12 assets                 → 409 (PROTECT honoured)
 POST /api/v1/categories/  (auditor/employee)  → 403
-GET  /api/v1/users/       (employee)          → 403
-GET  /api/v1/users/       (admin)             → 200
+GET  /api/v1/users/       (employee → admin)  → 403 / 200
 GET  /api/v1/categories/  (no token)          → 401
-GET  /api/v1/categories/9999/                 → 404
-POST /api/v1/categories/  (bad colour)        → 400 with field-level errors
+POST bad colour / bad custom_fields            → 400 with field-level errors
+OPTIONS preflight from :5500                   → 200, CORS headers present
+
+GET  /api/v1/assets/?page_size=3               → 200, 42 assets, 14 pages
+GET  /api/v1/assets/?status=available&warranty=expiring → 200, filters compose
+GET  /api/v1/assets/?search=latitude           → 200, 3 matches
+GET  /api/v1/assets/stats/                     → 200, cards match the table
+POST /api/v1/assets/  (SRS §5.3 payload)       → 201, tag TRA-2026-000014 generated
+POST /assets/{id}/assign/                      → 200 "assigned to Karan Verma"
+POST /assets/{id}/assign/  again               → 409 "already assigned to …"
+POST /assets/{id}/assign/  as employee         → 403
+POST /assets/{id}/checkin/                     → 200
+POST /assets/{id}/checkin/  again              → 409 "not currently assigned"
+POST /assets/{id}/retire/  {status: disposed}  → 200
+POST /assets/{id}/assign/  after disposal      → 409
+DELETE assigned asset as admin                 → 409 "still assigned to …"
+GET  /assets/{id}/history/                     → 200, 2 immutable rows
+GET  /assets/{id}/depreciation/                → 200, ends exactly at salvage
+GET  /assets/{id}/qr/                          → 200 image/png, 895 bytes
+
+GET  /api/v1/audit-logs/  (auditor / admin)    → 200
+GET  /api/v1/audit-logs/  (manager / employee) → 403 "Only Super Admins and Auditors…"
+POST/PATCH/DELETE /audit-logs/                 → 405, no write route exists
+GET  /audit-logs/summary/                      → 200 totals + per-action counts
+assign → one "Assigned" row, FK diff by name, _context carries notes
+failed login → "Sign-in failed" row, no actor, attempted password absent
 ```
+
+**Frontend** — all 21 files serve over HTTP; every JS file and inline block
+passes a syntax check. Not yet clicked through in a browser (see below).
 
 ---
 
 ## Deferred / known gaps
 
-- `Conflict` (409) is defined but not yet raised anywhere — it lands with the
-  assignment guards on Day 8.
-- Celery is configured (`config/celery.py`, beat schedule declared) but the tasks
-  it references don't exist yet; dev runs eagerly so nothing breaks.
-- Redis is not installed locally — not needed until Day 18.
-- `frontend/` is scaffolded but empty; Phase 3 starts Day 19.
-- Warranty flags are computed per-asset in Python; the dashboard aggregate query
-  arrives on Day 15.
+- **Browser click-through not done.** The pages were verified by serving them,
+  syntax-checking every script, and exercising the exact API calls each page
+  makes — but nobody has driven the real UI yet. Expect small visual fixes on
+  first run.
+- Maintenance, procurement and reports screens still show a "soon" badge in the
+  sidebar; their backends aren't built.
+- Audit rows are written but never pruned. A busy register will grow this table
+  indefinitely — worth a retention policy (archive or partition by month) before
+  production, and it pairs naturally with the Day 18 Celery work.
+- The audit trail is append-only at the application layer. A DB superuser can
+  still edit the table, so production should restrict grants on `audit_logs`.
+- Notifications dropdown renders an empty state; the model arrives on Day 18.
+- Attachment upload works via the API but has no UI yet — the detail page shows
+  specifications and history, not a documents tab. Worth adding with Day 26.
+- The asset form has no image upload control yet; `image` is accepted by the API.
+- Celery is configured with a beat schedule, but the tasks it names don't exist
+  yet; dev runs eagerly so nothing breaks.
+- Redis not installed locally — not needed until Day 18.
+- `value_over_time` is built from purchase dates (how the register grew), not a
+  historical revaluation. Worth revisiting if finance wants true month-end book values.
 
 ---
 
@@ -178,6 +373,18 @@ POST /api/v1/categories/  (bad colour)        → 400 with field-level errors
 | API | `http://127.0.0.1:8000/api/v1/` |
 | Swagger | `http://127.0.0.1:8000/api/docs/` |
 | Admin | `http://127.0.0.1:8000/admin/` |
+| Frontend | `http://127.0.0.1:5500/` |
 
-Run: `cd D:\trasset\backend && venv\Scripts\python.exe manage.py runserver`
-Test: `venv\Scripts\python.exe manage.py test tests`
+**Run both servers**
+```
+cd D:\trasset\backend  && venv\Scripts\python.exe manage.py runserver
+cd D:\trasset\frontend && python -m http.server 5500
+```
+
+**Test**
+```
+cd D:\trasset\backend && venv\Scripts\python.exe manage.py test tests
+```
+
+Demo logins — all use `Trasset@2026`:
+`admin@` · `manager@` · `head@` · `employee@` · `auditor@` `trasset.local`
