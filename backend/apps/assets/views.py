@@ -11,7 +11,7 @@ from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 
-from common.exceptions import Conflict
+from common.exceptions import Conflict, UnprocessableEntity
 from common.permissions import HasRolePermission
 from common.responses import ok
 from common.roles import Roles
@@ -23,6 +23,7 @@ from .models import Asset, AssetRequest, Attachment
 from .serializers import (
     AssetAssignmentSerializer,
     AssetDetailSerializer,
+    AssetImportSerializer,
     AssetListSerializer,
     AssetRequestCreateSerializer,
     AssetRequestSerializer,
@@ -33,11 +34,14 @@ from .serializers import (
     AttachmentSerializer,
     CheckinSerializer,
     DepreciationScheduleSerializer,
+    ImportColumnSerializer,
+    ImportResultSerializer,
     RequestApproveSerializer,
     RequestRejectSerializer,
     RetireSerializer,
 )
 from .services import assignment as assignment_service
+from .services import importing
 from .services import requests as request_service
 
 MONEY = DecimalField(max_digits=14, decimal_places=2)
@@ -256,6 +260,110 @@ class AssetViewSet(BaseModelViewSet):
         )
         totals["total_value"] = str(totals["total_value"])
         return ok(totals, "Asset statistics retrieved successfully")
+
+    # -----------------------------------------------------------------
+    # Bulk import (FR-10.1)
+    # -----------------------------------------------------------------
+    @extend_schema(
+        summary="Bulk import assets",
+        description=(
+            "Upload a CSV or XLSX matching the template. Every row is validated "
+            "with the same serializer the API uses, so import rules and API "
+            "rules cannot drift.\n\n"
+            "Masters are matched **by name** — 'Laptops', not an id. An unknown "
+            "name is a row error naming what was not found.\n\n"
+            "By default a single bad row aborts the whole file and nothing is "
+            "written. Send `partial=true` to import the good rows anyway, or "
+            "`dry_run=true` to see the report without writing."
+        ),
+        request={"multipart/form-data": AssetImportSerializer},
+        responses={200: ImportResultSerializer, 422: ImportResultSerializer},
+    )
+    @action(detail=False, methods=["post"], url_path="import",
+            parser_classes=[MultiPartParser, FormParser])
+    def bulk_import(self, request):
+        serializer = AssetImportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        options = serializer.validated_data
+        dry_run = options["dry_run"]
+        partial = options["partial"]
+
+        try:
+            rows = importing.read_rows(options["file"])
+        except importing.ImportError_ as exc:
+            raise UnprocessableEntity(detail=str(exc)) from exc
+
+        results = importing.validate_rows(rows, request=request)
+        has_errors = any(not row.ok for row in results)
+
+        # Nothing is written on a dry run, nor when errors exist and the caller
+        # did not opt into a partial import.
+        should_commit = not dry_run and (partial or not has_errors)
+
+        if should_commit:
+            importing.commit_rows(results, request=request)
+
+        summary = importing.summarise(results, committed=should_commit,
+                                      partial=partial)
+
+        if dry_run:
+            message = (f"Checked {summary['total_rows']} rows — "
+                       f"{summary['valid_rows']} ready, "
+                       f"{summary['invalid_rows']} with problems")
+        elif should_commit:
+            message = f"Imported {summary['created']} assets"
+            if summary["invalid_rows"]:
+                message += f", skipped {summary['invalid_rows']} rows with problems"
+        else:
+            message = (f"Nothing imported — {summary['invalid_rows']} of "
+                       f"{summary['total_rows']} rows have problems. Fix them, or "
+                       f"retry with partial import to bring in the rest.")
+
+        response = ok(summary, message)
+        if not dry_run and not should_commit:
+            # Valid request, refused because of the data in it.
+            response.status_code = http_status.HTTP_422_UNPROCESSABLE_ENTITY
+        return response
+
+    @extend_schema(
+        summary="Download the import template",
+        description="A CSV with the expected headers and one worked example row.",
+        responses={(200, "text/csv"): bytes},
+    )
+    @action(detail=False, methods=["get"], url_path="import/template")
+    def import_template(self, request):
+        content = importing.build_template_csv()
+
+        response = HttpResponse(content, content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = (
+            'attachment; filename="trasset-asset-import-template.csv"'
+        )
+        return response
+
+    @extend_schema(
+        summary="Import column reference",
+        description=(
+            "What each column means and whether it is required — so the import "
+            "wizard can explain itself without hard-coding the schema."
+        ),
+        responses={200: ImportColumnSerializer(many=True)},
+    )
+    @action(detail=False, methods=["get"], url_path="import/columns")
+    def import_columns(self, request):
+        return ok(
+            [
+                {
+                    "header": spec.header,
+                    "required": spec.required,
+                    "help_text": spec.help_text,
+                    "example": spec.example,
+                    "lookup": spec.lookup,
+                }
+                for spec in importing.COLUMNS
+            ],
+            "Import columns retrieved successfully",
+        )
 
     # -----------------------------------------------------------------
     # Delete

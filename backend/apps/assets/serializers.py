@@ -489,6 +489,74 @@ class AssetRequestStatsSerializer(serializers.Serializer):
     cancelled = serializers.IntegerField()
 
 
+# ---------------------------------------------------------------------------
+# Bulk import (FR-10.1)
+# ---------------------------------------------------------------------------
+class AssetImportSerializer(serializers.Serializer):
+    """POST /assets/import/"""
+
+    file = serializers.FileField(
+        help_text="CSV or XLSX matching the template.",
+    )
+    dry_run = serializers.BooleanField(
+        default=False,
+        help_text="Validate and report without writing anything.",
+    )
+    partial = serializers.BooleanField(
+        default=False,
+        help_text="Import the valid rows and report the rest. Off by default, "
+                  "so one bad row aborts the whole file.",
+    )
+
+    def validate_file(self, value):
+        name = (value.name or "").lower()
+        if not name.endswith((".csv", ".xlsx", ".xlsm")):
+            raise serializers.ValidationError(
+                "Upload a .csv or .xlsx file. Download the template if you need "
+                "the right column headers."
+            )
+        # Reuse the platform upload limit rather than inventing a second one.
+        from django.conf import settings
+
+        max_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+        if value.size > max_bytes:
+            raise serializers.ValidationError(
+                f"That file is {value.size / 1024 / 1024:.1f} MB — the limit is "
+                f"{settings.MAX_UPLOAD_SIZE_MB} MB."
+            )
+        return value
+
+
+class ImportRowSerializer(serializers.Serializer):
+    row = serializers.IntegerField(help_text="Spreadsheet row number.")
+    ok = serializers.BooleanField()
+    name = serializers.CharField(allow_blank=True)
+    asset_tag = serializers.CharField(allow_blank=True)
+    errors = serializers.DictField(child=serializers.ListField())
+
+
+class ImportResultSerializer(serializers.Serializer):
+    """What the import did, row by row."""
+
+    total_rows = serializers.IntegerField()
+    valid_rows = serializers.IntegerField()
+    invalid_rows = serializers.IntegerField()
+    created = serializers.IntegerField()
+    committed = serializers.BooleanField(
+        help_text="False for a dry run, or when errors aborted the import."
+    )
+    partial = serializers.BooleanField()
+    rows = ImportRowSerializer(many=True)
+
+
+class ImportColumnSerializer(serializers.Serializer):
+    header = serializers.CharField()
+    required = serializers.BooleanField()
+    help_text = serializers.CharField(allow_blank=True)
+    example = serializers.CharField(allow_blank=True)
+    lookup = serializers.CharField(allow_blank=True)
+
+
 class AssetStatsSerializer(serializers.Serializer):
     """Counts shown above the asset table."""
 

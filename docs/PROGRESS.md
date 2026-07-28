@@ -17,12 +17,12 @@
 |-------|------|--------|
 | Phase 0 — Foundation | 1–5 | ✅ Complete |
 | Phase 1 — Core Asset Engine | 6–12 | ✅ Complete (Days 6–12) |
-| Phase 2 — Maintenance, Procurement, Reports | 13–18 | 🟡 Days 13–16 done · Days 17, 18 open |
+| Phase 2 — Maintenance, Procurement, Reports | 13–18 | 🟡 Days 13–17 done · Day 18 open |
 | Phase 3 — Frontend | 19–26 | 🟡 Days 19–23 done · Day 25 mostly done · **every sidebar screen is now live** |
 | Phase 4 — Integration, Testing & Launch | 27–30 | ⬜ Not started |
 
-**Backend test suite:** 414 tests, all passing · **Coverage:** 88.1% (target ≥ 70%, NFR-12)
-**OpenAPI schema:** 57 endpoints, 0 errors, 0 warnings (NFR-13)
+**Backend test suite:** 456 tests, all passing · **Coverage:** 88.6% (target ≥ 70%, NFR-12)
+**OpenAPI schema:** 60 endpoints, 0 errors, 0 warnings (NFR-13)
 **Query counts:** every list endpoint asserted flat — cost does not grow with rows (NFR-1)
 
 > **Note on sequencing.** The plan runs backend-first (Days 1–18) then frontend
@@ -34,26 +34,31 @@
 
 ## ▶ Next up — start here
 
-**Day 17 — Bulk import** 🟢
+**Day 18 — Notifications & scheduled jobs** 🟢🟡 — the last of the backend feature work.
 
-1. `POST /assets/import/` accepting CSV/XLSX, validating **row by row** and
-   returning a per-row report: which rows would be created, which failed, and
-   why. Reuse `AssetWriteSerializer` so import and API validation cannot drift.
-2. A `?dry_run=true` mode that validates without writing — the UI should let
-   someone see the damage before committing.
-3. `GET /assets/import/template/` returning a CSV template with the right
-   headers and one example row. Look up categories, locations, departments and
-   vendors **by name**, not id — nobody types database ids into a spreadsheet.
-4. Import the whole file in one transaction so a bad row halfway through cannot
-   leave a half-populated register.
-5. Frontend import wizard: upload → validation report → confirm. The reports
-   screen already has the download plumbing to copy from.
+1. `Notification` model per SRS §4.1 (user, type, title, message, is_read,
+   related object, created_at) with `GET /notifications/` and
+   `POST /notifications/{id}/read/`, plus a mark-all-read.
+2. Fire in-app notifications from the events that already exist: asset assigned
+   to you, your request approved or rejected, a request awaiting your approval,
+   maintenance booked on an asset you hold.
+3. Celery + Redis. **Redis is not installed locally** — either install it, or
+   keep `CELERY_TASK_ALWAYS_EAGER` for dev and only wire the real broker at
+   deploy. The beat schedule in `config/celery.py` already names three tasks
+   that do not exist yet:
+   - `apps.assets.tasks.recalculate_all_depreciation` (monthly, FR-8.4)
+   - `apps.notifications.tasks.scan_expiring_warranties` (daily, FR-7.3)
+   - `apps.notifications.tasks.scan_due_maintenance` (daily, FR-6.5)
+4. Email dispatch for the same events, respecting `User.email_notifications`,
+   which exists but is currently never read.
+5. Wire the notifications dropdown in the top bar — it currently renders a
+   permanent empty state.
 
-**DoD:** A sample file imports with a clear validation report; bad rows are
-rejected with reasons.
+**DoD:** Triggering an assignment creates a notification; a scheduled task runs
+and produces reminders and emails in dev.
 
-**Then Day 18** — notifications and the Celery jobs, which is the last of the
-backend feature work before Phase 4.
+**After that, Phase 4** — Day 27 end-to-end journeys per role, Day 28 security
+and performance, Day 29 deployment, Day 30 docs and handover.
 
 Reusable groundwork: `BaseModelViewSet`, the envelope, the table/toolbar/modal
 patterns in `js/masters.js`, `js/assets.js`, `js/audit.js` and `js/requests.js`,
@@ -171,6 +176,41 @@ audit row.
 - Verified against hand calculations: ₹78,000 cost / ₹8,000 salvage / 4 years
   gives ₹17,500 a year and lands exactly on salvage.
 - **Still pending:** the monthly recalculation Celery task (Day 18).
+
+### Day 17 — Bulk import ✅
+- `POST /assets/import/` takes CSV or XLSX and returns a **per-row report**:
+  which rows are ready, which failed, and why, keyed by spreadsheet column and
+  numbered to match the actual row in the file (row 2 is the first data row).
+- **Validation is not duplicated.** Rows go through `AssetWriteSerializer`, the
+  same serializer the API uses, so import rules and API rules cannot drift.
+  Salvage-above-cost is rejected on import because it is rejected by the API.
+- **Masters are matched by name**, case-insensitively — nobody types database
+  ids into a spreadsheet. An unknown name is a row error that says what was not
+  found and what to do about it.
+- Three safety levels: `dry_run` writes nothing, the default aborts the whole
+  file if any row is bad (returning **422** with the report), and `partial=true`
+  imports the good rows and reports the rest.
+- Tolerates what spreadsheets actually contain: a UTF-8 BOM from Excel,
+  `₹1,78,000.00` in a cost column, `15/01/2026` as well as ISO dates, blank
+  spacer rows in XLSX, and unknown extra columns (ignored, not fatal).
+- Catches duplicates **within the file**, which the serializer cannot see
+  because it only checks the database.
+- `GET /assets/import/template/` builds its example row from **this
+  installation's** master data, preferring a name matching the column's own
+  example — so the row you download actually imports, filed under Laptops
+  rather than whichever category sorts first.
+- `GET /assets/import/columns/` exposes the column reference so the wizard can
+  explain itself without hard-coding the schema.
+- Import wizard on the assets screen: choose file → read the report → commit.
+  The dry run is not optional; nobody should discover what an import does by
+  running it.
+- `MAX_ROWS` caps a file at 5000.
+
+**Known cost:** a committed row is about ten queries — four foreign-key checks
+from the serializer, three for tag generation, the insert, and two for the audit
+record. That is the price of reusing the API's validation, and `MAX_ROWS` bounds
+the total, but a materially larger import belongs in a Celery job. Pinned by a
+test so it cannot quietly get worse.
 
 ### Day 16 — Reports & exports ✅
 - Four reports — asset register, depreciation, maintenance cost, assignment —

@@ -291,11 +291,15 @@
     readQuerySearch();
     $('#searchIcon').html(ui.icon('search', 17));
     $('#addBtn').prepend(ui.icon('plus', 17));
+    $('#importBtn').prepend(ui.icon('download', 16));
     $('#clearFiltersBtn').prepend(ui.icon('close', 15));
 
     T.auth.requireAuth()
       .then(function () {
-        if (!session.canWrite()) { $('#addBtn').remove(); }
+        if (!session.canWrite()) {
+          $('#addBtn').remove();
+          $('#importBtn').remove();
+        }
         return populateFilters();
       })
       .then(reload)
@@ -342,6 +346,10 @@
     $('#addBtn').on('click', function () { T.assetForm.open(null, reload); });
     $('#tableBody').on('click', '[data-empty-action]', function () {
       T.assetForm.open(null, reload);
+    });
+
+    $('#importBtn').on('click', function () {
+      T.importWizard.open(function () { reload(); });
     });
 
     $('#tableBody').on('click', '[data-act="edit"]', function () {
