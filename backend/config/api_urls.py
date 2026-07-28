@@ -33,7 +33,7 @@ urlpatterns = [
     path("", include("apps.accounts.urls")),
     path("", include("apps.masters.urls")),
     path("", include("apps.assets.urls")),
-    # path("", include("apps.maintenance.urls")),
+    path("", include("apps.maintenance.urls")),
     # path("", include("apps.procurement.urls")),
     path("", include("apps.reports.urls")),
     # path("", include("apps.notifications.urls")),

@@ -17,12 +17,12 @@
 |-------|------|--------|
 | Phase 0 — Foundation | 1–5 | ✅ Complete |
 | Phase 1 — Core Asset Engine | 6–12 | ✅ Complete (Days 6–12) |
-| Phase 2 — Maintenance, Procurement, Reports | 13–18 | 🟡 Day 15 dashboard API done · rest open |
-| Phase 3 — Frontend | 19–26 | 🟡 Days 19–23 done · Day 25 mostly done · audit + requests screens done |
+| Phase 2 — Maintenance, Procurement, Reports | 13–18 | 🟡 Days 13, 15 done · Days 14, 16–18 open |
+| Phase 3 — Frontend | 19–26 | 🟡 Days 19–23 done · Day 25 mostly done · audit, requests + maintenance screens done |
 | Phase 4 — Integration, Testing & Launch | 27–30 | ⬜ Not started |
 
-**Backend test suite:** 292 tests, all passing · **Coverage:** 85.1% (target ≥ 70%, NFR-12)
-**OpenAPI schema:** 43 endpoints, 0 errors, 0 warnings (NFR-13)
+**Backend test suite:** 328 tests, all passing · **Coverage:** 86.4% (target ≥ 70%, NFR-12)
+**OpenAPI schema:** 49 endpoints, 0 errors, 0 warnings (NFR-13)
 **Query counts:** every list endpoint asserted flat — cost does not grow with rows (NFR-1)
 
 > **Note on sequencing.** The plan runs backend-first (Days 1–18) then frontend
@@ -34,26 +34,25 @@
 
 ## ▶ Next up — start here
 
-**Day 13 — Maintenance management** 🟢
+**Day 14 — Procurement (purchase orders)** 🟢 — clears the last greyed-out nav item.
 
-1. `MaintenanceRecord` model: asset, type, scheduled date, completed date,
-   technician, vendor, cost estimate, actual cost, status
-   (scheduled / in_progress / completed / cancelled), notes.
-2. CRUD endpoints plus `POST /maintenance/{id}/complete/`. Scheduling flips the
-   asset to `Under Maintenance`; completing captures the actual cost and
-   restores the **previous** status — so an asset that was Assigned goes back to
-   Assigned, not to Available. Store the prior status on the record.
-3. Guards: only `Available` or `Assigned` assets can enter maintenance
-   (`Asset.can_be_maintained` already encodes this); completing a completed
-   record → 409.
-4. Give the transitions their own audit verbs via `audit.services.domain_action()`.
-5. Frontend `maintenance.html` — schedule form, list with status, and a complete
-   action capturing actual cost. Flip the nav item in `js/shell.js`.
+1. `PurchaseOrder` (po_number unique, vendor, po_date, expected_delivery,
+   status, total_amount, created_by) + `PurchaseOrderItem` (description,
+   quantity, unit_cost, category). Auto-generate the PO number the same way
+   asset tags work — see `apps/assets/services/tagging.py`.
+2. CRUD endpoints; `total_amount` derived from the line items rather than
+   trusted from the client.
+3. `POST /purchase-orders/{id}/receive/` optionally auto-creates assets from the
+   line items (FR-7.2) — quantity 3 of "Dell Latitude" creates 3 assets, each
+   with its own generated tag, in one transaction. Guard against receiving twice.
+4. Warranty-expiry flagging already exists on the asset side (FR-7.3); surface
+   it in the procurement view if useful.
+5. Frontend `procurement.html` with a line-item editor and a receive flow.
 
-**DoD:** Maintenance lifecycle updates asset status correctly; costs recorded.
+**DoD:** POs CRUD; receiving can generate assets; warranty flags computed.
 
-**Then Day 14** (procurement), which clears the last greyed-out nav item, and
-**Day 16–17** (reports and import/export).
+**Then Days 16–18** — reports and exports, bulk import, then notifications and
+the Celery jobs, which is the last of the backend feature work.
 
 Reusable groundwork: `BaseModelViewSet`, the envelope, the table/toolbar/modal
 patterns in `js/masters.js`, `js/assets.js`, `js/audit.js` and `js/requests.js`,
@@ -171,6 +170,32 @@ audit row.
 - Verified against hand calculations: ₹78,000 cost / ₹8,000 salvage / 4 years
   gives ₹17,500 a year and lands exactly on salvage.
 - **Still pending:** the monthly recalculation Celery task (Day 18).
+
+### Day 13 — Maintenance management ✅
+- `MaintenanceRecord` with type, schedule, technician/vendor, cost estimate vs
+  actual, and notes (FR-6.1).
+- **Scheduling does not take the asset out of service.** An asset booked for
+  next Tuesday is still usable today; it only moves to `Under Maintenance` when
+  the work actually starts (FR-6.2). A `start_now` flag books and starts in one
+  call for same-day work.
+- **`asset_status_before` is the field that matters.** Completing restores the
+  asset to where it came from, so a laptop that was *Assigned* when it went in
+  for a screen repair goes back to its holder rather than into the Available
+  pool — which is what a naive "restore to Available" would do (FR-6.3). Two
+  edge cases handled: if the holder was cleared while it sat in the workshop it
+  falls back to Available, and if something else moved the asset meanwhile the
+  completion leaves that alone rather than overwriting it.
+- Guards: can't double-book an asset (one open record at a time), can't
+  complete work that never started, can't start/complete/cancel a settled
+  record — all 409 with a sentence saying what to do.
+- Cancelling in-progress work puts the asset straight back into service.
+- Filters for status, type, vendor, category, date range, `open_only` and
+  `overdue`; stats endpoint reports actual vs estimated spend.
+- Maintenance screen with overdue rows marked in Coral, in-progress in Cream
+  Yolk, and cost variance shown against the estimate. The complete dialog states
+  where the asset will end up, since that is the non-obvious part.
+- Everyone can read maintenance — an employee holding a laptop should see it is
+  going in on Tuesday — but only managers can book, start, complete or cancel.
 
 ### Day 12 — Backend test & hardening pass ✅
 Not a paperwork exercise — it found three real problems.
