@@ -31,7 +31,7 @@ window.Trasset = window.Trasset || {};
     { id: 'masters', label: 'Master Data', icon: 'layers', href: 'masters.html', ready: true },
     { id: 'users', label: 'Users', icon: 'users', href: 'users.html', ready: true,
       roles: ['super_admin'] },
-    { id: 'audit', label: 'Audit Log', icon: 'shield', href: 'audit.html', ready: false,
+    { id: 'audit', label: 'Audit Log', icon: 'shield', href: 'audit.html', ready: true,
       roles: ['super_admin', 'auditor'] },
     { id: 'settings', label: 'Settings', icon: 'settings', href: 'settings.html', ready: true }
   ];

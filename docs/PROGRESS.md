@@ -5,7 +5,7 @@
 > Update this file at the end of every working session.
 
 **Started:** 2026-07-27
-**Last updated:** 2026-07-27
+**Last updated:** 2026-07-28
 **Plan:** [`Trasset_Build_Plan.md`](Trasset_Build_Plan.md) · **Contract:** [`Trasset_SRS.md`](Trasset_SRS.md)
 **Repo:** https://github.com/Shivamchaubey14/trasset (public) · branches `main`, `dev`
 
@@ -16,13 +16,13 @@
 | Phase | Days | Status |
 |-------|------|--------|
 | Phase 0 — Foundation | 1–5 | ✅ Complete |
-| Phase 1 — Core Asset Engine | 6–12 | 🟡 Days 6, 7, 8, 9 done · Days 10–12 open |
+| Phase 1 — Core Asset Engine | 6–12 | 🟡 Days 6–10 done · Days 11, 12 open |
 | Phase 2 — Maintenance, Procurement, Reports | 13–18 | 🟡 Day 15 dashboard API done · rest open |
-| Phase 3 — Frontend | 19–26 | 🟡 Days 19–23 done · Day 25 partly done |
+| Phase 3 — Frontend | 19–26 | 🟡 Days 19–23 done · Day 25 partly done · audit screen done |
 | Phase 4 — Integration, Testing & Launch | 27–30 | ⬜ Not started |
 
-**Backend test suite:** 163 tests, all passing · **Coverage:** 80.3% (target ≥ 70%, NFR-12)
-**OpenAPI schema:** 34 endpoints, 0 errors, 0 warnings (NFR-13)
+**Backend test suite:** 191 tests, all passing · **Coverage:** 82.4% (target ≥ 70%, NFR-12)
+**OpenAPI schema:** 37 endpoints, 0 errors, 0 warnings (NFR-13)
 
 > **Note on sequencing.** The plan runs backend-first (Days 1–18) then frontend
 > (19–26). At the user's request the frontend was pulled forward once auth,
@@ -33,23 +33,29 @@
 
 ## ▶ Next up — start here
 
-**Day 10 — Audit logging** 🟢
+**Day 11 — Asset requests & approvals** 🟢
 
-1. `AuditLog` model + signals/middleware capturing create/update/delete/assign
-   with user, IP and a JSON diff of what changed.
-2. `GET /audit-logs/` read-only, Admin + Auditor only, filterable by entity.
-3. Flip the `audit` nav item in `frontend/js/shell.js` to `ready: true` and
-   build `audit.html` off the existing table pattern.
+1. `AssetRequest` model: requester, asset (or category if the user is asking for
+   "a laptop"), reason, status (pending / approved / rejected / cancelled),
+   decided_by, decided_at, decision notes.
+2. Endpoints: `POST /asset-requests/` (employee), `GET` list scoped by role —
+   employees see their own, managers see all — plus
+   `POST /asset-requests/{id}/approve/` and `/reject/`.
+3. Approval triggers the existing `assignment.assign()` service inside the same
+   transaction, so an approved request produces a real check-out and its audit
+   row. Guard the transitions: a decided request can't be decided twice → 409.
+4. Frontend: a "Requests" screen — employees get a request form and their own
+   list, managers get an approvals inbox. Add the nav item to `js/shell.js`.
 
-**DoD:** Every asset action produces an audit entry; the endpoint lists them;
-auditors are read-only.
+**DoD:** Full request → approve → auto-assign loop works with correct
+permissions, and every step lands in the audit trail.
 
-**Then Day 11** (asset requests & approvals) and **Day 13** (maintenance),
-which unlock the two remaining greyed-out nav items.
+**Then Day 12** (backend hardening pass) and **Day 13** (maintenance).
 
 Reusable groundwork: `BaseModelViewSet`, the envelope, the table/toolbar/modal
-patterns in `js/masters.js` and `js/assets.js`, and `js/asset-form.js` for any
-dialog that mutates an asset.
+patterns in `js/masters.js`, `js/assets.js` and `js/audit.js`, `js/asset-form.js`
+for any dialog that mutates an asset, and `audit.services.domain_action()` to
+give a new business verb its own audit row.
 
 ---
 
@@ -161,6 +167,34 @@ dialog that mutates an asset.
 - Verified against hand calculations: ₹78,000 cost / ₹8,000 salvage / 4 years
   gives ₹17,500 a year and lands exactly on salvage.
 - **Still pending:** the monthly recalculation Celery task (Day 18).
+
+### Day 10 — Audit logging ✅
+- `AuditLog` per SRS §4.1, append-only by construction: `save()` refuses updates
+  and `delete()` raises, and the viewset exposes no write routes (405 on
+  POST/PATCH/DELETE). Application-level guarantee — production should also
+  restrict DB grants on the table.
+- `AuditContextMiddleware` binds the request; the **user is resolved lazily**
+  rather than cached, because DRF authenticates inside the view and
+  `request.user` at middleware time would be the anonymous session user.
+- `pre_save` snapshots the stored row so `post_save` can diff it. One extra
+  SELECT per update on tracked models; nothing on create.
+- Foreign keys are logged by display name, so a row reads
+  `location: Head Office → Store Room` rather than `2 → 4`.
+- `domain_action()` context manager gives a save a business verb, so assigning
+  writes one **Assigned** row instead of a generic Updated — used by
+  `assignment.assign/checkin/retire`.
+- Soft deletes are translated into a Deleted row rather than an `is_deleted`
+  field change.
+- Auth events recorded too (SEC-9): sign-in, **failed sign-in** (no actor, email
+  only), sign-out, password change and reset. Passwords are in `EXCLUDED_FIELDS`
+  and asserted absent from the trail by test.
+- Saves that change nothing write no row.
+- `suspend()` context manager keeps seeding and migrations out of the trail;
+  `bootstrap` uses it.
+- `GET /audit-logs/` (Admin + Auditor only) with filters for action, entity type,
+  entity id, user and date range, plus search and `/summary/` counts.
+- Audit screen with expandable per-row diffs, action pills coloured from the
+  palette, and summary cards.
 
 ### Day 9.1 — QR codes ✅ (pulled forward)
 - `GET /assets/{id}/qr/` returns a PNG encoding the asset's detail URL
@@ -289,6 +323,13 @@ DELETE assigned asset as admin                 → 409 "still assigned to …"
 GET  /assets/{id}/history/                     → 200, 2 immutable rows
 GET  /assets/{id}/depreciation/                → 200, ends exactly at salvage
 GET  /assets/{id}/qr/                          → 200 image/png, 895 bytes
+
+GET  /api/v1/audit-logs/  (auditor / admin)    → 200
+GET  /api/v1/audit-logs/  (manager / employee) → 403 "Only Super Admins and Auditors…"
+POST/PATCH/DELETE /audit-logs/                 → 405, no write route exists
+GET  /audit-logs/summary/                      → 200 totals + per-action counts
+assign → one "Assigned" row, FK diff by name, _context carries notes
+failed login → "Sign-in failed" row, no actor, attempted password absent
 ```
 
 **Frontend** — all 21 files serve over HTTP; every JS file and inline block
@@ -302,8 +343,13 @@ passes a syntax check. Not yet clicked through in a browser (see below).
   syntax-checking every script, and exercising the exact API calls each page
   makes — but nobody has driven the real UI yet. Expect small visual fixes on
   first run.
-- Maintenance, procurement, reports and audit screens still show a "soon" badge
-  in the sidebar; their backends aren't built.
+- Maintenance, procurement and reports screens still show a "soon" badge in the
+  sidebar; their backends aren't built.
+- Audit rows are written but never pruned. A busy register will grow this table
+  indefinitely — worth a retention policy (archive or partition by month) before
+  production, and it pairs naturally with the Day 18 Celery work.
+- The audit trail is append-only at the application layer. A DB superuser can
+  still edit the table, so production should restrict grants on `audit_logs`.
 - Notifications dropdown renders an empty state; the model arrives on Day 18.
 - Attachment upload works via the API but has no UI yet — the detail page shows
   specifications and history, not a documents tab. Worth adding with Day 26.

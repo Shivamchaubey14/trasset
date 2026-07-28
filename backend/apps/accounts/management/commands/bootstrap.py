@@ -18,6 +18,7 @@ from django.db.models import Count
 from apps.accounts.models import Role, User
 from apps.assets.constants import AssetStatus, AssignmentAction, DepreciationMethod
 from apps.assets.models import Asset, AssetAssignment
+from apps.audit.services import suspend as suspend_audit
 from apps.masters.models import Category, Department, Location, Vendor
 from common.roles import Roles
 
@@ -135,6 +136,12 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
+        # Seeding is not a user action — keep it out of the audit trail so the
+        # first real change is the first thing an auditor sees.
+        with suspend_audit():
+            self._run(options)
+
+    def _run(self, options):
         roles = {role.name: role for role in Role.objects.all()}
         if not roles:
             self.stderr.write(self.style.ERROR(

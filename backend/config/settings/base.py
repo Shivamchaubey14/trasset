@@ -74,6 +74,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Last, so the request is bound for the whole view (SEC-9).
+    "apps.audit.middleware.AuditContextMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"

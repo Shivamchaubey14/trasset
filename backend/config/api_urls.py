@@ -37,5 +37,5 @@ urlpatterns = [
     # path("", include("apps.procurement.urls")),
     path("", include("apps.reports.urls")),
     # path("", include("apps.notifications.urls")),
-    # path("", include("apps.audit.urls")),
+    path("", include("apps.audit.urls")),
 ]

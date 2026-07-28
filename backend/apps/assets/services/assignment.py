@@ -11,6 +11,8 @@ moment can't both win — the second sees the updated status and gets a 409.
 from django.db import transaction
 from django.utils import timezone
 
+from apps.audit.constants import AuditAction
+from apps.audit.services import domain_action
 from common.exceptions import Conflict
 
 from ..constants import TERMINAL_STATUSES, AssetStatus, AssignmentAction
@@ -60,7 +62,10 @@ def assign(asset, user, actor=None, notes=""):
     asset.assigned_to = user
     asset.assigned_at = timezone.now()
     asset.status = AssetStatus.ASSIGNED
-    asset.save()
+    # Log this as "Assigned" rather than a bare field update (FR-13.1).
+    with domain_action(AuditAction.ASSIGN, {"assigned_to": user.full_name,
+                                            "notes": notes}):
+        asset.save()
 
     AssetAssignment.objects.create(
         asset=asset,
@@ -110,7 +115,10 @@ def checkin(asset, actor=None, notes="", location=None):
             locked.status = AssetStatus.AVAILABLE
             if location is not None:
                 locked.location = location
-            locked.save()
+            with domain_action(AuditAction.CHECKIN, {"returned_by": holder.full_name,
+                                                     "days_held": held_days,
+                                                     "notes": notes}):
+                locked.save()
 
             AssetAssignment.objects.create(
                 asset=locked,
@@ -168,7 +176,8 @@ def retire(asset, status=AssetStatus.RETIRED, actor=None, notes=""):
     asset.status = status
     if notes:
         asset.notes = f"{asset.notes}\n{notes}".strip() if asset.notes else notes
-    asset.save()
+    with domain_action(AuditAction.RETIRE, {"outcome": status, "notes": notes}):
+        asset.save()
     return asset
 
 
