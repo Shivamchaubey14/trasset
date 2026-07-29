@@ -27,7 +27,7 @@
 | Phase 4 — Integration, Testing & Launch | 27–30 | 🟡 Days 27, 28 done · Days 29, 30 open |
 | Hindi/English toggle (added on request) | — | 🟡 Engine + chrome done · page content pending |
 | **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
-| **Phase 6 — Mobile app foundation** | 36–41 | 🟡 Days 36–39 done · Days 40, 41 open |
+| **Phase 6 — Mobile app foundation** | 36–41 | 🟡 Days 36–40 done · Day 41 open |
 
 **Backend test suite:** 710 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
@@ -63,12 +63,13 @@ runs in Expo Go with the tab shell, both themes and both fonts. Next:
 - **Day 37** — ✅ done: typed API client, generated from the schema.
 - **Day 38** — ✅ done: authentication, biometric unlock, session persistence.
 - **Day 39** — ✅ done: design system and component gallery.
-- **Day 40** — ⬅ **next**: scanning — the reason the app exists. expo-camera
-  for QR and 1D barcodes, resolving through `GET /assets/by-tag/` (BE-6),
-  haptics on a hit because the user is often not looking at the screen, a
-  permission flow that recovers from an earlier denial, and manual entry for
-  damaged labels.
-- **Day 41** — asset detail.
+- **Day 40** — ✅ done: scanning, manual entry, and a minimal asset detail to
+  land on.
+- **Day 41** — ⬅ **next**: asset detail proper. Assignment history, the
+  lifecycle actions surfaced by state and role (matching the web's rules and
+  the same 409 guards), specifications from category custom fields, and the
+  deep-link route polished. A minimal version already exists from Day 40 —
+  extend it rather than starting again.
 
 **Two things still needed from the user:** an **Expo account** for dev builds
 (Expo Go needs none, so Days 36–39 are unblocked), and eventually **push
@@ -149,6 +150,54 @@ audit row.
 ---
 
 ## Completed
+
+### Day 40 — Scanning ✅
+The reason the app exists (SRS §12.1).
+
+- **Both label kinds, one pipeline.** `parseScan` recognises the printed QR
+  (which encodes a *detail URL*, `…/asset-detail.html?tag=TRA-…`), a bare tag
+  someone wrote on a replacement sticker, and — falling through — a
+  manufacturer barcode, which is tried as a serial (FR-14.6, FR-14.7). Nothing
+  is rejected before the server has looked.
+- **One request on the happy path.** `GET /assets/by-tag/` (BE-6) exists for
+  exactly this and returns the detail shape, so a scan needs no follow-up call.
+  Measured at **38 ms** against MNFR-2's 2-second budget.
+- **The serial fallback is deliberately strict.** It searches, then requires an
+  *exact* serial match client-side. A search for `SN-4471` will happily return
+  three assets whose serials merely contain it, and opening the wrong asset is
+  worse than saying "not recognised". Proven: a partial serial resolves to
+  nothing rather than to something plausible.
+- **Haptics fire before the lookup, not after.** The user is holding the phone
+  at a shelf looking at the *asset*, not the screen (§12.6). The buzz confirms
+  the scan registered; whether it resolves is a separate signal (success vs
+  warning notification).
+- **Scanning is locked while one resolves**, via a ref rather than state. A
+  camera fires the same code many times a second and React re-renders too
+  slowly to gate it — without the lock one label launches a dozen requests and
+  pushes a dozen screens.
+- **The permission flow distinguishes "not asked yet" from "already refused".**
+  They look identical in the API but need opposite actions: one shows the OS
+  dialog, the other must send the user to Settings, because the OS will never
+  show that dialog again. A button that silently does nothing is the failure
+  being avoided.
+- **Every failure is a state with a way out** — unknown tag, unrecognised
+  barcode, ambiguous serial and offline all say something different, and each
+  offers "Scan again" and "Enter by hand". A scanner that quietly ignores a
+  label leaves the user unable to tell whether it even saw it.
+- **The camera unmounts when the tab loses focus.** Left running it drains the
+  battery and, on some Android devices, holds the sensor so other apps cannot
+  use it.
+- Manual entry (FR-14.8) goes through the *same* resolver, so there is one set
+  of answers rather than two implementations that drift.
+
+**Verified:** `npm run verify:scan` — 18 checks against the live API, all
+passing: every parse case, the QR round trip, exact-vs-partial serial matching,
+junk and unrelated barcodes reported as not-found rather than errors, and a
+soft-deleted asset refusing to resolve.
+
+**Needs the handset, honestly outstanding:** the camera itself, the haptics,
+and the permission dialogs. Everything downstream of the camera is proven; the
+camera is not.
 
 ### Day 39 — Design system ✅
 Brand-consistent primitives, before screens start improvising.

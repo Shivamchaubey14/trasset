@@ -7,23 +7,7 @@ import React from "react";
 import { Placeholder } from "@/components/Placeholder";
 
 export { ProfileScreen } from "./ProfileScreen";
-
-export function ScanScreen() {
-  return (
-    <Placeholder
-      day="Day 40"
-      title="Scan"
-      subtitle="The reason the app exists. Point the camera at a label and land on the asset."
-      planned={[
-        "QR and 1D barcode scanning with expo-camera (FR-14.6, FR-14.7)",
-        "Resolve through GET /assets/by-tag/ — one call, one asset (BE-6)",
-        "Haptic feedback on a hit: the user is often not looking at the screen",
-        "Manual entry when a label is damaged (FR-14.8)",
-        "Entry point for a stock take, with a banner to resume an open session",
-      ]}
-    />
-  );
-}
+export { ScanScreen } from "./scan/ScanScreen";
 
 export function AssetsScreen() {
   return (

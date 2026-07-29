@@ -19,8 +19,11 @@ import {
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
 
+import type { AssetDetail } from "@/api";
 import { useAuth } from "@/auth/AuthContext";
+import { AssetDetailScreen } from "@/screens/AssetDetailScreen";
 import { GalleryScreen } from "@/screens/GalleryScreen";
+import { ManualEntryScreen } from "@/screens/scan/ManualEntryScreen";
 import { SignInScreen } from "@/screens/auth/SignInScreen";
 import { UnlockScreen } from "@/screens/auth/UnlockScreen";
 import { fonts, useTheme } from "@/theme";
@@ -32,8 +35,10 @@ export type RootStackParamList = {
   SignIn: undefined;
   Unlock: undefined;
   Gallery: undefined;
+  /** `asset` is the record a scan already fetched, so detail paints instantly. */
+  Asset: { id: number; asset?: AssetDetail };
+  ManualEntry: undefined;
   // Arriving in later phases:
-  // Asset: { id: number };
   // StockTake: { id?: number };
 };
 
@@ -53,6 +58,8 @@ const linking: LinkingOptions<RootStackParamList> = {
           Profile: "profile",
         },
       },
+      // `trasset://assets/12` from a tapped push (FR-14.23, BE-3).
+      Asset: "assets/:id",
     },
   },
 };
@@ -93,6 +100,16 @@ export function RootNavigator() {
         {state === "signedIn" ? (
           <>
             <Stack.Screen name="App" component={AppTabs} />
+            <Stack.Screen
+              name="Asset"
+              component={AssetDetailScreen}
+              options={{ headerShown: true, title: "Asset" }}
+            />
+            <Stack.Screen
+              name="ManualEntry"
+              component={ManualEntryScreen}
+              options={{ headerShown: true, title: "Find an asset" }}
+            />
             {__DEV__ ? (
               <Stack.Screen
                 name="Gallery"

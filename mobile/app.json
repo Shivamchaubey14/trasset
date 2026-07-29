@@ -36,6 +36,12 @@
         {
           "faceIDPermission": "Trasset uses Face ID so you can unlock the app without typing your password."
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Trasset uses the camera to scan asset labels and barcodes."
+        }
       ]
     ],
     "extra": {
