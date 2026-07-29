@@ -12,6 +12,7 @@
     "gen:api": "openapi-typescript http://127.0.0.1:8000/api/schema/ -o src/api/schema.d.ts",
     "verify:api": "tsx scripts/verify-client.ts",
     "verify:scan": "tsx scripts/verify-scan.ts",
+    "verify:detail": "tsx scripts/verify-detail.ts",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },

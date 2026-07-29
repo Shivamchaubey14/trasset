@@ -27,7 +27,8 @@
 | Phase 4 — Integration, Testing & Launch | 27–30 | 🟡 Days 27, 28 done · Days 29, 30 open |
 | Hindi/English toggle (added on request) | — | 🟡 Engine + chrome done · page content pending |
 | **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
-| **Phase 6 — Mobile app foundation** | 36–41 | 🟡 Days 36–40 done · Day 41 open |
+| **Phase 6 — Mobile app foundation** | 36–41 | ✅ Complete (Days 36–41) |
+| Phase 7 — Core journeys | 42–47 | ⬜ Not started |
 
 **Backend test suite:** 710 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
@@ -63,13 +64,14 @@ runs in Expo Go with the tab shell, both themes and both fonts. Next:
 - **Day 37** — ✅ done: typed API client, generated from the schema.
 - **Day 38** — ✅ done: authentication, biometric unlock, session persistence.
 - **Day 39** — ✅ done: design system and component gallery.
-- **Day 40** — ✅ done: scanning, manual entry, and a minimal asset detail to
-  land on.
-- **Day 41** — ⬅ **next**: asset detail proper. Assignment history, the
-  lifecycle actions surfaced by state and role (matching the web's rules and
-  the same 409 guards), specifications from category custom fields, and the
-  deep-link route polished. A minimal version already exists from Day 40 —
-  extend it rather than starting again.
+- **Day 40** — ✅ done: scanning and manual entry.
+- **Day 41** — ✅ done: asset detail with history and state/role-aware actions.
+  **Phase 6 complete.**
+
+**Phase 7 — core journeys (Days 42–47) is next.** Day 42 is "My assets" and
+register search; Day 43 makes the assign and check-in buttons actually work,
+with the user picker and the 409-as-resolvable-conflict flow those buttons are
+waiting on.
 
 **Two things still needed from the user:** an **Expo account** for dev builds
 (Expo Go needs none, so Days 36–39 are unblocked), and eventually **push
@@ -150,6 +152,47 @@ audit row.
 ---
 
 ## Completed
+
+### Day 41 — Asset detail ✅ — *Phase 6 complete*
+What you need while standing in front of the thing.
+
+- **Not a port of the web's tabs.** The web has room for Overview, History,
+  Specifications and Depreciation side by side; a phone does not, and hiding
+  history behind a tab costs a tap in exactly the moment somebody is asking
+  "who had this last?". One scroll, ordered by what a person at a shelf needs
+  first: what it is, who has it, then the detail. Depreciation is deliberately
+  absent — a valuation schedule is a desk task (§12.8) and the current value is
+  already on screen.
+- **Actions are surfaced by state and role**, mirroring
+  `frontend/js/asset-detail.js` exactly: assign only from Available, check in
+  only from Assigned, retire only while not terminal, nothing at all for a role
+  that cannot write. Deliberately narrower than the web — no Edit, no Delete
+  (§12.8). Retire is flagged `onlineOnly`, since §12.5 excludes it from the
+  offline queue.
+- **Reporting an issue is available to everyone, not just managers.** An
+  employee holding a broken laptop is who notices first, and making that
+  manager-only means it never gets reported (FR-14.14).
+- **A state with no action explains itself.** "Under maintenance" is not a
+  failure and should not read like one, so the screen says why the asset cannot
+  be assigned rather than just omitting the button.
+- **Assignment history is a timeline**, with the current holder open-ended
+  rather than shown with a fabricated end date.
+- **The deep-link id is normalised.** `trasset://assets/12` supplies `id` as a
+  *string* from the URL while a scan supplies a number — without `Number()` the
+  same asset caches twice under `"12"` and `12`.
+
+**Verified:** `npm run verify:detail` — 19 checks, all passing. The valuable
+ones are in part 2: rather than testing the action rules against my own idea of
+the server, it asks the client what it would show and the *server* what it
+would allow, for each role, and fails on disagreement. A manager is offered
+assign and the server permits it; an employee is not offered it and the server
+returns 403. That is the property that matters — a hidden button is a courtesy,
+and the two must not drift.
+
+**Outstanding:** the buttons appear but do not act yet — assign and check in are
+Day 43 (they need the user picker and the conflict flow), report-an-issue is
+Day 44. Tapping one says so rather than failing silently. And the DoD's "on a
+real device" is still yours to confirm.
 
 ### Day 40 — Scanning ✅
 The reason the app exists (SRS §12.1).
