@@ -191,6 +191,16 @@ builds at 6.79 MB.
 itself both need a real handset. The logic underneath each is covered, but
 neither has been driven on hardware yet.
 
+**Splash artwork and app icon added** (pulled forward from Day 58, since the
+splash-holding logic was meaningless without something to show). Generated from
+`frontend/assets/favicon.svg` and `logo.svg` so the app icon is *the same mark*
+as the website's rather than a lookalike, and set in real Quicksand Bold from
+the font package the app already bundles. Two details worth keeping:
+the Android adaptive foreground is drawn at 34% so a round-icon launcher
+mask cannot clip it; and the splash wordmark is **white + green, not the web's
+ink + green**, because Ink on an Ink background is invisible — the same reason
+Ink stops being text in the dark theme.
+
 ### Day 37 — Mobile API client ✅
 Typed access to the API, generated rather than hand-written.
 
