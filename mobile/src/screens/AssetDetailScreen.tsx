@@ -40,16 +40,21 @@ import {
 import type { RootStackParamList } from "@/navigation/RootNavigator";
 import { type AssetStatus, fonts, fontSizes, radius, spacing, useTheme } from "@/theme";
 
+/**
+ * A history row is an *event*, not a date range — the API appends one row per
+ * transition (FR-4.3, immutable by construction). Getting this wrong is easy:
+ * an earlier draft assumed `assigned_at`/`returned_at` and rendered every entry
+ * as "still held" with no dates at all.
+ */
 type HistoryRow = {
   id: number;
   action: string;
   action_label?: string;
   user?: { full_name?: string } | null;
   assigned_by?: { full_name?: string } | null;
-  assigned_at?: string | null;
-  returned_at?: string | null;
   days_held?: number | null;
   notes?: string | null;
+  created_at: string;
 };
 
 export function AssetDetailScreen() {
@@ -125,11 +130,22 @@ export function AssetDetailScreen() {
     : (rawHistory?.results ?? []);
 
   function runAction(spec: ActionSpec) {
-    // Day 43 wires assign and check in with the user picker and the 409
-    // conflict flow; Day 44 wires report-an-issue. The buttons appear now
-    // because getting *which* actions show, by state and role, is this day's
-    // job — and it is the part that has to match the API's rules exactly.
-    toast.show(`"${spec.label}" arrives on Day ${spec.action === "report" ? 44 : 43}.`);
+    switch (spec.action) {
+      case "assign":
+        navigation.navigate("Assign", { assetId: id, assetTag: asset.asset_tag });
+        return;
+      case "checkin":
+        navigation.navigate("Checkin", {
+          assetId: id,
+          assetTag: asset.asset_tag,
+          holderName: holder?.full_name ?? null,
+        });
+        return;
+      default:
+        // Report-an-issue is Day 44; retire is not in mobile v1's queue story
+        // and lands with the rest of the lifecycle work.
+        toast.show(`"${spec.label}" arrives on Day 44.`);
+    }
   }
 
   return (
@@ -257,9 +273,19 @@ function Specifications({ asset }: { asset: AssetDetail }) {
 }
 
 function HistoryEntry({ row, last }: { row: HistoryRow; last: boolean }) {
-  const { colors } = useTheme();
-  const checkedIn = Boolean(row.returned_at);
-  const tint = checkedIn ? colors.slate : colors.primary;
+  const { colors, status: statusColors } = useTheme();
+
+  // The dot colours the *kind* of event, reusing the status palette so a
+  // check-out here reads the same green as an Assigned pill elsewhere.
+  const tint =
+    row.action === "checkin"
+      ? statusColors.available
+      : row.action === "retire"
+        ? statusColors.retired
+        : colors.ink;
+
+  const headline = row.action_label ?? humanise(row.action);
+  const person = row.user?.full_name;
 
   return (
     <View style={styles.historyRow}>
@@ -272,18 +298,15 @@ function HistoryEntry({ row, last }: { row: HistoryRow; last: boolean }) {
         {/* `value` is right-aligned for the label/value rows above; a timeline
             entry reads left-to-right, so the alignment is overridden here. */}
         <Text style={[styles.value, styles.alignLeft, { color: colors.text }]}>
-          {row.user?.full_name ?? "Unknown holder"}
+          {person ? `${headline} — ${person}` : headline}
         </Text>
         <Text style={[styles.label, { color: colors.textMuted }]}>
-          {formatDate(row.assigned_at)}
-          {row.returned_at ? ` → ${formatDate(row.returned_at)}` : " — still held"}
-          {typeof row.days_held === "number" ? ` · ${row.days_held} days` : ""}
+          {formatDate(row.created_at)}
+          {row.assigned_by?.full_name ? ` · by ${row.assigned_by.full_name}` : ""}
+          {typeof row.days_held === "number" && row.days_held >= 0
+            ? ` · held ${row.days_held} ${row.days_held === 1 ? "day" : "days"}`
+            : ""}
         </Text>
-        {row.assigned_by?.full_name ? (
-          <Text style={[styles.label, { color: colors.textMuted }]}>
-            issued by {row.assigned_by.full_name}
-          </Text>
-        ) : null}
         {row.notes ? (
           <Text style={[styles.notes, { color: colors.textMuted }]}>{row.notes}</Text>
         ) : null}

@@ -1759,9 +1759,9 @@ export interface components {
             readonly status: components["schemas"]["AssetStatusEnum"];
             readonly status_label: string;
             readonly status_color: string;
-            readonly location: components["schemas"]["Ref"];
-            readonly department: components["schemas"]["Ref"];
-            readonly assigned_to: components["schemas"]["AssigneeRef"];
+            readonly location: components["schemas"]["Ref"] | null;
+            readonly department: components["schemas"]["Ref"] | null;
+            readonly assigned_to: components["schemas"]["AssigneeRef"] | null;
             /** Format: date-time */
             readonly assigned_at: string | null;
             /** Format: date */
@@ -1787,7 +1787,7 @@ export interface components {
             readonly description: string;
             readonly model_number: string;
             readonly manufacturer: string;
-            readonly vendor: components["schemas"]["Ref"];
+            readonly vendor: components["schemas"]["Ref"] | null;
             /** Format: decimal */
             readonly salvage_value: string;
             readonly useful_life_years: number;
@@ -1799,7 +1799,7 @@ export interface components {
             readonly custom_data: unknown;
             readonly notes: string;
             readonly attachments: components["schemas"]["Attachment"][];
-            readonly created_by: components["schemas"]["AssigneeRef"];
+            readonly created_by: components["schemas"]["AssigneeRef"] | null;
             readonly can_be_assigned: boolean;
             readonly can_be_maintained: boolean;
             readonly is_terminal: boolean;
@@ -1837,9 +1837,9 @@ export interface components {
             readonly status: components["schemas"]["AssetStatusEnum"];
             readonly status_label: string;
             readonly status_color: string;
-            readonly location: components["schemas"]["Ref"];
-            readonly department: components["schemas"]["Ref"];
-            readonly assigned_to: components["schemas"]["AssigneeRef"];
+            readonly location: components["schemas"]["Ref"] | null;
+            readonly department: components["schemas"]["Ref"] | null;
+            readonly assigned_to: components["schemas"]["AssigneeRef"] | null;
             /** Format: date-time */
             readonly assigned_at: string | null;
             /** Format: date */

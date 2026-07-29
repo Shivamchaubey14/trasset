@@ -14,6 +14,7 @@
     "verify:scan": "tsx scripts/verify-scan.ts",
     "verify:detail": "tsx scripts/verify-detail.ts",
     "verify:list": "tsx scripts/verify-list.ts",
+    "verify:lifecycle": "tsx scripts/verify-lifecycle.ts",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
@@ -27,6 +28,7 @@
     "expo": "~54.0.0",
     "expo-camera": "~17.0.10",
     "expo-constants": "~18.0.13",
+    "expo-crypto": "~15.0.9",
     "expo-device": "~8.0.10",
     "expo-font": "~14.0.12",
     "expo-haptics": "~15.0.8",

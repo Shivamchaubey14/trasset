@@ -10,6 +10,7 @@ export { Avatar, initialsOf } from "./Avatar";
 export { Button } from "./Button";
 export { Card } from "./Card";
 export { Chip } from "./Chip";
+export { ConflictSheet } from "./ConflictSheet";
 export { EmptyState } from "./EmptyState";
 export { OfflineBanner } from "./OfflineBanner";
 export { Placeholder } from "./Placeholder";

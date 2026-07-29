@@ -80,9 +80,14 @@ class AssetListSerializer(serializers.ModelSerializer):
     """
 
     category = CategoryRefSerializer(read_only=True)
-    location = RefSerializer(read_only=True)
-    department = RefSerializer(read_only=True)
-    assigned_to = AssigneeRefSerializer(read_only=True)
+    # `allow_null` on a read-only field changes nothing at runtime — it exists
+    # so the generated OpenAPI schema tells the truth. Without it the schema
+    # claims these are always present, and a client generated from it (the
+    # mobile app, SRS §12.2) inherits the lie: `asset.assigned_to.full_name`
+    # type-checks and then explodes on the first unassigned asset.
+    location = RefSerializer(read_only=True, allow_null=True)
+    department = RefSerializer(read_only=True, allow_null=True)
+    assigned_to = AssigneeRefSerializer(read_only=True, allow_null=True)
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     status_color = serializers.CharField(read_only=True)
     warranty_expiring_soon = serializers.BooleanField(read_only=True)
@@ -108,8 +113,8 @@ class AssetListSerializer(serializers.ModelSerializer):
 class AssetDetailSerializer(AssetListSerializer):
     """Everything the detail page shows."""
 
-    vendor = RefSerializer(read_only=True)
-    created_by = AssigneeRefSerializer(read_only=True)
+    vendor = RefSerializer(read_only=True, allow_null=True)
+    created_by = AssigneeRefSerializer(read_only=True, allow_null=True)
     attachments = AttachmentSerializer(many=True, read_only=True)
     depreciation_method_label = serializers.CharField(
         source="get_depreciation_method_display", read_only=True

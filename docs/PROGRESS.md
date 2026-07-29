@@ -28,7 +28,7 @@
 | Hindi/English toggle (added on request) | — | 🟡 Engine + chrome done · page content pending |
 | **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
 | **Phase 6 — Mobile app foundation** | 36–41 | ✅ Complete (Days 36–41) |
-| **Phase 7 — Core journeys** | 42–47 | 🟡 Day 42 done · Days 43–47 open |
+| **Phase 7 — Core journeys** | 42–47 | 🟡 Days 42, 43 done · Days 44–47 open |
 
 **Backend test suite:** 710 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
@@ -70,13 +70,13 @@ runs in Expo Go with the tab shell, both themes and both fonts. Next:
 
 **Phase 7 — core journeys (Days 42–47).** Day 42 is ✅ done.
 
-- **Day 43** — ⬅ **next**: make the assign and check-in buttons work. User
-  picker, condition notes on check-in, optimistic UI, and **409 surfaced as a
-  conflict the user can resolve** rather than a dead end — someone else took
-  the asset first, and the person who just scanned it needs telling (§12.5).
-- **Day 44** — camera capture and report-an-issue. **Day 45** — requests and
-  approvals. **Day 46** — push registration and deep links. **Day 47** —
-  profile and settings proper.
+- **Day 43** — ✅ done: assign and check in, with the conflict flow.
+- **Day 44** — ⬅ **next**: camera capture and report-an-issue. Photos attached
+  to an asset (FR-14.13) with **client-side resize before upload** — a 12 MP
+  photo over mobile data is unacceptable — and raising a maintenance record
+  from the phone (FR-14.14).
+- **Day 45** — requests and approvals. **Day 46** — push registration and deep
+  links. **Day 47** — profile and settings proper.
 
 **Two things still needed from the user:** an **Expo account** for dev builds
 (Expo Go needs none, so Days 36–39 are unblocked), and eventually **push
@@ -157,6 +157,53 @@ audit row.
 ---
 
 ## Completed
+
+### Day 43 — Assign & check in ✅
+The buttons from Day 41 now act.
+
+- **A 409 is not an error the user caused.** Someone else issued the asset
+  while they were choosing a holder; they did nothing wrong, the world moved.
+  So it gets its own path — a sheet headed "Someone got there first", coloured
+  **Cream Yolk rather than Coral**, showing the server's own sentence (which
+  already names who has it and what to do), and whose only way out refreshes.
+  Dismissing back onto a form for an asset somebody else now holds would be
+  worse than the error.
+- **One idempotency key per submission** (BE-4), generated when the form opens
+  and reused for every retry of that attempt. Regenerating per retry would
+  defeat the mechanism entirely — the server would see two different actions.
+  Proven: replaying an assign returns the same answer and produces one history
+  row, not two.
+- **Rollback restores the exact previous value, not a refetch.** A refetch on
+  failure is another request that can also fail, leaving the UI showing a state
+  that never existed.
+- Check-in leads with **condition notes**, because nobody will ever be closer
+  to that fact than the person holding the thing right now, and offers an
+  optional return location since equipment routinely comes back to a different
+  room.
+
+**Two real bugs this caught, both in code from earlier days.**
+
+**1. The OpenAPI schema was lying about nullability.** `assigned_to`,
+`location`, `department`, `vendor` and `created_by` are all `null=True` on the
+model but were declared as plain nested serializers, so the generated schema
+claimed they are always present — and the mobile client, generated from that
+schema (SRS §12.2), inherited the lie. `asset.assigned_to.full_name` type-checks
+and then explodes on the first unassigned asset. Fixed with `allow_null=True`
+on the read-only nested fields, which changes nothing at runtime and everything
+about the contract. Types regenerated; 710 backend tests still pass, schema
+still 0 warnings.
+
+**2. The Day 41 history timeline read fields that do not exist.** Assignment
+history is an append-only list of *events* (`action`, `user`, `assigned_by`,
+`created_at`, `days_held`), not date-range records — but the timeline rendered
+`assigned_at` / `returned_at`, so every row would have shown "—" and "still
+held". Day 41's verification only asserted that history *returned a list*,
+which is why it passed. It now asserts the field shape.
+
+**Verified:** `npm run verify:lifecycle` — 16 checks, all passing: the exact
+requests the mutations issue, the idempotent replay, the 409's wording, and
+that a 403 is deliberately *not* routed to the conflict sheet, because "you may
+not" and "somebody beat you to it" need different words.
 
 ### Day 42 — My assets & register search ✅
 - **Two modes, one screen.** "My assets" and "Register" are versions of the

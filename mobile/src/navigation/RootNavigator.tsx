@@ -22,6 +22,8 @@ import React from "react";
 import type { AssetDetail } from "@/api";
 import { useAuth } from "@/auth/AuthContext";
 import { AssetDetailScreen } from "@/screens/AssetDetailScreen";
+import { AssignScreen } from "@/screens/assets/AssignScreen";
+import { CheckinScreen } from "@/screens/assets/CheckinScreen";
 import { GalleryScreen } from "@/screens/GalleryScreen";
 import { ManualEntryScreen } from "@/screens/scan/ManualEntryScreen";
 import { SignInScreen } from "@/screens/auth/SignInScreen";
@@ -38,6 +40,8 @@ export type RootStackParamList = {
   /** `asset` is the record a scan already fetched, so detail paints instantly. */
   Asset: { id: number; asset?: AssetDetail };
   ManualEntry: undefined;
+  Assign: { assetId: number; assetTag: string };
+  Checkin: { assetId: number; assetTag: string; holderName?: string | null };
   // Arriving in later phases:
   // StockTake: { id?: number };
 };
@@ -110,6 +114,12 @@ export function RootNavigator() {
               component={ManualEntryScreen}
               options={{ headerShown: true, title: "Find an asset" }}
             />
+            {/* Presented as sheets: both are a short decision on top of the
+                asset you are looking at, not a place you navigate to. */}
+            <Stack.Group screenOptions={{ presentation: "modal", headerShown: true }}>
+              <Stack.Screen name="Assign" component={AssignScreen} options={{ title: "Assign" }} />
+              <Stack.Screen name="Checkin" component={CheckinScreen} options={{ title: "Check in" }} />
+            </Stack.Group>
             {__DEV__ ? (
               <Stack.Screen
                 name="Gallery"
