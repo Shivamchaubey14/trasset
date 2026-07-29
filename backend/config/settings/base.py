@@ -65,6 +65,10 @@ LOCAL_APPS = [
     "apps.reports",
     "apps.notifications",
     "apps.audit",
+    # Its own app rather than part of `assets`, following how maintenance and
+    # procurement are organised: a distinct workflow with its own endpoints,
+    # rules and vocabulary (SRS §12.4, BE-7).
+    "apps.stocktake",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -265,6 +269,7 @@ SPECTACULAR_SETTINGS = {
         {"name": "Reports", "description": "Dashboard, reports and exports"},
         {"name": "Notifications", "description": "In-app notifications"},
         {"name": "Audit", "description": "Immutable audit trail"},
+        {"name": "Stock take", "description": "Physical counting sessions and reconciliation"},
     ],
 }
 

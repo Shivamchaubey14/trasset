@@ -9,8 +9,9 @@
 **Plan:** [`Trasset_Build_Plan.md`](Trasset_Build_Plan.md) · **Contract:** [`Trasset_SRS.md`](Trasset_SRS.md)
 
 > **Scope now spans two releases.** v1.0 is the web app (Days 1–30, in progress).
-> v1.1 is a React Native mobile app (Days 31–60), specified in SRS §12. Mobile
-> work has not started and is not blocked on anything except finishing v1.0.
+> v1.1 is a React Native mobile app (Days 31–60), specified in SRS §12. Its
+> backend groundwork (Phase 5, SRS §12.4) is **done**; the app itself has not
+> been started and is waiting on the user's go-ahead.
 **Repo:** https://github.com/Shivamchaubey14/trasset (public) · branches `main`, `dev`
 
 ---
@@ -25,12 +26,13 @@
 | Phase 3 — Frontend | 19–26 | 🟡 Days 19–25 done · Day 26 done except browser QA |
 | Phase 4 — Integration, Testing & Launch | 27–30 | 🟡 Days 27, 28 done · Days 29, 30 open |
 | Hindi/English toggle (added on request) | — | 🟡 Engine + chrome done · page content pending |
-| **Phase 5 — Mobile API groundwork** | 31–35 | 🟡 Days 31–34 done · Day 35 open |
+| **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
+| Phase 6 — Mobile app foundation | 36–41 | ⛔ Not started — awaiting your go-ahead |
 
-**Backend test suite:** 671 tests, all passing · **Coverage:** 89.1% (target ≥ 70%, NFR-12)
+**Backend test suite:** 710 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
 **Dependencies:** `pip-audit` clean — no known vulnerabilities
-**OpenAPI schema:** 68 endpoints, 0 errors, 0 warnings (NFR-13)
+**OpenAPI schema:** 74 endpoints, 0 errors, 0 warnings (NFR-13)
 
 > **Backend feature work is complete.** Every functional requirement in SRS §3
 > has an implementation, except the `[L]`-priority printable label sheets
@@ -50,34 +52,36 @@
 > user's direction. Deployment is incremental from here — "we will deploy as the
 > things get done" — rather than the single Day 29 cutover the plan assumed.
 
-**1. Phase 5 — mobile API groundwork (Days 31–35).** In progress. This is backend
-work inside the existing Django project, so it needs no new toolchain:
+**1. Phase 5 — mobile API groundwork (Days 31–35) is ✅ complete.** Every item in
+SRS §12.4 now exists: BE-1 through BE-8. The backend is ready for a mobile
+client — sessions that survive, replayable writes, cheap sync, one-call scans,
+push, and the stock-take model.
 
-- **Day 31** — ✅ done: mobile sessions and device registry (BE-1, BE-2).
-- **Day 32** — ✅ done: idempotency keys on the mutating endpoints (BE-4).
-- **Day 33** — ✅ done: delta sync, asset-tag lookup, per-device throttle
-  (BE-5, BE-6, BE-8).
-- **Day 34** — ✅ done: push dispatch (BE-3).
-- **Day 35** — ⬅ **next**: stock-take API (BE-7). Last day of Phase 5.
+**2. ⛔ Phase 6 (Days 36–41) is waiting on you.** It stands up the React Native
+app itself — Expo, TypeScript, a generated API client, navigation — and you
+asked to be consulted before any of that begins. Nothing has been started.
 
-> **Stop at the end of Day 35.** Phase 6 (Days 36–41) stands up the React
-> Native app itself, and the user asked to be consulted before that starts.
+When you give the go-ahead, Day 36 is project setup: Expo + TypeScript +
+expo-router in `mobile/` per SRS §10.5, lint and format config, EAS build
+profiles, and per-profile API base URLs. Worth deciding first: whether the
+app lives in this repo under `mobile/` as §10.5 assumes, and whether you have
+an Expo account for the dev builds and, later, the push credentials Day 34's
+`ExpoPushBackend` needs to be exercised for real.
 
-Then Phase 6 (Days 36–41) sets up the React Native app itself. Contract is
-SRS §12; each day's Objective / Tasks / Definition of Done is in
-`Trasset_Build_Plan.md`.
+The contract for Phase 6 is SRS §12; each day's Objective / Tasks / Definition
+of Done is in `Trasset_Build_Plan.md`.
 
-**2. Carried over from v1.0 — open, not abandoned:**
+**3. Carried over from v1.0 — open, not abandoned, and not blocked on mobile:**
 
 - **Day 29** deploy and **Day 30** docs + `v1.0` tag. Deploying is now
   incremental, so pull these forward whenever a piece is ready rather than
   waiting.
-- **Browser QA of the whole web UI** — still nobody has driven it (see below).
+- **Browser QA of the whole web UI** — still nobody has driven it (see item 5).
 - **Hindi page content** — the toggle works and the chrome is bilingual, but
   table headers, filters, modals, forms and the JS-built strings are still
-  English. Detail in item 3.
+  English. Detail in item 4.
 
-**3. Finish the Hindi/English toggle** (user request, in progress — commit `b7977ef`).
+**4. Finish the Hindi/English toggle** (user request, in progress — commit `b7977ef`).
 
 Done and pushed: the translation engine `frontend/js/i18n.js` (`t`, `apply`,
 `set`, `toggle`, `mount`, a Hindi dictionary, `localStorage` under
@@ -100,7 +104,7 @@ content:
 Rule that keeps this safe: **the English stays in the markup as the fallback**,
 so a missing key degrades to English, never to a raw key name.
 
-**4. Browser QA — Day 26's one remaining blocker: somebody opening the app in a
+**5. Browser QA — Day 26's one remaining blocker: somebody opening the app in a
 browser.** The Hindi switch is now part of what needs looking at.
 
 Everything on Day 26 that could be done without a browser is done (see below).
@@ -120,7 +124,7 @@ Run both servers, open `http://127.0.0.1:5500`, and note anything that looks
 wrong. Small visual fixes are cheap now and get more expensive once Phase 4
 starts.
 
-**5. The rest of Phase 4:**
+**6. The rest of Phase 4:**
 - **Day 27** — ✅ done: every journey walked per role against SRS §11.4.
 - **Day 28** — ✅ done: SRS §9 security checklist, list endpoints load-tested at
   10,000 assets, `pip-audit` clean.
@@ -138,6 +142,55 @@ audit row.
 ---
 
 ## Completed
+
+### Day 35 — Stock take API ✅ — *Phase 5 complete*
+BE-7, and the feature SRS §12.3 calls the one that most justifies a native app.
+A session opens, takes a batch of scans, and submits a reconciliation of found,
+missing and unexpected — the day's DoD, asserted in one test and walked against
+the live server.
+
+- **Its own app, `apps/stocktake/`**, following how maintenance and procurement
+  are organised: a distinct workflow with its own rules and vocabulary rather
+  than more weight on `assets`. An extension to the §10.2 layout, consistent
+  with the pattern already there.
+- **The report is written down, never recomputed.** A stock take is a
+  point-in-time claim about what was physically present. If "missing" were
+  derived live from current asset locations, then somebody moving an asset next
+  week would silently rewrite last week's count — and a report that changes
+  after the fact is worse than no report. Missing entries are materialised at
+  submit, and `expected_location` is snapshotted so the row keeps saying where
+  the asset was *supposed* to be even after the finding is acted on. Tested by
+  moving an asset after submit and asserting the report does not move.
+- **Submit is idempotent in its own right**, not only through BE-4. An offline
+  client replays it, and the reply is exactly what a flaky link loses. A second
+  submit returns the existing reconciliation rather than writing a second set
+  of missing entries. The idempotency-key path covers the scan endpoint too,
+  and there is a test for that.
+- **A batch answers per scan, never whole.** One stray label from another
+  system must not reject an afternoon's counting, so an unknown tag is reported
+  against that scan and the rest are recorded — the Day 17 import report
+  pattern. Duplicates are absorbed as duplicates: scanning the same shelf twice
+  is ordinary behaviour, and the first scan's time stands.
+- **Scan times come from the client.** An offline session is submitted hours
+  later, and the server clock would claim the whole count happened in one
+  second (FR-14.21).
+- **Two open sessions for one location are refused** — two people counting one
+  store room produce two contradictory reports and no way to tell which is
+  right. Cancelling frees the location again.
+- **Terminal assets are not expected.** Nobody should be sent looking for
+  something that was disposed of; the live check bore this out, a 12-asset
+  location expecting 10.
+- **The status is not directly writable** (no PUT/PATCH route): a session
+  becomes *submitted* by reconciling, not by assertion — the same reasoning
+  that keeps `Asset.status` out of the asset serializer.
+- **Read is narrower than usual**: managers and auditors only. Reconciling the
+  register against reality is exactly the evidence an auditor wants, and the
+  read-only guard still stops them writing. Tested in both directions.
+- `tests/test_stocktake.py` — 39 tests; the app is at 100% coverage bar nothing.
+
+**Phase 5 is complete.** Every item in SRS §12.4 exists: BE-1 client-aware
+sessions, BE-2 device registry, BE-3 push, BE-4 idempotency, BE-5 delta sync,
+BE-6 tag lookup, BE-7 stock take, BE-8 per-device throttle.
 
 ### Day 34 — Push dispatch ✅
 BE-3. An assignment now produces an in-app record, an email **and** a push to
@@ -965,6 +1018,17 @@ POST /assets/19/assign/  (manager → employee)  → 200
      server log                                → PUSH to ExponentPush… with
                                                  data.deep_link trasset://assets/48
 PATCH /auth/me/ {push_notifications: false}    → 200, preference honoured
+
+POST /stock-takes/  {location_id}              → 201, expected 10 of 12 (2 terminal, excluded)
+POST /stock-takes/  same location again        → 409 "…already in progress, started by …"
+POST /stock-takes/1/scan/  batch of 5          → 200 "3 of 5 scans recorded"
+     …one real, one real, repeat, stray, junk  → recorded · recorded · duplicate ·
+                                                 recorded(unexpected) · unknown
+     live counts                               → found 2, missing 8, unexpected 1
+POST /stock-takes/1/submit/                    → 200 "2 found, 8 missing, 1 unexpected"
+POST /stock-takes/1/submit/  again             → 200, identical counts (idempotent)
+POST /stock-takes/1/scan/   after submit       → 409 "…already submitted"
+GET  /stock-takes/1/report/                    → found 2 · missing 8 · unexpected 1
 ```
 
 **Frontend** — all 21 files serve over HTTP; every JS file and inline block
