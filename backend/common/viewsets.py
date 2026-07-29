@@ -4,12 +4,14 @@ Base viewsets so every resource behaves the same way (NFR-11).
 Provides:
 * role-driven permissions (``read_roles`` / ``write_roles``)
 * the ``write`` throttle scope on unsafe methods (SEC-7)
+* ``Idempotency-Key`` support on unsafe methods (BE-4)
 * a 200-with-envelope delete instead of a bodyless 204, so the frontend can
   always read ``message`` from a response
 """
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 
+from common.idempotency import IdempotentWriteMixin
 from common.permissions import HasRolePermission
 from common.responses import ok
 from common.roles import Roles
@@ -27,8 +29,15 @@ class ScopedThrottleMixin:
         return super().get_throttles()
 
 
-class BaseModelViewSet(ScopedThrottleMixin, viewsets.ModelViewSet):
-    """Standard CRUD viewset for Trasset resources."""
+class BaseModelViewSet(IdempotentWriteMixin, ScopedThrottleMixin, viewsets.ModelViewSet):
+    """
+    Standard CRUD viewset for Trasset resources.
+
+    Every write here honours ``Idempotency-Key`` (BE-4). It is applied at the
+    base rather than per-endpoint because it costs nothing when the header is
+    absent, and the set of actions a client might queue offline is not
+    something this layer should be guessing at.
+    """
 
     permission_classes = [IsAuthenticated, HasRolePermission]
     read_roles = Roles.ALL

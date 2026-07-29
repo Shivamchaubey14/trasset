@@ -54,6 +54,9 @@ THIRD_PARTY_APPS = [
 ]
 
 LOCAL_APPS = [
+    # Cross-cutting infrastructure. An app because it owns a model (the
+    # idempotency ledger, BE-4), not because it is a domain.
+    "common",
     "apps.accounts",
     "apps.masters",
     "apps.assets",
@@ -269,9 +272,10 @@ SPECTACULAR_SETTINGS = {
 CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
 CORS_ALLOW_CREDENTIALS = False
 
-# `X-Client` is not in the default allow-list, and a browser will not send an
-# unlisted custom header at all — the preflight simply fails (SRS §12.4, BE-1).
-CORS_ALLOW_HEADERS = (*cors_default_headers, "x-client")
+# Neither `X-Client` nor `Idempotency-Key` is in the default allow-list, and a
+# browser will not send an unlisted custom header at all — the preflight simply
+# fails (SRS §12.4, BE-1 and BE-4).
+CORS_ALLOW_HEADERS = (*cors_default_headers, "x-client", "idempotency-key")
 
 # ---------------------------------------------------------------------------
 # Email (FR-12.2)
@@ -306,6 +310,16 @@ CELERY_TASK_TIME_LIMIT = 360
 # ---------------------------------------------------------------------------
 ASSET_TAG_PREFIX = env("ASSET_TAG_PREFIX", default="TRA")   # FR-3.2
 WARRANTY_EXPIRY_WARN_DAYS = 30                              # FR-7.3
+
+# Idempotency (SRS §12.4, BE-4)
+# How long a stored response stays replayable. Long enough to cover a phone
+# that was offline overnight, short enough that the table does not grow without
+# bound.
+IDEMPOTENCY_TTL_HOURS = env.int("IDEMPOTENCY_TTL_HOURS", default=24)
+# How long one in-flight request holds its key. Past this a second attempt may
+# take the key over, so a worker that died mid-request does not wedge an
+# offline queue until the daily purge.
+IDEMPOTENCY_LEASE_SECONDS = env.int("IDEMPOTENCY_LEASE_SECONDS", default=60)
 
 LOGGING = {
     "version": 1,

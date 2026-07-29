@@ -25,9 +25,9 @@
 | Phase 3 — Frontend | 19–26 | 🟡 Days 19–25 done · Day 26 done except browser QA |
 | Phase 4 — Integration, Testing & Launch | 27–30 | 🟡 Days 27, 28 done · Days 29, 30 open |
 | Hindi/English toggle (added on request) | — | 🟡 Engine + chrome done · page content pending |
-| **Phase 5 — Mobile API groundwork** | 31–35 | 🟡 Day 31 done · Days 32–35 open |
+| **Phase 5 — Mobile API groundwork** | 31–35 | 🟡 Days 31, 32 done · Days 33–35 open |
 
-**Backend test suite:** 586 tests, all passing · **Coverage:** 89.1% (target ≥ 70%, NFR-12)
+**Backend test suite:** 610 tests, all passing · **Coverage:** 89.3% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
 **Dependencies:** `pip-audit` clean — no known vulnerabilities
 **OpenAPI schema:** 67 endpoints, 0 errors, 0 warnings (NFR-13)
@@ -54,9 +54,9 @@
 work inside the existing Django project, so it needs no new toolchain:
 
 - **Day 31** — ✅ done: mobile sessions and device registry (BE-1, BE-2).
-- **Day 32** — ⬅ **next**: idempotency keys on the mutating endpoints (BE-4).
-  The single most important change for offline, per SRS §12.4.
-- **Day 33** — delta sync, asset-tag lookup, per-device throttle (BE-5, BE-6, BE-8).
+- **Day 32** — ✅ done: idempotency keys on the mutating endpoints (BE-4).
+- **Day 33** — ⬅ **next**: delta sync, asset-tag lookup, per-device throttle
+  (BE-5, BE-6, BE-8).
 - **Day 34** — push dispatch (BE-3).
 - **Day 35** — stock-take API (BE-7).
 
@@ -135,6 +135,54 @@ audit row.
 ---
 
 ## Completed
+
+### Day 32 — Idempotency keys ✅
+BE-4, which SRS §12.4 calls the single most important backend change for
+offline support. `Idempotency-Key: <uuid>` on an unsafe request; the response
+is stored against the key and replayed to anyone sending it again.
+
+- **The failure this fixes is not double-execution — it is a lie.** A phone
+  draining its offline queue often cannot tell whether a request landed,
+  because it is the *response* that went missing. It retries, and the Day 8
+  guards answer **409 "already assigned to Karan Verma"**: the check-out
+  worked, the user did nothing wrong, and they are shown an error. With a key
+  the retry now returns the original 200. Both halves of that contrast are in
+  the verified-working list below.
+- **A mixin, not middleware.** Keys are scoped per user, and DRF authenticates
+  *inside* the view — `request.user` at middleware time is the anonymous
+  session user. Day 10 hit exactly this with the audit middleware and worked
+  around it by resolving the user lazily; sitting at the DRF layer avoids the
+  problem rather than re-solving it. Applied on `BaseModelViewSet`, so every
+  write endpoint including the lifecycle actions gets it, and a request with no
+  header behaves exactly as before at zero extra queries.
+- **The unique constraint on (user, key) is the concurrency control.** Two
+  copies of the same queued action racing on reconnect both try to insert and
+  the database picks the winner; the loser is told the first is still running.
+- **The row is a lease, not just a cache.** A worker dying mid-request would
+  otherwise hold the key until the daily purge — which for an offline queue
+  means a stuck item the user cannot clear. Past
+  `IDEMPOTENCY_LEASE_SECONDS` (60) another attempt takes the key over, via a
+  conditional `UPDATE` so that exactly one of several waiters wins.
+- **A key reused with a different payload is 409.** The fingerprint covers
+  method, path and body, so one key cannot be spent on two different actions.
+- **5xx is never cached**; the record is deleted so the client can genuinely
+  retry. 4xx is cached, being deterministic.
+- Keys expire after 24 hours, purged by `common.tasks.purge_idempotency_keys`
+  on the beat schedule at 03:00 — the retention policy the audit trail still
+  lacks.
+- `common` became an installed app, since the ledger belongs to no single
+  domain and a model has to live somewhere. `Idempotency-Key` added to
+  `CORS_ALLOW_HEADERS` for the same reason as `X-Client`.
+- `tests/test_idempotency.py` — 24 tests.
+
+**A real bug the live check caught, which the tests did not.** The stored
+envelope was originally a `JSONField`, and every test passed because
+`assertJSONEqual` compares parsed structures. Against the real server the
+replayed body came back **the same length but with different key order**:
+MySQL's native JSON type normalises object key order, so the retry received the
+same data in a different shape from the response it was retrying. Now stored as
+`TextField` and returned verbatim, with a test that asserts the bytes are
+identical rather than merely equivalent.
 
 ### Day 31 — Mobile sessions & device registry ✅
 First day of Release 2. Both changes are backend-only and change nothing for
@@ -778,6 +826,11 @@ GET  /auth/devices/                            → 200, 1 row
 POST /auth/devices/  platform=blackberry       → 400 "…is not a valid choice."
 POST /auth/devices/  no token                  → 401
 DELETE /auth/devices/{id}/                     → 200, list empty; repeat → 404
+
+POST /assets/{id}/assign/  Idempotency-Key: K  → 200 "TRA-2026-000019 assigned to Karan Verma"
+POST  same request, same key                   → 200 identical bytes, Idempotent-Replay: true
+POST  same key, different payload              → 409 "…already been used for a different request"
+POST  same request, NO key  (the contrast)     → 409 "…is already assigned to Karan Verma"
 ```
 
 **Frontend** — all 21 files serve over HTTP; every JS file and inline block
