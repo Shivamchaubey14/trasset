@@ -25,6 +25,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { configureApi, configureTokenStore, createQueryClient } from "@/api";
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
+import { ToastProvider } from "@/components";
 import { env } from "@/config/env";
 import { RootNavigator } from "@/navigation/RootNavigator";
 import { ThemeProvider, useTheme } from "@/theme";
@@ -83,9 +84,15 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <AuthProvider>
-            <Shell />
-          </AuthProvider>
+          {/*
+            Above AuthProvider so a session-expiry message can still be shown
+            while the app is unwinding to the sign-in screen.
+          */}
+          <ToastProvider>
+            <AuthProvider>
+              <Shell />
+            </AuthProvider>
+          </ToastProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </QueryClientProvider>

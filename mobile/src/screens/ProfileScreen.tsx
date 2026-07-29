@@ -6,9 +6,13 @@
  * notification preferences, theme override, the offline queue — lands later.
  */
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import type { RootStackParamList } from "@/navigation/RootNavigator";
 
 import { useAuth } from "@/auth/AuthContext";
 import {
@@ -26,6 +30,8 @@ export function ProfileScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { user, signOut } = useAuth();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const [kind, setKind] = useState<BiometricKind>("none");
   const [biometricOn, setBiometricOn] = useState(false);
@@ -123,6 +129,14 @@ export function ProfileScreen() {
             accessibilityLabel={`Unlock with ${biometricLabel(kind)}`}
           />
         </View>
+      ) : null}
+
+      {__DEV__ ? (
+        <Button
+          label="Component gallery"
+          variant="ghost"
+          onPress={() => navigation.navigate("Gallery")}
+        />
       ) : null}
 
       <Button

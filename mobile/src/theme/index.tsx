@@ -35,11 +35,22 @@ const ThemeContext = createContext<Theme>({
   series: lightSeries,
 });
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Follows the OS setting. An in-app override lands with the settings screen
-  // (Day 47); until then the system is the single source of truth.
-  const scheme = useColorScheme();
-  const dark = scheme === "dark";
+export function ThemeProvider({
+  children,
+  scheme: forced,
+}: {
+  children: React.ReactNode;
+  /**
+   * Force a scheme instead of following the OS.
+   *
+   * Used by the component gallery to render both themes on one screen, and it
+   * is the same mechanism the in-app theme override will use on Day 47 —
+   * worth having now rather than reworking the provider then.
+   */
+  scheme?: "light" | "dark";
+}) {
+  const systemScheme = useColorScheme();
+  const dark = (forced ?? systemScheme) === "dark";
 
   const value = useMemo<Theme>(
     () => ({

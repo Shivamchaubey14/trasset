@@ -27,7 +27,7 @@
 | Phase 4 — Integration, Testing & Launch | 27–30 | 🟡 Days 27, 28 done · Days 29, 30 open |
 | Hindi/English toggle (added on request) | — | 🟡 Engine + chrome done · page content pending |
 | **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
-| **Phase 6 — Mobile app foundation** | 36–41 | 🟡 Days 36–38 done · Days 39–41 open |
+| **Phase 6 — Mobile app foundation** | 36–41 | 🟡 Days 36–39 done · Days 40, 41 open |
 
 **Backend test suite:** 710 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
@@ -62,12 +62,13 @@ runs in Expo Go with the tab shell, both themes and both fonts. Next:
 
 - **Day 37** — ✅ done: typed API client, generated from the schema.
 - **Day 38** — ✅ done: authentication, biometric unlock, session persistence.
-- **Day 39** — ⬅ **next**: the design system. Primitives in light and dark
-  (Button, Card, StatusPill, Avatar, Input, EmptyState, **OfflineBanner**,
-  Skeleton, Toast) and a gallery screen rendering every one in both themes.
-  `Button` and `TextField` already exist in minimal form from Day 38 and should
-  be folded in rather than duplicated.
-- **Day 40** — scanning. **Day 41** — asset detail.
+- **Day 39** — ✅ done: design system and component gallery.
+- **Day 40** — ⬅ **next**: scanning — the reason the app exists. expo-camera
+  for QR and 1D barcodes, resolving through `GET /assets/by-tag/` (BE-6),
+  haptics on a hit because the user is often not looking at the screen, a
+  permission flow that recovers from an earlier denial, and manual entry for
+  damaged labels.
+- **Day 41** — asset detail.
 
 **Two things still needed from the user:** an **Expo account** for dev builds
 (Expo Go needs none, so Days 36–39 are unblocked), and eventually **push
@@ -148,6 +149,54 @@ audit row.
 ---
 
 ## Completed
+
+### Day 39 — Design system ✅
+Brand-consistent primitives, before screens start improvising.
+
+`Button · Card · StatusPill · Avatar · TextField · EmptyState · OfflineBanner ·
+Skeleton · Toast`, all exported from `@/components`, plus a gallery screen
+rendering every one in **light and dark on the same screen** (the day's DoD).
+The gallery works by nesting `ThemeProvider` with a forced scheme — the same
+mechanism the in-app theme override will use on Day 47, so it was worth
+building into the provider now rather than reworking it then.
+
+**A real accessibility bug the gallery caught immediately.** `StatusPill` first
+put the status colour as *text* on a 13% tint of itself. Measured: **1.45:1 for
+Under maintenance** on light, against the 4.5:1 NFR-9 requires — roughly
+white-on-white. Available was 2.25:1. Only *Assigned* passed, and only because
+Ink is dark to begin with.
+
+The failure is structural rather than a bad colour pick: a tint of a colour is
+by definition close to that colour, so every light or warm hue fails the same
+way. Fixed by moving the colour off the text — the tint and dot carry it as
+decoration, the label uses the normal text colour. **Worst case across both
+themes and both surfaces went from 1.45:1 to 8.59:1.** Written up as a worked
+example in `Trasset_Design_Tokens.md` §5, because the mistake is an easy one to
+repeat.
+
+Decisions worth keeping:
+
+- **Card elevation is carried by value, not shadow.** The web separates a card
+  from the page with a soft shadow; that cue is much weaker on a dark surface,
+  so there are three surface values and the shadow is a light-mode extra.
+- **Toasts sit at the bottom**, not top-right as on the web — within thumb
+  reach, and above the tab bar rather than over it. **Errors do not
+  auto-dismiss**: a success can be missed harmlessly, but a failure the user
+  never saw is how work gets silently lost (FR-14.27).
+- **Skeletons honour reduce-motion.** A pulsing screen is genuinely unpleasant
+  for some people, and the skeleton communicates fine without the animation.
+- **`EmptyState` has three tones**, because "empty" is three conditions —
+  nothing yet, nothing matched, or the request failed — and they need different
+  words. A "Clear filters" button on a screen that failed to load is worse than
+  useless.
+- **`OfflineBanner` distinguishes offline from offline-with-queued-work.** The
+  second is the one that matters: someone who checked an asset in with no
+  signal must see that it has not happened yet.
+- **`Avatar` falls back to initials, not a silhouette** — a list of identical
+  grey figures tells the reader nothing.
+
+`OfflineBanner` is presentational for now; real connectivity detection lands
+with Day 48 and the queue count with Day 49.
 
 ### Day 38 — Mobile authentication ✅
 Sign in, stay in, sign out cleanly.

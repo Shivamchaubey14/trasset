@@ -20,6 +20,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
 
 import { useAuth } from "@/auth/AuthContext";
+import { GalleryScreen } from "@/screens/GalleryScreen";
 import { SignInScreen } from "@/screens/auth/SignInScreen";
 import { UnlockScreen } from "@/screens/auth/UnlockScreen";
 import { fonts, useTheme } from "@/theme";
@@ -30,6 +31,7 @@ export type RootStackParamList = {
   App: NavigatorScreenParams<TabParamList>;
   SignIn: undefined;
   Unlock: undefined;
+  Gallery: undefined;
   // Arriving in later phases:
   // Asset: { id: number };
   // StockTake: { id?: number };
@@ -89,7 +91,16 @@ export function RootNavigator() {
       */}
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {state === "signedIn" ? (
-          <Stack.Screen name="App" component={AppTabs} />
+          <>
+            <Stack.Screen name="App" component={AppTabs} />
+            {__DEV__ ? (
+              <Stack.Screen
+                name="Gallery"
+                component={GalleryScreen}
+                options={{ headerShown: true, title: "Components" }}
+              />
+            ) : null}
+          </>
         ) : state === "locked" ? (
           <Stack.Screen name="Unlock" component={UnlockScreen} />
         ) : (

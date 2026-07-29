@@ -159,3 +159,30 @@ and deliberately the only one.
 adding it, at 4.5:1 for text and 3:1 for fills. The two values in this document
 that differ between themes (Coral, Ink) are both cases where that check failed
 and a derived value was needed — neither was predictable by eye.
+
+---
+
+## 5. A worked example: why status pills use neutral text
+
+The first version of `StatusPill` put the status colour as *text* on a 13% tint
+of itself — a common pattern, and it looks right in a mockup. Measured:
+
+| Status | Light | |
+|--------|-------|---|
+| Under maintenance | Cream Yolk on `#FFF7E6` | **1.45:1** |
+| Available | Nest Green on `#E5F5EE` | **2.25:1** |
+| Lost | Coral on `#FCE7E7` | 3.30:1 |
+| Assigned | Ink on `#E2E5E7` | 8.94:1 |
+
+Only *Assigned* passed, and only because Ink is dark to begin with. The failure
+is structural, not a bad colour choice: **a tint of a colour is by definition
+close to that colour**, so the lighter and warmer the hue, the worse it gets.
+Cream Yolk at 1.45:1 is roughly white-on-white.
+
+The fix was to move the colour off the text: the tint and dot carry the status
+colour as decoration, and the label uses the normal text colour. Worst case
+across both themes and both surfaces went from **1.45:1 to 8.59:1**.
+
+That is also the accessible answer rather than merely the legible one — the
+status is conveyed by a word, so a reader who cannot distinguish the hues loses
+nothing, and the dot is decorative rather than load-bearing.
