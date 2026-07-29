@@ -1,5 +1,7 @@
 """User manager — email is the login identifier, not a username."""
 from django.contrib.auth.models import BaseUserManager
+from django.db import models
+from django.utils import timezone
 
 
 class UserManager(BaseUserManager):
@@ -40,3 +42,29 @@ class UserManager(BaseUserManager):
                 extra_fields["role"] = role
 
         return self._create_user(email, password, **extra_fields)
+
+
+class DeviceManager(models.Manager):
+    """Registration is an upsert, because a device registers more than once."""
+
+    def register(self, user, push_token: str, **fields):
+        """
+        Record ``push_token`` against ``user``, returning ``(device, created)``.
+
+        A push token identifies one physical handset, so re-registering — which
+        happens on every app launch and on token rotation — updates the row
+        rather than adding another. Two rows for one phone means two pushes for
+        one event.
+
+        The row is also *moved* to ``user`` if it was registered by somebody
+        else. That is a handset changing hands, and leaving it pointed at the
+        previous owner would send them notifications about someone else's
+        assets.
+
+        ``update_or_create`` is used rather than a get-then-save because it
+        recovers from the unique-constraint race two simultaneous launches can
+        provoke.
+        """
+        fields["user"] = user
+        fields["last_seen_at"] = timezone.now()
+        return self.update_or_create(push_token=push_token, defaults=fields)

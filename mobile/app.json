@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "Trasset",
+    "slug": "trasset-mobile",
+    "scheme": "trasset",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "primaryColor": "#3BB77E",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#253D4E"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "in.trasset.app"
+    },
+    "android": {
+      "package": "in.trasset.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#3BB77E"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-font",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Trasset uses Face ID so you can unlock the app without typing your password."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Trasset uses the camera to scan asset labels and barcodes."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Trasset uses the camera so you can photograph an asset's condition.",
+          "photosPermission": "Trasset accesses your photos so you can attach one to an asset."
+        }
+      ]
+    ],
+    "extra": {
+      "apiUrl": "http://127.0.0.1:8000/api/v1"
+    }
+  }
+}

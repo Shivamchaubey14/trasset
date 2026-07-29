@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Maintenance · Trasset</title>
+
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Lexend:wght@300;400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/layout.css">
+
+  <style>
+    /* Overdue work is the thing that needs chasing, so it reads loudest. */
+    tr.is-overdue td:first-child { box-shadow: inset 3px 0 0 var(--color-danger); }
+    tr.is-active  td:first-child { box-shadow: inset 3px 0 0 var(--color-accent); }
+
+    .cost-over  { color: var(--color-danger); font-weight: 600; }
+    .cost-under { color: var(--color-primary); font-weight: 600; }
+    .notes-text {
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden; color: var(--color-muted); font-size: var(--fs-small);
+      max-width: 280px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="boot" id="boot">
+  <div class="boot-inner">
+    <div class="spinner-lg"></div>
+    <p class="text-muted text-small">Loading maintenance…</p>
+  </div>
+</div>
+
+<a href="#main" class="skip-link">Skip to content</a>
+
+<div class="app" id="app">
+  <main class="main">
+    <div class="content" id="main">
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title" data-i18n="page.maintenance">Maintenance</h1>
+          <p class="page-subtitle" data-i18n="page.maintenanceSub">
+            What's booked in, what's out of service, and what it cost.
+          </p>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-secondary" id="clearFiltersBtn" style="display:none">
+            <span class="btn-label">Clear filters</span>
+          </button>
+          <button class="btn btn-primary" id="scheduleBtn">
+            <span class="btn-label">Schedule maintenance</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="kpi-grid mb-5" id="statGrid"></div>
+
+      <div class="card">
+        <div class="toolbar">
+          <div class="search-box input-group">
+            <span class="input-group-icon" id="searchIcon"></span>
+            <label class="sr-only" for="searchInput">Search maintenance</label>
+            <input class="input" type="search" id="searchInput"
+                   placeholder="Search by asset, technician or vendor…" autocomplete="off">
+          </div>
+          <select class="select" id="statusFilter" aria-label="Filter by status">
+            <option value="">All statuses</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="in_progress">In progress</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <select class="select" id="typeFilter" aria-label="Filter by type">
+            <option value="">All types</option>
+          </select>
+          <select class="select" id="dueFilter" aria-label="Filter by due state">
+            <option value="">Any date</option>
+            <option value="overdue">Overdue</option>
+            <option value="open">Still open</option>
+          </select>
+          <div class="toolbar-spacer"></div>
+          <span class="text-small text-muted" id="resultCount"></span>
+        </div>
+
+        <div class="card-body is-flush">
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th class="is-sortable" data-sort="scheduled_date">
+                    Scheduled <span class="sort-icon"></span>
+                  </th>
+                  <th>Asset</th>
+                  <th>Work</th>
+                  <th>Who</th>
+                  <th class="is-sortable" data-sort="status">
+                    Status <span class="sort-icon"></span>
+                  </th>
+                  <th class="is-sortable" style="text-align:right" data-sort="actual_cost">
+                    Cost <span class="sort-icon"></span>
+                  </th>
+                  <th style="text-align:right;width:150px">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="pagination" id="paginationBar" style="display:none">
+          <span class="pagination-info" id="paginationInfo"></span>
+          <span id="paginationControls"></span>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="js/vendor/jquery.min.js"></script>
+<script src="js/i18n.js"></script>
+<script src="js/api.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/shell.js"></script>
+<script src="js/asset-form.js"></script>
+<script src="js/maintenance.js"></script>
+</body>
+</html>

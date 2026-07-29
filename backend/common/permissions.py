@@ -77,26 +77,6 @@ class IsSuperAdmin(BasePermission):
         return is_super_admin(request.user)
 
 
-class IsAssetManager(BasePermission):
-    """Super Admin or Asset Manager."""
-
-    message = "Only an Asset Manager or Super Admin may perform this action."
-
-    def has_permission(self, request, view):
-        return is_manager(request.user)
-
-
-class IsManagerOrReadOnly(BasePermission):
-    """Anyone authenticated may read; only managers may write."""
-
-    message = "Only an Asset Manager or Super Admin may modify this resource."
-
-    def has_permission(self, request, view):
-        if request.method in SAFE_METHODS:
-            return bool(request.user and request.user.is_authenticated)
-        return is_manager(request.user)
-
-
 class IsAdminOrAuditor(BasePermission):
     """Audit log visibility (FR-13.2)."""
 
@@ -106,23 +86,13 @@ class IsAdminOrAuditor(BasePermission):
         return role_of(request.user) in (Roles.SUPER_ADMIN, Roles.AUDITOR)
 
 
-class IsOwnerOrManager(BasePermission):
-    """
-    Object-level: managers see everything, other users only their own records.
-
-    The view names the field pointing at the owning user via ``owner_field``
-    (default ``user``).
-    """
-
-    message = "You may only access your own records."
-
-    def has_object_permission(self, request, view, obj):
-        if is_manager(request.user):
-            return True
-        owner_field = getattr(view, "owner_field", "user")
-        owner = obj
-        for part in owner_field.split("."):
-            owner = getattr(owner, part, None)
-            if owner is None:
-                return False
-        return owner == request.user
+# ---------------------------------------------------------------------------
+# A note on per-owner access
+#
+# There is deliberately no "IsOwnerOrManager" class here. Restricting someone
+# to their own records is done by narrowing the queryset in ``get_queryset``
+# (see AssetRequestViewSet), not by an object-level permission. Object-level
+# checks only run on detail routes, so a permission class alone would leave the
+# list endpoint returning everyone's rows — the filtering has to happen in the
+# query for the restriction to mean anything.
+# ---------------------------------------------------------------------------

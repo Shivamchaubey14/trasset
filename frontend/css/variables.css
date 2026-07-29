@@ -8,10 +8,35 @@
   --color-primary: #3BB77E;   /* Nest Green  */
   --color-accent:  #FDC040;   /* Cream Yolk  */
   --color-ink:     #253D4E;   /* Ink         */
-  --color-bg:      #F4F6F8;   /* Cloud       */
+  --color-bg:      #E7EDF2;   /* Cloud       */
   --color-surface: #FFFFFF;
-  --color-muted:   #7B8794;   /* Slate       */
+  /*
+    Brand Slate is #7B8794, but at 3.7:1 on white it fails WCAG AA for normal
+    text — and it carries every piece of secondary copy in the app. So the two
+    roles are split: --color-slate stays the brand swatch for status colours
+    and charts, while --color-muted is a darkened version used for text.
+  */
+  --color-slate:   #7B8794;   /* Slate — brand swatch, status, charts */
+  --color-muted:   #5C6877;   /* Secondary text — clears AA on every surface */
   --color-danger:  #E5484D;   /* Coral       */
+
+  /*
+    A white card on a near-white page reads as one flat sheet. Cloud sits far
+    enough below white for a card to register as its own surface, and this
+    subtle tint separates a card's header and footer from its body without
+    introducing a second colour.
+  */
+  --surface-subtle: #F5F8FA;
+  --surface-zebra:  #FBFCFD;   /* alternate table rows */
+
+  /*
+    Table headers need to read as labels, not as another row of data. A tint
+    close to white does not achieve that, so the header sits a clear step down
+    from the rows and its text is smaller, bolder and tracked. Measured at
+    5.9:1 against the header fill, so it still meets AA (NFR-9).
+  */
+  --table-head-bg:   #E4EAF0;
+  --table-head-text: #46596C;
 
   /* --- Derived tints (kept as literals so they stay stable) --- */
   --primary-dark:  #2f9c69;
@@ -36,19 +61,34 @@
   --status-available:   var(--color-primary);
   --status-assigned:    var(--color-ink);
   --status-maintenance: var(--color-accent);
-  --status-retired:     var(--color-muted);
+  /* Status colours stay on the brand swatch, not the darkened text tone. */
+  --status-retired:     var(--color-slate);
   --status-lost:        var(--color-danger);
-  --status-disposed:    var(--color-muted);
+  --status-disposed:    var(--color-slate);
 
-  /* --- Chart series (palette-consistent, SRS §7.3) --- */
-  --chart-1: #3BB77E;
-  --chart-2: #253D4E;
-  --chart-3: #FDC040;
-  --chart-4: #7B8794;
-  --chart-5: #5FC9A0;
-  --chart-6: #4A6B85;
-  --chart-7: #E5484D;
-  --chart-8: #B8C2CC;
+  /*
+    --- Chart series (SRS §7.3) ---
+    The three brand colours alone run out at about four categories, and tints
+    of them stop being distinguishable. Four supporting hues extend the set to
+    ten. Ordered so neighbours differ in hue and lightness, since a chart legend
+    is read by adjacency.
+  */
+  --chart-1: #3BB77E;   /* Nest Green  */
+  --chart-2: #253D4E;   /* Ink         */
+  --chart-3: #FDC040;   /* Cream Yolk  */
+  --chart-4: #6C6FD4;   /* Indigo      */
+  --chart-5: #2F9BB5;   /* Teal        */
+  --chart-6: #E08A3C;   /* Amber       */
+  --chart-7: #5A7D8C;   /* Steel       */
+  --chart-8: #7B8794;   /* Slate       */
+  --chart-9: #5FC9A0;   /* Mint        */
+  --chart-10: #E5484D;  /* Coral       */
+
+  /* Named so non-chart code can reach them without counting positions. */
+  --color-teal:   #2F9BB5;
+  --color-indigo: #6C6FD4;
+  --color-amber:  #E08A3C;
+  --color-steel:  #5A7D8C;
 
   /* --- Typography --- */
   --font-head: 'Quicksand', 'Trebuchet MS', system-ui, sans-serif;
@@ -103,6 +143,36 @@
   --z-sticky: 200;
   --z-modal: 1000;
   --z-toast: 1100;
+}
+
+/*
+  Hindi.
+
+  Quicksand and Lexend carry no Devanagari glyphs — Hindi set in them renders
+  as empty boxes. Noto Sans Devanagari takes over for both roles when the
+  document is in Hindi, so the brand fonts still define the English identity
+  while the Hindi is actually readable.
+
+  Devanagari also needs a little more vertical room than Latin at the same
+  size, hence the line-height bump.
+*/
+html[lang="hi"] {
+  --font-head: 'Noto Sans Devanagari', 'Nirmala UI', 'Mangal', sans-serif;
+  --font-body: 'Noto Sans Devanagari', 'Nirmala UI', 'Mangal', sans-serif;
+  --lh-body: 1.65;
+  --lh-tight: 1.4;
+}
+
+/*
+  The switch fades the page rather than swapping text in view — a hard swap
+  shows a frame of half-English, half-Hindi, which reads as a glitch.
+*/
+body {
+  transition: opacity 180ms var(--ease), transform 180ms var(--ease);
+}
+body.lang-switching {
+  opacity: 0;
+  transform: translateY(4px);
 }
 
 /* Respect users who ask for less motion (NFR-9). */

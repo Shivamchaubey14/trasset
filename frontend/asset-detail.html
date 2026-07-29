@@ -8,7 +8,7 @@
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Lexend:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Lexend:wght@300;400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="css/variables.css">
   <link rel="stylesheet" href="css/base.css">
@@ -52,6 +52,40 @@
     .qr-box img {
       width: 168px; height: 168px; padding: var(--space-2);
       background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+    }
+
+    /* Documents */
+    .doc-row {
+      display: flex; align-items: center; gap: var(--space-3);
+      padding: var(--space-3);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      margin-bottom: var(--space-2);
+      transition: border-color var(--dur-fast) var(--ease);
+    }
+    .doc-row:last-child { margin-bottom: 0; }
+    .doc-row:hover { border-color: var(--border-strong); }
+    .doc-icon {
+      width: 38px; height: 38px; flex-shrink: 0;
+      display: grid; place-items: center; border-radius: var(--radius-sm);
+      background: var(--ink-soft); color: var(--ink-light);
+    }
+    .doc-info { flex: 1; min-width: 0; }
+    .doc-name {
+      font-weight: 500; display: block;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .doc-meta { font-size: var(--fs-small); color: var(--color-muted); }
+
+    /* A drop target reads as one; a plain button does not. */
+    .dropzone {
+      border: 2px dashed var(--border-strong); border-radius: var(--radius);
+      padding: var(--space-6) var(--space-4); text-align: center;
+      color: var(--color-muted); cursor: pointer;
+      transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+    }
+    .dropzone:hover, .dropzone.is-over {
+      border-color: var(--color-primary); background: var(--primary-soft);
+      color: var(--primary-darker);
     }
 
     @media print {
@@ -107,9 +141,16 @@
           <!-- Tabs -->
           <div class="card">
             <div class="tabs" role="tablist">
-              <button class="tab is-active" data-tab="history" role="tab">History</button>
-              <button class="tab" data-tab="specs" role="tab">Specifications</button>
-              <button class="tab" data-tab="depreciation" role="tab">Depreciation</button>
+              <button class="tab is-active" data-tab="history" role="tab"
+                      aria-selected="true" aria-controls="tabHistory">History</button>
+              <button class="tab" data-tab="specs" role="tab"
+                      aria-selected="false" aria-controls="tabSpecs">Specifications</button>
+              <button class="tab" data-tab="documents" role="tab"
+                      aria-selected="false" aria-controls="tabDocuments">
+                Documents <span id="docCount"></span>
+              </button>
+              <button class="tab" data-tab="depreciation" role="tab"
+                      aria-selected="false" aria-controls="tabDepreciation">Depreciation</button>
             </div>
 
             <div class="card-body" id="tabHistory">
@@ -118,6 +159,18 @@
 
             <div class="card-body hidden" id="tabSpecs">
               <div id="specsContent"></div>
+            </div>
+
+            <div class="card-body hidden" id="tabDocuments">
+              <div class="flex justify-between items-center mb-4" id="documentsToolbar">
+                <p class="text-muted text-small" style="margin:0">
+                  Invoices, warranty certificates and photographs.
+                </p>
+                <button class="btn btn-secondary btn-sm" id="uploadDocBtn">
+                  <span class="btn-label">Upload</span>
+                </button>
+              </div>
+              <div id="documentsContent"></div>
             </div>
 
             <div class="card-body hidden" id="tabDepreciation">
@@ -174,6 +227,7 @@
 
 <script src="js/vendor/jquery.min.js"></script>
 <script src="js/vendor/chart.umd.min.js"></script>
+<script src="js/i18n.js"></script>
 <script src="js/api.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/auth.js"></script>

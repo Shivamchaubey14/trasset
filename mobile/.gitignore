@@ -1,0 +1,25 @@
+node_modules/
+.expo/
+dist/
+web-build/
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Native build output (managed workflow regenerates these)
+android/
+ios/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Local secrets — never commit
+.env
+.env.local
+
+# macOS
+.DS_Store

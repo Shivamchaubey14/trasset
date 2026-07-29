@@ -5,8 +5,13 @@
 > Update this file at the end of every working session.
 
 **Started:** 2026-07-27
-**Last updated:** 2026-07-28
+**Last updated:** 2026-07-29
 **Plan:** [`Trasset_Build_Plan.md`](Trasset_Build_Plan.md) · **Contract:** [`Trasset_SRS.md`](Trasset_SRS.md)
+
+> **Scope now spans two releases.** v1.0 is the web app (Days 1–30, in progress).
+> v1.1 is a React Native mobile app (Days 31–60), specified in SRS §12. Its
+> backend groundwork (Phase 5, SRS §12.4) is **done**; the app itself has not
+> been started and is waiting on the user's go-ahead.
 **Repo:** https://github.com/Shivamchaubey14/trasset (public) · branches `main`, `dev`
 
 ---
@@ -16,13 +21,24 @@
 | Phase | Days | Status |
 |-------|------|--------|
 | Phase 0 — Foundation | 1–5 | ✅ Complete |
-| Phase 1 — Core Asset Engine | 6–12 | 🟡 Days 6–10 done · Days 11, 12 open |
-| Phase 2 — Maintenance, Procurement, Reports | 13–18 | 🟡 Day 15 dashboard API done · rest open |
-| Phase 3 — Frontend | 19–26 | 🟡 Days 19–23 done · Day 25 partly done · audit screen done |
-| Phase 4 — Integration, Testing & Launch | 27–30 | ⬜ Not started |
+| Phase 1 — Core Asset Engine | 6–12 | ✅ Complete (Days 6–12) |
+| Phase 2 — Maintenance, Procurement, Reports | 13–18 | ✅ Complete (Days 13–18) |
+| Phase 3 — Frontend | 19–26 | 🟡 Days 19–25 done · Day 26 done except browser QA |
+| Phase 4 — Integration, Testing & Launch | 27–30 | 🟡 Days 27, 28 done · Days 29, 30 open |
+| Hindi/English toggle (added on request) | — | 🟡 Engine + chrome done · page content pending |
+| **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
+| **Phase 6 — Mobile app foundation** | 36–41 | ✅ Complete (Days 36–41) |
+| **Phase 7 — Core journeys** | 42–47 | 🟡 Days 42–44 done · Days 45–47 open |
 
-**Backend test suite:** 191 tests, all passing · **Coverage:** 82.4% (target ≥ 70%, NFR-12)
-**OpenAPI schema:** 37 endpoints, 0 errors, 0 warnings (NFR-13)
+**Backend test suite:** 719 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
+**Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
+**Dependencies:** `pip-audit` clean — no known vulnerabilities
+**OpenAPI schema:** 74 endpoints, 0 errors, 0 warnings (NFR-13)
+
+> **Backend feature work is complete.** Every functional requirement in SRS §3
+> has an implementation, except the `[L]`-priority printable label sheets
+> (FR-9.3) and recurring maintenance schedules (FR-6.4), both deferred to v1.1.
+**Query counts:** every list endpoint asserted flat — cost does not grow with rows (NFR-1)
 
 > **Note on sequencing.** The plan runs backend-first (Days 1–18) then frontend
 > (19–26). At the user's request the frontend was pulled forward once auth,
@@ -33,33 +49,772 @@
 
 ## ▶ Next up — start here
 
-**Day 11 — Asset requests & approvals** 🟢
+> **From 2026-07-29 the mobile application is the main workstream**, at the
+> user's direction. Deployment is incremental from here — "we will deploy as the
+> things get done" — rather than the single Day 29 cutover the plan assumed.
 
-1. `AssetRequest` model: requester, asset (or category if the user is asking for
-   "a laptop"), reason, status (pending / approved / rejected / cancelled),
-   decided_by, decided_at, decision notes.
-2. Endpoints: `POST /asset-requests/` (employee), `GET` list scoped by role —
-   employees see their own, managers see all — plus
-   `POST /asset-requests/{id}/approve/` and `/reject/`.
-3. Approval triggers the existing `assignment.assign()` service inside the same
-   transaction, so an approved request produces a real check-out and its audit
-   row. Guard the transitions: a decided request can't be decided twice → 409.
-4. Frontend: a "Requests" screen — employees get a request form and their own
-   list, managers get an approvals inbox. Add the nav item to `js/shell.js`.
+**1. Phase 5 — mobile API groundwork (Days 31–35) is ✅ complete.** Every item in
+SRS §12.4 now exists: BE-1 through BE-8. The backend is ready for a mobile
+client — sessions that survive, replayable writes, cheap sync, one-call scans,
+push, and the stock-take model.
 
-**DoD:** Full request → approve → auto-assign loop works with correct
-permissions, and every step lands in the audit trail.
+**2. Phase 6 — mobile app foundation (Days 36–41).** Day 36 is done: `mobile/`
+runs in Expo Go with the tab shell, both themes and both fonts. Next:
 
-**Then Day 12** (backend hardening pass) and **Day 13** (maintenance).
+- **Day 37** — ✅ done: typed API client, generated from the schema.
+- **Day 38** — ✅ done: authentication, biometric unlock, session persistence.
+- **Day 39** — ✅ done: design system and component gallery.
+- **Day 40** — ✅ done: scanning and manual entry.
+- **Day 41** — ✅ done: asset detail with history and state/role-aware actions.
+  **Phase 6 complete.**
+
+**Phase 7 — core journeys (Days 42–47).** Day 42 is ✅ done.
+
+- **Day 43** — ✅ done: assign and check in, with the conflict flow.
+- **Day 44** — ✅ done: photo capture and report-an-issue.
+- **Day 45** — ⬅ **next**: requests and approvals. An employee raises a request
+  (FR-14.16); an approver sees a pending inbox and approves or rejects with a
+  reason (FR-14.17). Note §12.5 excludes approvals from the offline queue —
+  they are decisions that are hard to unwind.
+- **Day 46** — push registration and deep links. **Day 47** — profile and
+  settings proper.
+
+**Two things still needed from the user:** an **Expo account** for dev builds
+(Expo Go needs none, so Days 36–39 are unblocked), and eventually **push
+credentials**, without which Day 34's `ExpoPushBackend` cannot be exercised
+against the real service.
+
+The contract for Phase 6 is SRS §12; each day's Objective / Tasks / Definition
+of Done is in `Trasset_Build_Plan.md`.
+
+**3. Carried over from v1.0 — open, not abandoned, and not blocked on mobile:**
+
+- **Day 29** deploy and **Day 30** docs + `v1.0` tag. Deploying is now
+  incremental, so pull these forward whenever a piece is ready rather than
+  waiting.
+- **Browser QA of the whole web UI** — still nobody has driven it (see item 5).
+- **Hindi page content** — the toggle works and the chrome is bilingual, but
+  table headers, filters, modals, forms and the JS-built strings are still
+  English. Detail in item 4.
+
+**4. Finish the Hindi/English toggle** (user request, in progress — commit `b7977ef`).
+
+Done and pushed: the translation engine `frontend/js/i18n.js` (`t`, `apply`,
+`set`, `toggle`, `mount`, a Hindi dictionary, `localStorage` under
+`trasset.lang`, and a `trasset:lang` event); the control mounted top-right on
+the sign-in page and in the top bar of every app page; `html[lang="hi"]`
+switching both font roles to Noto Sans Devanagari; the 180 ms fade on switch;
+and `data-i18n` on the login page, the shell nav and top bar, and all 11 page
+titles and subtitles.
+
+What is left — the app is bilingual in its chrome but still English in its
+content:
+- Dynamic strings built in JavaScript: `js/ui.js` empty states, the pagination
+  line, toasts and validation messages. Route them through `T.i18n.t()`.
+- Per-page content on all 11 screens — table headers, filter and tab labels,
+  modal titles, form labels, button text.
+- Server-supplied display strings (status labels, role labels, category names).
+  Role labels are already mapped through `role.*` keys; statuses need the same.
+- Extend the dictionary in `js/i18n.js` as each of those lands.
+
+Rule that keeps this safe: **the English stays in the markup as the fallback**,
+so a missing key degrades to English, never to a raw key name.
+
+**5. Browser QA — Day 26's one remaining blocker: somebody opening the app in a
+browser.** The Hindi switch is now part of what needs looking at.
+
+Everything on Day 26 that could be done without a browser is done (see below).
+What remains needs a human at a screen:
+
+1. **Click through the whole app.** The standing gap. Every script is
+   syntax-checked and every API call each page makes has been exercised, but
+   nobody has driven the UI. This will generate the real punch list, and it
+   should happen before Phase 4 rather than after.
+2. **Responsive check down to 768px** (NFR-9). The breakpoints are written and
+   the layout is built for it, but it has never been resized.
+3. **Screen-reader spot check.** The structural work is done — focus trap,
+   `aria-sort`, labelled controls, tablists — but no assistive technology has
+   actually been pointed at it.
+
+Run both servers, open `http://127.0.0.1:5500`, and note anything that looks
+wrong. Small visual fixes are cheap now and get more expensive once Phase 4
+starts.
+
+**6. The rest of Phase 4:**
+- **Day 27** — ✅ done: every journey walked per role against SRS §11.4.
+- **Day 28** — ✅ done: SRS §9 security checklist, list endpoints load-tested at
+  10,000 assets, `pip-audit` clean.
+- **Day 29** — deploy: Nginx, Gunicorn, MySQL, Redis, Celery worker and beat,
+  TLS, nightly backups. Now incremental — stand the environment up early and
+  ship to it as pieces finish.
+- **Day 30** — docs, seed real master data, tag v1.0.
 
 Reusable groundwork: `BaseModelViewSet`, the envelope, the table/toolbar/modal
-patterns in `js/masters.js`, `js/assets.js` and `js/audit.js`, `js/asset-form.js`
-for any dialog that mutates an asset, and `audit.services.domain_action()` to
-give a new business verb its own audit row.
+patterns in `js/masters.js`, `js/assets.js`, `js/audit.js` and `js/requests.js`,
+`js/asset-form.js` for any dialog that mutates an asset, and
+`audit.services.domain_action()` / `record()` to give a new business verb its own
+audit row.
 
 ---
 
 ## Completed
+
+### Day 44 — Photos & issue reporting ✅
+
+- **Every photo is resized before it leaves the phone.** A modern camera makes
+  a 12 MP JPEG of 4–8 MB; sending that from a stock room is slow enough to look
+  broken, expensive for whoever pays for the connection, and pointless — the
+  picture exists to show a scratch on a lid, and 1600px does that as well as
+  4032px. It would also start bouncing off the API's own 10 MB ceiling (SEC-8).
+  Measured in the verification: 32 KB against a 10 MB limit.
+- **EXIF is stripped on capture.** There is no reason to ship GPS coordinates
+  of where an asset was photographed to the server, and MNFR-8 is explicit
+  about what may sit at rest.
+- **A failed resize falls back to the original** rather than throwing — a photo
+  that is too big is better than no photo, and the server's limit is the
+  backstop.
+- Capture is offered to managers only, matching the API (`write_roles =
+  MANAGERS` on attachments); everyone can *see* the photos, because a picture
+  of the damage is exactly what the person holding the asset wants to check
+  against.
+
+**A gap between the SRS and the implementation, closed.** SRS §2.3 gives the
+Employee role "reports issues" and FR-14.14 requires it from the phone — but
+`MaintenanceViewSet` was `write_roles = MANAGERS`, so the button Day 41 showed
+every role would have been refused for most of them. That is exactly the
+client/server drift the Day 41 verification was built to catch, and it was
+caught here rather than by a user.
+
+Creating a maintenance record is now open to any role, then narrowed in
+`perform_create`:
+
+- a non-manager may only report on **an asset they are currently holding** —
+  otherwise "report an issue" quietly becomes "book work on anything";
+- `start_now` is forced off, because taking an asset out of service is a
+  scheduling decision, not part of noticing a fault;
+- technician, vendor and cost estimate are **dropped rather than rejected** for
+  a reporter — the reporter did not put them there, a crafted request did;
+- everything after the report — start, complete, cancel — stays with managers.
+
+Auditors are still excluded: the read-only guard in `HasRolePermission` applies
+to every unsafe method regardless of what a view declares. 9 backend tests
+cover it; the suite is now **719**.
+
+**Verified:** `npm run verify:photos` — 11 checks, all passing, including the
+DoD end to end: a multipart upload lands and then appears on the asset record
+the web app reads. Plus `npm run verify:lifecycle` and the rest still green.
+
+**One thing to know if the app misbehaves after a dependency is added:** Metro
+caches its module map, so a newly installed package can fail to resolve until
+the bundler is restarted with `--clear`. That happened here with
+`expo-image-picker` and cost ten minutes chasing a "missing" file that was on
+disk the whole time.
+
+### Day 43 — Assign & check in ✅
+The buttons from Day 41 now act.
+
+- **A 409 is not an error the user caused.** Someone else issued the asset
+  while they were choosing a holder; they did nothing wrong, the world moved.
+  So it gets its own path — a sheet headed "Someone got there first", coloured
+  **Cream Yolk rather than Coral**, showing the server's own sentence (which
+  already names who has it and what to do), and whose only way out refreshes.
+  Dismissing back onto a form for an asset somebody else now holds would be
+  worse than the error.
+- **One idempotency key per submission** (BE-4), generated when the form opens
+  and reused for every retry of that attempt. Regenerating per retry would
+  defeat the mechanism entirely — the server would see two different actions.
+  Proven: replaying an assign returns the same answer and produces one history
+  row, not two.
+- **Rollback restores the exact previous value, not a refetch.** A refetch on
+  failure is another request that can also fail, leaving the UI showing a state
+  that never existed.
+- Check-in leads with **condition notes**, because nobody will ever be closer
+  to that fact than the person holding the thing right now, and offers an
+  optional return location since equipment routinely comes back to a different
+  room.
+
+**Two real bugs this caught, both in code from earlier days.**
+
+**1. The OpenAPI schema was lying about nullability.** `assigned_to`,
+`location`, `department`, `vendor` and `created_by` are all `null=True` on the
+model but were declared as plain nested serializers, so the generated schema
+claimed they are always present — and the mobile client, generated from that
+schema (SRS §12.2), inherited the lie. `asset.assigned_to.full_name` type-checks
+and then explodes on the first unassigned asset. Fixed with `allow_null=True`
+on the read-only nested fields, which changes nothing at runtime and everything
+about the contract. Types regenerated; 710 backend tests still pass, schema
+still 0 warnings.
+
+**2. The Day 41 history timeline read fields that do not exist.** Assignment
+history is an append-only list of *events* (`action`, `user`, `assigned_by`,
+`created_at`, `days_held`), not date-range records — but the timeline rendered
+`assigned_at` / `returned_at`, so every row would have shown "—" and "still
+held". Day 41's verification only asserted that history *returned a list*,
+which is why it passed. It now asserts the field shape.
+
+**Verified:** `npm run verify:lifecycle` — 16 checks, all passing: the exact
+requests the mutations issue, the idempotent replay, the 409's wording, and
+that a 403 is deliberately *not* routed to the conflict sheet, because "you may
+not" and "somebody beat you to it" need different words.
+
+### Day 42 — My assets & register search ✅
+- **Two modes, one screen.** "My assets" and "Register" are versions of the
+  same question — *what am I holding* and *where is that thing* — and people
+  switch between them constantly, so a segmented control beats two tabs.
+- **The filter set is deliberately narrower than the web's** (FR-14.15). The
+  web offers status, category, location, warranty state, value band and date
+  ranges; this has search, status and location. Those are the two facts that
+  matter standing in a room. Category and warranty are *reporting* filters, and
+  a phone is not where reports get built (§12.8).
+- **Rows carry three facts, not seven columns.** A seven-column table is
+  unreadable at 375px. And when an asset is assigned the row leads with *who
+  holds it* rather than its location — if somebody has it, the location is
+  where the register thinks it is, not where it is.
+- Infinite scroll rather than a pagination footer, fetching at 40% from the
+  bottom so a fast scroller does not meet a spinner; pull-to-refresh throughout.
+- **Three distinct empty states** — nothing held, nothing matched, or the
+  request failed — reusing the tones from Day 39. Offline says so and points at
+  the cache rather than reading as an error.
+
+**Verified:** `npm run verify:list` — 15 checks against the live API, all
+passing. It issues the *exact* URLs the screen builds (repeated `?status=`
+included, since that cannot be expressed as a plain object) and proves what the
+list assumes: pages that do not overlap, `total_pages` that stops the infinite
+scroll, filters that genuinely narrow, and both halves of the DoD — finding an
+asset by tag, name and serial, and `assigned_to` returning only that person's
+assets.
+
+### Day 41 — Asset detail ✅ — *Phase 6 complete*
+What you need while standing in front of the thing.
+
+- **Not a port of the web's tabs.** The web has room for Overview, History,
+  Specifications and Depreciation side by side; a phone does not, and hiding
+  history behind a tab costs a tap in exactly the moment somebody is asking
+  "who had this last?". One scroll, ordered by what a person at a shelf needs
+  first: what it is, who has it, then the detail. Depreciation is deliberately
+  absent — a valuation schedule is a desk task (§12.8) and the current value is
+  already on screen.
+- **Actions are surfaced by state and role**, mirroring
+  `frontend/js/asset-detail.js` exactly: assign only from Available, check in
+  only from Assigned, retire only while not terminal, nothing at all for a role
+  that cannot write. Deliberately narrower than the web — no Edit, no Delete
+  (§12.8). Retire is flagged `onlineOnly`, since §12.5 excludes it from the
+  offline queue.
+- **Reporting an issue is available to everyone, not just managers.** An
+  employee holding a broken laptop is who notices first, and making that
+  manager-only means it never gets reported (FR-14.14).
+- **A state with no action explains itself.** "Under maintenance" is not a
+  failure and should not read like one, so the screen says why the asset cannot
+  be assigned rather than just omitting the button.
+- **Assignment history is a timeline**, with the current holder open-ended
+  rather than shown with a fabricated end date.
+- **The deep-link id is normalised.** `trasset://assets/12` supplies `id` as a
+  *string* from the URL while a scan supplies a number — without `Number()` the
+  same asset caches twice under `"12"` and `12`.
+
+**Verified:** `npm run verify:detail` — 19 checks, all passing. The valuable
+ones are in part 2: rather than testing the action rules against my own idea of
+the server, it asks the client what it would show and the *server* what it
+would allow, for each role, and fails on disagreement. A manager is offered
+assign and the server permits it; an employee is not offered it and the server
+returns 403. That is the property that matters — a hidden button is a courtesy,
+and the two must not drift.
+
+**Outstanding:** the buttons appear but do not act yet — assign and check in are
+Day 43 (they need the user picker and the conflict flow), report-an-issue is
+Day 44. Tapping one says so rather than failing silently. And the DoD's "on a
+real device" is still yours to confirm.
+
+### Day 40 — Scanning ✅
+The reason the app exists (SRS §12.1).
+
+- **Both label kinds, one pipeline.** `parseScan` recognises the printed QR
+  (which encodes a *detail URL*, `…/asset-detail.html?tag=TRA-…`), a bare tag
+  someone wrote on a replacement sticker, and — falling through — a
+  manufacturer barcode, which is tried as a serial (FR-14.6, FR-14.7). Nothing
+  is rejected before the server has looked.
+- **One request on the happy path.** `GET /assets/by-tag/` (BE-6) exists for
+  exactly this and returns the detail shape, so a scan needs no follow-up call.
+  Measured at **38 ms** against MNFR-2's 2-second budget.
+- **The serial fallback is deliberately strict.** It searches, then requires an
+  *exact* serial match client-side. A search for `SN-4471` will happily return
+  three assets whose serials merely contain it, and opening the wrong asset is
+  worse than saying "not recognised". Proven: a partial serial resolves to
+  nothing rather than to something plausible.
+- **Haptics fire before the lookup, not after.** The user is holding the phone
+  at a shelf looking at the *asset*, not the screen (§12.6). The buzz confirms
+  the scan registered; whether it resolves is a separate signal (success vs
+  warning notification).
+- **Scanning is locked while one resolves**, via a ref rather than state. A
+  camera fires the same code many times a second and React re-renders too
+  slowly to gate it — without the lock one label launches a dozen requests and
+  pushes a dozen screens.
+- **The permission flow distinguishes "not asked yet" from "already refused".**
+  They look identical in the API but need opposite actions: one shows the OS
+  dialog, the other must send the user to Settings, because the OS will never
+  show that dialog again. A button that silently does nothing is the failure
+  being avoided.
+- **Every failure is a state with a way out** — unknown tag, unrecognised
+  barcode, ambiguous serial and offline all say something different, and each
+  offers "Scan again" and "Enter by hand". A scanner that quietly ignores a
+  label leaves the user unable to tell whether it even saw it.
+- **The camera unmounts when the tab loses focus.** Left running it drains the
+  battery and, on some Android devices, holds the sensor so other apps cannot
+  use it.
+- Manual entry (FR-14.8) goes through the *same* resolver, so there is one set
+  of answers rather than two implementations that drift.
+
+**Verified:** `npm run verify:scan` — 18 checks against the live API, all
+passing: every parse case, the QR round trip, exact-vs-partial serial matching,
+junk and unrelated barcodes reported as not-found rather than errors, and a
+soft-deleted asset refusing to resolve.
+
+**Needs the handset, honestly outstanding:** the camera itself, the haptics,
+and the permission dialogs. Everything downstream of the camera is proven; the
+camera is not.
+
+### Day 39 — Design system ✅
+Brand-consistent primitives, before screens start improvising.
+
+`Button · Card · StatusPill · Avatar · TextField · EmptyState · OfflineBanner ·
+Skeleton · Toast`, all exported from `@/components`, plus a gallery screen
+rendering every one in **light and dark on the same screen** (the day's DoD).
+The gallery works by nesting `ThemeProvider` with a forced scheme — the same
+mechanism the in-app theme override will use on Day 47, so it was worth
+building into the provider now rather than reworking it then.
+
+**A real accessibility bug the gallery caught immediately.** `StatusPill` first
+put the status colour as *text* on a 13% tint of itself. Measured: **1.45:1 for
+Under maintenance** on light, against the 4.5:1 NFR-9 requires — roughly
+white-on-white. Available was 2.25:1. Only *Assigned* passed, and only because
+Ink is dark to begin with.
+
+The failure is structural rather than a bad colour pick: a tint of a colour is
+by definition close to that colour, so every light or warm hue fails the same
+way. Fixed by moving the colour off the text — the tint and dot carry it as
+decoration, the label uses the normal text colour. **Worst case across both
+themes and both surfaces went from 1.45:1 to 8.59:1.** Written up as a worked
+example in `Trasset_Design_Tokens.md` §5, because the mistake is an easy one to
+repeat.
+
+Decisions worth keeping:
+
+- **Card elevation is carried by value, not shadow.** The web separates a card
+  from the page with a soft shadow; that cue is much weaker on a dark surface,
+  so there are three surface values and the shadow is a light-mode extra.
+- **Toasts sit at the bottom**, not top-right as on the web — within thumb
+  reach, and above the tab bar rather than over it. **Errors do not
+  auto-dismiss**: a success can be missed harmlessly, but a failure the user
+  never saw is how work gets silently lost (FR-14.27).
+- **Skeletons honour reduce-motion.** A pulsing screen is genuinely unpleasant
+  for some people, and the skeleton communicates fine without the animation.
+- **`EmptyState` has three tones**, because "empty" is three conditions —
+  nothing yet, nothing matched, or the request failed — and they need different
+  words. A "Clear filters" button on a screen that failed to load is worse than
+  useless.
+- **`OfflineBanner` distinguishes offline from offline-with-queued-work.** The
+  second is the one that matters: someone who checked an asset in with no
+  signal must see that it has not happened yet.
+- **`Avatar` falls back to initials, not a silhouette** — a list of identical
+  grey figures tells the reader nothing.
+
+`OfflineBanner` is presentational for now; real connectivity detection lands
+with Day 48 and the queue count with Day 49.
+
+### Day 38 — Mobile authentication ✅
+Sign in, stay in, sign out cleanly.
+
+- **Four session states, not two.** `starting · signedOut · locked · signedIn`.
+  The one a web app has no equivalent of is `locked`: a phone gets picked up by
+  other people, and the alternative — signing out whenever the app is
+  backgrounded — would make the offline queue worthless.
+- **The splash is held until fonts *and* the session resolve.** Without it the
+  app shows a frame of the sign-in screen before the restored session lands,
+  which reads to the user as having been signed out.
+- **Biometrics are a lock on the door, not the key.** What authenticates
+  against the API is the refresh token in the Keychain; a fingerprint only
+  decides whether the app will use it right now. So **the password fallback
+  always works** (FR-14.4), the escape hatch is shown rather than hidden behind
+  a failure count, and a cancel stops the prompt rather than re-asking — an app
+  that re-prompts on cancel is an app people uninstall.
+- **Enabling biometric unlock is confirmed with the biometric itself.** Turning
+  on a lock the user then cannot open is the worst available outcome, so the
+  toggle proves it works before it is stored.
+- **Two ways the gate self-clears rather than stranding anyone:** if enrolment
+  was removed since opting in, the unlock screen detects it and offers the
+  password route; and signing out clears the flag, so the next person does not
+  meet an unlock screen with no session behind it.
+- **Session expiry drops the tokens and nothing else.** Anything queued offline
+  survives to be replayed after signing back in (Day 49) — a token expiring is
+  the worst possible moment to also lose a user's queued work.
+- **Auth and app are exclusive navigator branches**, not a modal over the tabs,
+  so signing out unmounts the whole app tree rather than leaving screens alive
+  behind a login sheet holding the previous user's data.
+- Minimal `Button` and `TextField` primitives were needed for the form; Day 39
+  should fold them into the design system rather than duplicate them.
+
+**Verified:** `npm run verify:api` still 18/18, including the session-restore
+path that *is* the force-quit case — access token gone, refresh token traded in
+for a new one — and sign-out leaving nothing behind. Type-check clean, bundle
+builds at 6.79 MB.
+
+**Not verifiable off-device, and honestly outstanding:** the literal DoD
+("sign in, force-quit, reopen — still signed in") and the biometric prompt
+itself both need a real handset. The logic underneath each is covered, but
+neither has been driven on hardware yet.
+
+**Splash artwork and app icon added** (pulled forward from Day 58, since the
+splash-holding logic was meaningless without something to show). Generated from
+`frontend/assets/favicon.svg` and `logo.svg` so the app icon is *the same mark*
+as the website's rather than a lookalike, and set in real Quicksand Bold from
+the font package the app already bundles. Two details worth keeping:
+the Android adaptive foreground is drawn at 34% so a round-icon launcher
+mask cannot clip it; and the splash wordmark is **white + green, not the web's
+ink + green**, because Ink on an Ink background is invisible — the same reason
+Ink stops being text in the dark theme.
+
+### Day 37 — Mobile API client ✅
+Typed access to the API, generated rather than hand-written.
+
+- **6,619 lines of types generated from `/api/schema/`** covering all 74
+  endpoints, by `npm run gen:api`. This is the return on keeping the schema at
+  0 warnings since Day 2 — the client cannot drift from the API, because it is
+  not written by hand. `src/api/types.ts` gives friendly aliases (`Asset`,
+  `User`) so a server-side rename surfaces as one compile error rather than
+  thirty.
+- **The request layer mirrors `frontend/js/api.js`**, which had already solved
+  envelope unwrapping, single-flight refresh and error normalisation. Three
+  things differ because this is a phone:
+  - **Every request has a timeout.** `fetch` has none, and on bad signal a call
+    hangs indefinitely — the never-resolving spinner §12.6 calls the signature
+    failure of a mobile app. A hang now surfaces as a network error the UI can
+    show an offline state for.
+  - **`X-Client: mobile` on every request**, which is what earns the 30-day
+    refresh rather than the web's 7 (BE-1).
+  - **`Idempotency-Key` is supported but never auto-generated** (BE-4). A fresh
+    key per attempt would defeat the mechanism entirely, so it has to come from
+    whoever owns the retry — the durable queue on Day 49.
+- **Refresh tokens go to the Keychain / Keystore, never AsyncStorage**
+  (FR-14.2). The web client accepts localStorage as a documented trade-off
+  because a browser has nothing better; a phone does, so that trade-off is not
+  inherited.
+- **The API layer holds no platform imports.** The base URL and the secure
+  store are injected once in `App.tsx`. That is not architecture for its own
+  sake — it is what let the client be run against the real server without a
+  device, which is how the day's DoD was actually verified.
+- **Offline is not an expired session.** A refresh that fails on the network
+  keeps the token and returns false; only a refusal from the server signs the
+  user out. Otherwise a tunnel ride would log everybody off.
+- **Mutations are never retried automatically** in TanStack Query — a blind
+  retry can apply an action twice. Queries retry only network errors and 5xx;
+  retrying a 4xx just repeats an answer the server already gave, and retrying a
+  409 would hide a conflict the user needs to resolve (§12.5).
+
+**Verified against the live server, not by type-check alone.**
+`npm run verify:api` runs the real client against the real API — 18 checks, all
+passing: unwrapped data from typed calls, field-level errors preserved, session
+restore and sign-out, and both halves of the DoD. The single-flight proof is
+worth naming: four parallel calls are made with a deliberately broken access
+token, and because refresh rotation is on (SEC-2), a second concurrent refresh
+would have presented an already-blacklisted token and failed. Surviving that
+*is* the proof.
+
+### Day 36 — Mobile project setup ✅
+`mobile/` exists and runs in Expo Go with the tab shell, both themes and both
+brand fonts.
+
+- **Expo SDK 54**, React Native 0.81.5, React 19.1.0, TypeScript strict.
+  Pinned to match the user's milkkart app, which is a known-good configuration
+  on this machine, rather than taking the newest template — SDK 57 was what
+  `create-expo-app` produced and was deliberately discarded.
+- **React Navigation, not expo-router.** SRS §12.2 names React Navigation;
+  Day 36 of the build plan says expo-router. The SRS is the contract, so the
+  plan line is the error. Recorded here so nobody "fixes" it later.
+- **Bottom tabs per §12.6** — Scan · Assets · Requests · Notifications ·
+  Profile, Scan centred and oversized as the primary action.
+- **Asset detail is routed at the root, not inside a tab.** It is reached from
+  a scan, a search result, an approval and a push deep link; nesting it in one
+  tab would mean either four copies or deep links landing in the wrong tab.
+  `trasset://` linking is wired for the same reason (FR-14.23).
+- **Both themes from the first screen**, following the OS setting.
+  `src/theme/tokens.ts` carries light and dark; `docs/Trasset_Design_Tokens.md`
+  documents every value with its measured contrast.
+- **Fonts are bundled, not fetched** — `@expo-google-fonts` for Quicksand and
+  Lexend, held until loaded so the first frame is not system font that reflows.
+- **The API URL is derived from the packager host**, because a phone cannot
+  reach `127.0.0.1` — that address is the phone itself. The commonest first-day
+  mobile failure, avoided by construction rather than documentation.
+- `@/` path alias through babel-module-resolver and tsconfig paths.
+
+**Verified:** `tsc --noEmit` clean, and the Android bundle actually builds
+(5.7 MB dev bundle, HTTP 200 from Metro) — the type check alone would not have
+caught a bad Babel alias.
+
+**Not yet done from Day 36's task list:** ESLint and Prettier configuration,
+and EAS build profiles. EAS needs an Expo account, which the user has not
+supplied yet; Expo Go needs none, so Days 37–39 are not blocked.
+
+### Day 35 — Stock take API ✅ — *Phase 5 complete*
+BE-7, and the feature SRS §12.3 calls the one that most justifies a native app.
+A session opens, takes a batch of scans, and submits a reconciliation of found,
+missing and unexpected — the day's DoD, asserted in one test and walked against
+the live server.
+
+- **Its own app, `apps/stocktake/`**, following how maintenance and procurement
+  are organised: a distinct workflow with its own rules and vocabulary rather
+  than more weight on `assets`. An extension to the §10.2 layout, consistent
+  with the pattern already there.
+- **The report is written down, never recomputed.** A stock take is a
+  point-in-time claim about what was physically present. If "missing" were
+  derived live from current asset locations, then somebody moving an asset next
+  week would silently rewrite last week's count — and a report that changes
+  after the fact is worse than no report. Missing entries are materialised at
+  submit, and `expected_location` is snapshotted so the row keeps saying where
+  the asset was *supposed* to be even after the finding is acted on. Tested by
+  moving an asset after submit and asserting the report does not move.
+- **Submit is idempotent in its own right**, not only through BE-4. An offline
+  client replays it, and the reply is exactly what a flaky link loses. A second
+  submit returns the existing reconciliation rather than writing a second set
+  of missing entries. The idempotency-key path covers the scan endpoint too,
+  and there is a test for that.
+- **A batch answers per scan, never whole.** One stray label from another
+  system must not reject an afternoon's counting, so an unknown tag is reported
+  against that scan and the rest are recorded — the Day 17 import report
+  pattern. Duplicates are absorbed as duplicates: scanning the same shelf twice
+  is ordinary behaviour, and the first scan's time stands.
+- **Scan times come from the client.** An offline session is submitted hours
+  later, and the server clock would claim the whole count happened in one
+  second (FR-14.21).
+- **Two open sessions for one location are refused** — two people counting one
+  store room produce two contradictory reports and no way to tell which is
+  right. Cancelling frees the location again.
+- **Terminal assets are not expected.** Nobody should be sent looking for
+  something that was disposed of; the live check bore this out, a 12-asset
+  location expecting 10.
+- **The status is not directly writable** (no PUT/PATCH route): a session
+  becomes *submitted* by reconciling, not by assertion — the same reasoning
+  that keeps `Asset.status` out of the asset serializer.
+- **Read is narrower than usual**: managers and auditors only. Reconciling the
+  register against reality is exactly the evidence an auditor wants, and the
+  read-only guard still stops them writing. Tested in both directions.
+- `tests/test_stocktake.py` — 39 tests; the app is at 100% coverage bar nothing.
+
+**Phase 5 is complete.** Every item in SRS §12.4 exists: BE-1 client-aware
+sessions, BE-2 device registry, BE-3 push, BE-4 idempotency, BE-5 delta sync,
+BE-6 tag lookup, BE-7 stock take, BE-8 per-device throttle.
+
+### Day 34 — Push dispatch ✅
+BE-3. An assignment now produces an in-app record, an email **and** a push to
+every registered device — one test asserts exactly that, being the day's DoD.
+
+- **Extended the existing dispatch point, not a parallel path.** Push is queued
+  inside `notify()` next to email, so it inherits every rule already proved
+  there: nobody is notified about their own action, and a rolled-back action
+  pushes nothing (`transaction.on_commit`).
+- **A pluggable backend, the way Django does email.** `PUSH_BACKEND` names the
+  class; console for development, in-memory for tests, Expo for production
+  (SRS §12.2 — Expo fronts APNs and FCM so the server handles neither).
+  Calling the provider inline would have made the whole notification path
+  untestable without a network and pinned the app to one vendor.
+- **One Celery task per device, not per notification.** A single task looping
+  over devices would, on retry after a partial failure, re-send to the handsets
+  that already got it — and one dead device would hold up the rest. Separate
+  tasks retry and back off independently.
+- **A dead token is pruned, not retried.** Expo reports `DeviceNotRegistered`
+  when the app has been uninstalled or the token rotated; no amount of backoff
+  fixes that, so the row is deleted. Every other error raises so the task
+  retries.
+- **Deep links (FR-14.23).** `link` could not serve for this — it holds a web
+  path like `asset-detail.html?id=12`, meaningless to a native app. The target
+  is derived from the related object instead: `trasset://assets/12`. An
+  unmapped or missing target falls back to the notification list rather than
+  producing a link that goes nowhere.
+- **Push goes out for every type, unlike email.** The reasoning differs: an
+  email per check-in would train people to ignore Trasset's mail, but a push is
+  the whole reason the app is on the phone, and the OS offers its own mute.
+- **`queue_push` cannot raise.** It runs from `on_commit`, which fires while
+  the action that caused it is still completing, so anything escaping would
+  fail the check-out it was only meant to report on. Tested by making the
+  backend explode and asserting the assign still returns 200 with the asset
+  moved.
+- `tests/test_push.py` — 33 tests.
+
+**Deviation from the day's task list, flagged deliberately.** The plan said
+"respect the existing per-user notification preference", which would have meant
+reusing `email_notifications`. Added a separate `push_notifications` field
+instead: they are different consents wanted in different places — email at a
+desk, push in a stock room — and one flag would mean somebody who muted email
+digests silently stopped receiving the alerts the mobile app exists to deliver.
+Both directions are tested. Say the word if you would rather they were one
+switch.
+
+**Not verified against the real Expo service.** The console backend was
+exercised end to end on the live server (an assignment produced the in-app
+record and a logged push carrying `trasset://assets/48`), and the ticket parser
+is unit-tested against Expo's documented success, `DeviceNotRegistered` and
+rate-limit replies. But `ExpoPushBackend.send` itself has never made a real
+call — that needs an Expo account and a physical device, which arrives with
+Phase 6.
+
+### Day 33 — Delta sync, tag lookup & per-device throttle ✅
+
+**BE-5 — `?updated_since=` on the asset, request, maintenance and notification
+lists.** One `DeltaSyncMixin` in `common/sync.py` rather than four
+implementations. Three details decide whether this works in practice:
+
+- **Deleted rows are included while syncing.** A client that only hears about
+  live rows never learns anything went away, so a disposed asset would sit on
+  the phone for ever. The delta widens to `all_objects` and returns the row
+  with `is_deleted: true` for the client to drop.
+- **Only on `list`.** Honouring the parameter on a detail route would let a
+  crafted query string reach a soft-deleted record — exactly what the Day 28
+  bypass tests assert is impossible. There is a test that the detail route
+  still 404s with the parameter attached.
+- **Ordered oldest-change-first, and inclusive.** The client checkpoints on the
+  `updated_at` of the last row it saw, so the order has to be the one the
+  checkpoint comes from; `pk` breaks ties, since a bulk update can hand
+  hundreds of rows the same timestamp. The comparison is `>=` rather than `>`:
+  that repeats the boundary row, which a client applying changes by id absorbs
+  harmlessly, where `>` would silently drop a change written in the same
+  microsecond as the checkpoint. Losing a row is worse than repeating one.
+
+Accepts an ISO-8601 timestamp or a plain date; nonsense gets a 400 naming the
+formats. Two serializer fields were added to make it usable at all:
+`is_deleted` on the asset list and `updated_at` on notifications — without the
+latter a client has nothing to checkpoint on.
+
+**BE-6 — `GET /assets/by-tag/{tag}/`.** Exact, single-result, case-insensitive
+(a tag can arrive from a barcode reader, a hand-typed box, or a URL something
+has lowercased). Returns the detail shape, because scanning is how the app
+opens an asset. A soft-deleted asset still 404s.
+
+**BE-8 — per-device throttling.** `DeviceScopedRateThrottle` buckets the
+existing scopes per device, so a phone draining its offline queue cannot lock
+the same person out of the browser session they are sitting in front of.
+
+- **The device is identified by the access token's `jti`, not by a header.**
+  Each device holds its own token chain, so nothing is client-supplied and
+  there is nothing to forge. A header would have let any caller mint itself
+  unlimited budget by varying a value it controls.
+- **Anonymous callers are never split.** This is the security-relevant half:
+  `/auth/login/` is exactly where an unauthenticated request is throttled, and
+  keying that on anything the caller sends would hand an attacker unlimited
+  sign-in attempts. There is a test that varying the client header across
+  failed logins still trips the limit.
+- The trade-off is that a token rotation resets that device's counter. Refresh
+  is itself throttled under `auth`, so gaming it costs auth budget.
+- Test settings now name the **same throttle class production uses** — a test
+  exercising a different class from the deployed one proves nothing about the
+  deployed one, which is the Day 12 lesson restated.
+
+**Known limitation, deliberate:** only assets soft-delete. A hard-deleted
+request, maintenance record or notification cannot propagate through a delta,
+because there is no tombstone to send. Notifications are purged on a schedule
+anyway and are safe to treat as ephemeral; the other two are rare admin-only
+deletions. If that ever matters, it needs a tombstone table, not a patch here.
+
+`tests/test_delta_sync.py` — 28 tests. BE-8 is proved by test rather than by a
+live check: tripping a real 120/min limit against the dev server is not a
+useful thing to do by hand.
+
+### Day 32 — Idempotency keys ✅
+BE-4, which SRS §12.4 calls the single most important backend change for
+offline support. `Idempotency-Key: <uuid>` on an unsafe request; the response
+is stored against the key and replayed to anyone sending it again.
+
+- **The failure this fixes is not double-execution — it is a lie.** A phone
+  draining its offline queue often cannot tell whether a request landed,
+  because it is the *response* that went missing. It retries, and the Day 8
+  guards answer **409 "already assigned to Karan Verma"**: the check-out
+  worked, the user did nothing wrong, and they are shown an error. With a key
+  the retry now returns the original 200. Both halves of that contrast are in
+  the verified-working list below.
+- **A mixin, not middleware.** Keys are scoped per user, and DRF authenticates
+  *inside* the view — `request.user` at middleware time is the anonymous
+  session user. Day 10 hit exactly this with the audit middleware and worked
+  around it by resolving the user lazily; sitting at the DRF layer avoids the
+  problem rather than re-solving it. Applied on `BaseModelViewSet`, so every
+  write endpoint including the lifecycle actions gets it, and a request with no
+  header behaves exactly as before at zero extra queries.
+- **The unique constraint on (user, key) is the concurrency control.** Two
+  copies of the same queued action racing on reconnect both try to insert and
+  the database picks the winner; the loser is told the first is still running.
+- **The row is a lease, not just a cache.** A worker dying mid-request would
+  otherwise hold the key until the daily purge — which for an offline queue
+  means a stuck item the user cannot clear. Past
+  `IDEMPOTENCY_LEASE_SECONDS` (60) another attempt takes the key over, via a
+  conditional `UPDATE` so that exactly one of several waiters wins.
+- **A key reused with a different payload is 409.** The fingerprint covers
+  method, path and body, so one key cannot be spent on two different actions.
+- **5xx is never cached**; the record is deleted so the client can genuinely
+  retry. 4xx is cached, being deterministic.
+- Keys expire after 24 hours, purged by `common.tasks.purge_idempotency_keys`
+  on the beat schedule at 03:00 — the retention policy the audit trail still
+  lacks.
+- `common` became an installed app, since the ledger belongs to no single
+  domain and a model has to live somewhere. `Idempotency-Key` added to
+  `CORS_ALLOW_HEADERS` for the same reason as `X-Client`.
+- `tests/test_idempotency.py` — 24 tests.
+
+**A real bug the live check caught, which the tests did not.** The stored
+envelope was originally a `JSONField`, and every test passed because
+`assertJSONEqual` compares parsed structures. Against the real server the
+replayed body came back **the same length but with different key order**:
+MySQL's native JSON type normalises object key order, so the retry received the
+same data in a different shape from the response it was retrying. Now stored as
+`TextField` and returned verbatim, with a test that asserts the bytes are
+identical rather than merely equivalent.
+
+### Day 31 — Mobile sessions & device registry ✅
+First day of Release 2. Both changes are backend-only and change nothing for
+the web client.
+
+- **BE-1 — the refresh lifetime now follows the client.** A phone signing in
+  with `X-Client: mobile` gets 30 days; a browser keeps 7. The value is
+  configurable (`JWT_MOBILE_REFRESH_DAYS`) and lives in `common/clients.py`.
+- **The client is stamped into the token as a claim, not just read off the
+  header.** That matters at rotation: SimpleJWT re-derives the expiry on every
+  refresh, so a mobile session would have silently dropped back to 7 days the
+  first time it refreshed. `ClientAwareRefreshToken.set_exp()` reads the
+  lifetime from the token's own claim, which means rotation needs no header at
+  all and a proxy stripping `X-Client` cannot demote a phone to a weekly
+  logout. Overriding that one method also meant leaving SimpleJWT's rotation
+  and blacklisting code untouched.
+- **An unrecognised `X-Client` value is treated as web**, so a guessed or
+  mistyped header cannot buy the longer session. Only the *refresh* is
+  client-aware — the access token stays at 15 minutes for everyone, since a
+  long-lived access token widens the window an intercepted one is useful for.
+- **BE-2 — `Device` model** (user, platform, push token, name, app version,
+  last seen) with `POST /auth/devices/`, `GET /auth/devices/` and
+  `DELETE /auth/devices/{id}/`.
+- **Registration is an upsert.** An app registers on every launch, so a repeat
+  `push_token` updates the row and returns 200 rather than creating a second
+  one — two rows for one handset means two pushes for one event. Done through
+  `update_or_create`, which survives the unique-constraint race two
+  simultaneous launches can provoke.
+- **A push token is globally unique, not unique per user**, so a handset that
+  changes hands *moves* to the new owner. Leaving it pointed at the previous
+  owner would send them notifications about somebody else's assets.
+- **Devices deliberately sit outside the role matrix.** `HasRolePermission`
+  makes auditors read-only everywhere, which would have stopped an auditor from
+  ever registering a phone. Registering a device is not a business write;
+  ownership is enforced by scoping the queryset instead, so another user's
+  device returns 404 rather than 403 — it does not exist as far as that caller
+  is concerned.
+- Signing out takes the device with it: `/auth/logout/` accepts an optional
+  `push_token`, scoped to the caller, alongside the explicit `DELETE`.
+- `x-client` added to `CORS_ALLOW_HEADERS` — a browser will not send a custom
+  header that is not on the allow-list, and the preflight just fails.
+- `tests/test_mobile_sessions.py` — 27 tests: the two lifetimes differ and
+  survive repeated rotation, an unknown client falls back to web, the old token
+  is still blacklisted on rotation (SEC-2), a re-registered token updates
+  rather than duplicates, a handset moves owner, and every role including
+  auditor can register.
+
+**Correction to this file:** the *Next up* list had the BE numbers scrambled
+against SRS §12.4 (it credited Day 32 with BE-3 and Day 34 with BE-6, when
+idempotency is BE-4 and push is BE-3). The build plan's per-day tasks were
+right; only the summary here was wrong. Realigned above.
 
 ### Day 1 — Project setup & environment ✅
 - Directory tree at `D:\trasset` (`backend/`, `frontend/`, `docs/`).
@@ -167,6 +922,306 @@ give a new business verb its own audit row.
 - Verified against hand calculations: ₹78,000 cost / ₹8,000 salvage / 4 years
   gives ₹17,500 a year and lands exactly on salvage.
 - **Still pending:** the monthly recalculation Celery task (Day 18).
+
+### Day 28 — Security & performance hardening ✅
+- **Dependency audit had never been run.** `pip-audit` found **17 known
+  vulnerabilities**: 5 in Django 5.1.6, 1 in simplejwt 5.4.0, and 11 in Pillow
+  11.1.0. Upgraded to Django 5.1.15, simplejwt 5.5.1 and Pillow 12.3.0 — audit
+  now clean, all tests still passing. `requirements.txt` records that these are
+  **security floors, not preferences**.
+- `tests/test_security_checklist.py` — 32 tests asserting the SRS §9
+  configuration itself, including production settings loaded directly so a
+  regression in `prod.py` fails here rather than during a deploy: DEBUG off,
+  HSTS, secure cookies, CORS not wildcarded, Argon2 (checked against *base*
+  settings, since test settings swap in MD5), token rotation and blacklisting,
+  upload allowlist excluding executables, throttling, bounded pagination.
+- Bypass attempts, since Day 28 asks explicitly: a soft-deleted asset cannot be
+  read, listed, reported or acted on; role escalation via `PATCH /auth/me/` is
+  ignored; a scoped queryset cannot be widened by a crafted filter; a
+  blacklisted refresh token cannot be reused; and a 500 leaks neither the
+  exception message nor a traceback.
+- **NFR-1 measured at the specified scale**, not at demo scale. Seeded 10,000
+  assets and measured median and p95 over 10 runs per endpoint. Everything
+  passed — worst p95 288 ms on the asset list, dashboard 229 ms, register
+  report 205 ms. The seed data was removed afterwards.
+
+**A real bug this uncovered:** `Asset.all_objects.filter(...).delete()`
+soft-deletes rather than purging *and* returned a bare integer instead of
+Django's `(count, {label: count})`. Any caller written the normal way —
+`deleted, _ = qs.delete()` — crashes with a confusing unpacking error a long
+way from the cause. It bit the cleanup step of the performance script. Fixed to
+return Django's shape, documented that delete means soft-delete everywhere
+including `all_objects`, and covered by tests.
+
+### Day 27 — End-to-end journeys ✅
+- `tests/test_journeys.py` — 27 tests walking whole tasks the way a person
+  performs them, rather than endpoints in isolation.
+- **Asset manager:** create → issue → breaks → maintenance → returns to the
+  same holder → check in → dispose, then asserting the system agrees with
+  itself afterwards: history has exactly the right two rows, the audit trail
+  carries all four verbs, and the recipient was notified.
+- **Employee:** request → approval → the asset actually moves → it appears in
+  their own list. Plus: an employee is 403 on six manager-only endpoints, and
+  sees zero of another person's requests or notifications.
+- **Department head:** approves within their department, sees nothing from
+  another one, cannot create assets.
+- **Auditor:** reads the whole estate and exports all four reports in both
+  formats, yet is 403 on seven distinct write attempts.
+- **Super admin:** stands up categories, locations and a user who can then sign
+  in; deactivating a holder keeps their assignment history.
+- **Procurement:** order → place → receive → three tagged assets exist and one
+  can be issued immediately.
+- **SRS §11.4 reconciliation**, which had never been tested: the dashboard KPIs
+  are computed by entirely separate code from the asset register report. Six
+  tests assert they agree — on count, book value, purchase value, the status
+  breakdown summing to the total, and after a soft delete moves both numbers
+  together. If they disagreed, one of them was lying to somebody making a
+  decision.
+- Cross-cutting invariants: a failed 409 leaves no history, audit or
+  notification behind; an assignment is visible from all five angles; every
+  error uses the standard envelope; pagination is uniform across eight lists.
+
+### Day 26 (partial) — Documents tab & accessibility ✅
+Everything on Day 26 that does not require a browser.
+
+- **Documents tab on asset detail (FR-3.7).** The attachment API and its
+  upload validation had been done since Day 7 with no UI at all. Now: list with
+  type icon, size, uploader and age; open in a new tab; delete with the file
+  removed from storage as well as the row; drag-and-drop or click-to-choose,
+  multi-file, uploaded one at a time so a single rejection does not lose the
+  batch; per-file errors reported by name. Write controls hidden for
+  non-managers, and the API refuses them independently.
+- **Modal focus trap.** Tab and Shift+Tab now cycle inside an open dialog.
+  Without it a keyboard user tabbed straight past the last control into the page
+  behind — still live, still interactive, invisible behind the backdrop. This
+  was the most serious accessibility defect in the app.
+- **`aria-sort` on every sortable column.** The arrow told a sighted user which
+  column was sorted and which way; a screen-reader user got nothing. Wired
+  through all seven tables plus the dynamically-built masters header.
+- **Arrow-key navigation between tabs** on asset detail, with `aria-selected`
+  kept in step — a tablist should be operable from the keyboard.
+- Audited every icon-only control for an accessible name: **all named**.
+
+**Correction:** PROGRESS previously claimed the settings screen was missing the
+notification-preference toggle. It was not — the control and the serializer
+field both existed. The note was stale, not the code.
+
+### Day 18 — Notifications & scheduled jobs ✅
+- `Notification` model with type-driven icon and colour, so the UI has no
+  mapping table of its own. The related object is stored as plain type/id
+  rather than a generic FK — a notification must outlive the thing it refers
+  to, and must never keep a row alive by pointing at it.
+- Wired into the events that already existed: asset assigned, asset checked in,
+  request submitted (to the right approvers), request approved, request
+  rejected, maintenance started, maintenance completed.
+- **Nobody is notified about their own action.** A manager assigning to
+  themselves does not need telling.
+- **Notifying never breaks the action.** Failures are logged and swallowed —
+  nobody should fail to issue a laptop because the mail server is down. There
+  is a test that patches the notification layer to explode and asserts the
+  assignment still succeeds.
+- Approvers are resolved by scope: managers hear about every request, a
+  department head only about their own department's.
+- Email (FR-12.2) goes out for the events that warrant it, not all of them — an
+  email per check-in would train people to ignore Trasset's mail. Respects
+  `User.email_notifications`, which existed but was never read until now.
+- Emails are queued with `transaction.on_commit`, so a rolled-back action
+  cannot leave someone holding mail about something that never happened.
+  Delivery is idempotent via `emailed_at`, so a retried task cannot double-send.
+- Celery tasks, all three named by the existing beat schedule:
+  `recalculate_all_depreciation` (monthly, FR-8.4), `scan_expiring_warranties`
+  (daily, FR-7.3), `scan_due_maintenance` (daily, FR-6.5), plus a
+  `purge_read_notifications` housekeeping task.
+- The scans are **safe to run twice** — they check whether the same reminder
+  already went out today. Beat firing twice does not spam anyone.
+- Depreciation recalculation skips rows whose value has not moved and runs with
+  auditing suspended, so a monthly job does not rewrite the whole table or bury
+  the audit trail under thousands of machine updates.
+- Notifications dropdown wired: unread badge, 60-second poll, mark-one-read on
+  click-through, mark-all-read.
+
+**Verified against real Redis**, not just eager mode: worker connected,
+all five tasks registered, scans dispatched through the broker, notifications
+created, and the resulting email tasks queued and delivered.
+
+### Day 17 — Bulk import ✅
+- `POST /assets/import/` takes CSV or XLSX and returns a **per-row report**:
+  which rows are ready, which failed, and why, keyed by spreadsheet column and
+  numbered to match the actual row in the file (row 2 is the first data row).
+- **Validation is not duplicated.** Rows go through `AssetWriteSerializer`, the
+  same serializer the API uses, so import rules and API rules cannot drift.
+  Salvage-above-cost is rejected on import because it is rejected by the API.
+- **Masters are matched by name**, case-insensitively — nobody types database
+  ids into a spreadsheet. An unknown name is a row error that says what was not
+  found and what to do about it.
+- Three safety levels: `dry_run` writes nothing, the default aborts the whole
+  file if any row is bad (returning **422** with the report), and `partial=true`
+  imports the good rows and reports the rest.
+- Tolerates what spreadsheets actually contain: a UTF-8 BOM from Excel,
+  `₹1,78,000.00` in a cost column, `15/01/2026` as well as ISO dates, blank
+  spacer rows in XLSX, and unknown extra columns (ignored, not fatal).
+- Catches duplicates **within the file**, which the serializer cannot see
+  because it only checks the database.
+- `GET /assets/import/template/` builds its example row from **this
+  installation's** master data, preferring a name matching the column's own
+  example — so the row you download actually imports, filed under Laptops
+  rather than whichever category sorts first.
+- `GET /assets/import/columns/` exposes the column reference so the wizard can
+  explain itself without hard-coding the schema.
+- Import wizard on the assets screen: choose file → read the report → commit.
+  The dry run is not optional; nobody should discover what an import does by
+  running it.
+- `MAX_ROWS` caps a file at 5000.
+
+**Known cost:** a committed row is about ten queries — four foreign-key checks
+from the serializer, three for tag generation, the insert, and two for the audit
+record. That is the price of reusing the API's validation, and `MAX_ROWS` bounds
+the total, but a materially larger import belongs in a Celery job. Pinned by a
+test so it cannot quietly get worse.
+
+### Day 16 — Reports & exports ✅
+- Four reports — asset register, depreciation, maintenance cost, assignment —
+  each a class in `apps/reports/reports.py` declaring its queryset, columns and
+  totals. Everything else (filtering, pagination, CSV, XLSX) is shared, so a
+  fifth report is a class, not another endpoint.
+- All four accept `date_from`, `date_to`, `department`, `location` and
+  `category` (FR-11.4). Each report maps those onto its own field paths, so
+  filtering maintenance by department reaches through to the asset.
+- **The frontend is report-agnostic.** The table is built from the column
+  metadata the API returns, so adding a report on the backend makes it appear in
+  the UI with no frontend change.
+- Exports (FR-10.2): **CSV streams** row by row via `StreamingHttpResponse` —
+  nothing larger than one row is ever held. **XLSX** uses openpyxl's
+  `write_only` workbook, which flushes to a temp file as rows are appended;
+  memory stays flat for a 100k-row register (NFR-5).
+- CSV carries a UTF-8 BOM so Excel on Windows doesn't mangle the rupee sign and
+  accented names. XLSX gets real dates and numbers with formats, and totals go
+  on a **separate Summary sheet** as numbers, so they can be summed and can't be
+  mistaken for a data row.
+- The `export` throttle scope — configured since Day 2 but never used — is now
+  applied to download requests.
+- **PDF is deferred to v1.1** by decision. `?export=pdf` returns a 400 naming
+  the valid choices rather than silently handing back CSV; there is a test for it.
+
+**Note on the query parameter:** it is `?export=csv`, not `?format=csv`. DRF
+reserves `format` for content negotiation and returns **404** when no renderer
+matches the value — which is exactly what happened first time, across 19 tests.
+
+### Day 14 — Procurement (purchase orders) ✅
+- `PurchaseOrder` + `PurchaseOrderItem` with `PO-2026-000001` numbering. The
+  sequence generator in `apps/assets/services/tagging.py` was generalised into
+  `next_sequence(prefix, year)` so PO numbers reuse the same locked-counter
+  mechanism as asset tags — one implementation, separate sequences per prefix
+  (asserted by test).
+- **`total_amount` is derived from the line items, never accepted from the
+  client** — a caller claiming an order is worth ₹1 is ignored. Tested.
+- **Receiving creates one asset per unit (FR-7.2).** Quantity 3 of "Dell
+  Latitude 5440" becomes three separate asset records, each with its own tag,
+  because they are three physical things that get assigned and maintained
+  independently. Assets inherit the order's vendor, location, department and
+  unit cost, and the order's `warranty_months` is stamped as an expiry date
+  (FR-7.3).
+- **Partial receipt is a real state.** Suppliers ship part of an order, so
+  `receive` takes per-line quantities and the order sits in *Partially received*
+  with the outstanding balance visible. Omitting `lines` receives everything left.
+- Lines can be flagged `create_assets=False` for consumables — 20 HDMI cables
+  are received without polluting the asset register.
+- Guards: can't receive against a draft or a closed order, can't receive more
+  than outstanding, can't edit line items once goods have arrived (it would lose
+  the received quantities), can't delete an order with receipts against it.
+- `.distinct()` on the queryset because search spans line items, which would
+  otherwise return an order once per matching line.
+- Procurement screen with an inline line-item editor that totals as you type,
+  expandable line detail per order, and a receive dialog that says up front how
+  many assets it will create.
+
+### Day 13 — Maintenance management ✅
+- `MaintenanceRecord` with type, schedule, technician/vendor, cost estimate vs
+  actual, and notes (FR-6.1).
+- **Scheduling does not take the asset out of service.** An asset booked for
+  next Tuesday is still usable today; it only moves to `Under Maintenance` when
+  the work actually starts (FR-6.2). A `start_now` flag books and starts in one
+  call for same-day work.
+- **`asset_status_before` is the field that matters.** Completing restores the
+  asset to where it came from, so a laptop that was *Assigned* when it went in
+  for a screen repair goes back to its holder rather than into the Available
+  pool — which is what a naive "restore to Available" would do (FR-6.3). Two
+  edge cases handled: if the holder was cleared while it sat in the workshop it
+  falls back to Available, and if something else moved the asset meanwhile the
+  completion leaves that alone rather than overwriting it.
+- Guards: can't double-book an asset (one open record at a time), can't
+  complete work that never started, can't start/complete/cancel a settled
+  record — all 409 with a sentence saying what to do.
+- Cancelling in-progress work puts the asset straight back into service.
+- Filters for status, type, vendor, category, date range, `open_only` and
+  `overdue`; stats endpoint reports actual vs estimated spend.
+- Maintenance screen with overdue rows marked in Coral, in-progress in Cream
+  Yolk, and cost variance shown against the estimate. The complete dialog states
+  where the asset will end up, since that is the non-obvious part.
+- Everyone can read maintenance — an employee holding a laptop should see it is
+  going in on Tuesday — but only managers can book, start, complete or cancel.
+
+### Day 12 — Backend test & hardening pass ✅
+Not a paperwork exercise — it found three real problems.
+
+- **N+1 on `/asset-requests/`.** `AssetRequestSerializer` nests a full
+  `AssetListSerializer` for both `asset` and `fulfilled_asset`, each reaching
+  category, location, department and assignee, but only some were joined.
+  Measured 6 queries at 1 row growing to 15 — now flat.
+- **The throttle tests were testing nothing.** DRF binds `throttle_classes` and
+  `SimpleRateThrottle.THROTTLE_RATES` at *import* time, so `override_settings`
+  never reaches views that are already imported. The first version of the test
+  file "passed" while no throttling was active at all. Test settings now keep
+  the throttle class wired with `None` rates (DRF treats that as unlimited) and
+  the tests patch `THROTTLE_RATES` directly. 429 is now genuinely observed on
+  the `auth` and `write` scopes, including the asset lifecycle actions.
+- **Three dead permission classes removed** — `IsAssetManager`,
+  `IsManagerOrReadOnly` and `IsOwnerOrManager` were defined but never used.
+  `IsOwnerOrManager` was the risky one: it only implemented
+  `has_object_permission`, so used alone it would have left list endpoints
+  returning everyone's rows. A comment now records why per-owner access is done
+  by narrowing `get_queryset` instead.
+
+Also added:
+- `tests/test_performance.py` — every list endpoint asserts its query count does
+  **not grow with row count**, which is the invariant that actually regresses.
+  Exact-count assertions were deliberately avoided as too brittle.
+- `tests/test_validators.py` — upload validation (SEC-8) went from 0 tests to
+  27, covering executables, double extensions (`invoice.pdf.exe`), SVG,
+  content-type mismatch, and the size ceiling at and over the limit.
+  `common/validators.py` 56% → **100%**.
+- `tests/test_permission_internals.py` — anonymous and role-less users, the
+  per-action override, and the auditor read-only guard holding even when a view
+  declares `write_roles = ALL`. `common/permissions.py` 66% → **100%**.
+- All SRS §4.3 indexes verified present in the live MySQL schema by reading
+  `INFORMATION_SCHEMA`, not just trusting the model `Meta`.
+
+Coverage 83.3% → **85.1%**; 224 → **292 tests**.
+
+### Day 11 — Asset requests & approvals ✅
+- `AssetRequest` names **either** a specific asset or a category, so someone can
+  ask for "a laptop" without first browsing the register (FR-4.4).
+- Approval delegates to the existing `assignment.assign()` **inside the same
+  transaction**. If the asset was taken between the request and the decision,
+  `assign` raises 409 and the whole approval rolls back — the request stays
+  pending rather than being marked approved with nothing handed over. Covered by
+  a test.
+- Approving a category request requires the approver to choose the asset; they
+  can also substitute an equivalent item, recorded as `fulfilled_asset`.
+- Guards: a decided request can't be decided again (409); only the requester can
+  withdraw one; a reason is required to reject.
+- **Visibility is scoped in `get_queryset`, not by a client filter** — employees
+  see only their own, department heads see their department's, managers see
+  everything. Tested that a crafted `?requester=` can't widen it.
+- The requester is taken from the token, never the payload.
+- Duplicate pending requests for the same asset are refused.
+- `AssetRequest` is deliberately **not** in `TRACKED_MODELS`: every transition is
+  a named business event, so Requested / Approved / Rejected / Cancelled are
+  recorded explicitly rather than as generic Created-then-Updated pairs.
+- Requests screen reads as "My requests" for employees and "Approvals" for
+  approvers, with pending rows marked in Cream Yolk.
+- Demo users now sit in departments — the head and employee share one, so the
+  department-head approval path is actually demonstrable in the seeded data.
 
 ### Day 10 — Audit logging ✅
 - `AuditLog` per SRS §4.1, append-only by construction: `save()` refuses updates
@@ -330,6 +1385,61 @@ POST/PATCH/DELETE /audit-logs/                 → 405, no write route exists
 GET  /audit-logs/summary/                      → 200 totals + per-action counts
 assign → one "Assigned" row, FK diff by name, _context carries notes
 failed login → "Sign-in failed" row, no actor, attempted password absent
+
+POST /asset-requests/  (employee)              → 201
+POST /asset-requests/  duplicate pending       → 400
+POST /asset-requests/  no asset and no category→ 400
+POST /asset-requests/  (auditor)               → 403 read-only
+POST /asset-requests/{id}/approve/ (employee)  → 403
+POST /asset-requests/{id}/approve/ (dept head) → 200, asset assigned
+POST approve a category request with no choice → 409 "Choose which asset…"
+POST approve/reject an already-decided one     → 409
+list scoping: employee 3 · head 3 · manager 3 · auditor 0
+audit trail reads: Requested → Approved
+
+POST /auth/login/                              → refresh 7 days,  client=web
+POST /auth/login/   X-Client: mobile           → refresh 30 days, client=mobile
+POST /auth/refresh/ (mobile token, no header)  → refresh 30 days, client=mobile
+POST /auth/login/   X-Client: sneaky           → refresh 7 days,  client=web
+POST /auth/devices/                            → 201 "Device registered successfully"
+POST /auth/devices/  same push_token           → 200 same id, name and version updated
+GET  /auth/devices/                            → 200, 1 row
+POST /auth/devices/  platform=blackberry       → 400 "…is not a valid choice."
+POST /auth/devices/  no token                  → 401
+DELETE /auth/devices/{id}/                     → 200, list empty; repeat → 404
+
+POST /assets/{id}/assign/  Idempotency-Key: K  → 200 "TRA-2026-000019 assigned to Karan Verma"
+POST  same request, same key                   → 200 identical bytes, Idempotent-Replay: true
+POST  same key, different payload              → 409 "…already been used for a different request"
+POST  same request, NO key  (the contrast)     → 409 "…is already assigned to Karan Verma"
+
+GET  /assets/?updated_since=<5 min ahead>      → 0 rows
+GET  /assets/?updated_since=<checkpoint>       → 1 row, just the asset created after it
+GET  /assets/by-tag/TRA-2026-000020/           → 200, single object (no results array)
+GET  /assets/by-tag/tra-2026-000020/           → 200 (case-insensitive)
+GET  /assets/by-tag/TRA-2026-999999/           → 404 "No asset carries the tag …"
+DELETE the asset, then the same delta          → 1 row, is_deleted: true
+    …while the normal list                     → no longer contains it
+    …and by-tag                                → 404
+GET  /assets/?updated_since=last%20tuesday     → 400 naming the accepted formats
+
+POST /auth/devices/  (employee, mobile)        → 201, push_notifications: true
+POST /assets/19/assign/  (manager → employee)  → 200
+     in-app notifications                      → 6 → 7
+     server log                                → PUSH to ExponentPush… with
+                                                 data.deep_link trasset://assets/48
+PATCH /auth/me/ {push_notifications: false}    → 200, preference honoured
+
+POST /stock-takes/  {location_id}              → 201, expected 10 of 12 (2 terminal, excluded)
+POST /stock-takes/  same location again        → 409 "…already in progress, started by …"
+POST /stock-takes/1/scan/  batch of 5          → 200 "3 of 5 scans recorded"
+     …one real, one real, repeat, stray, junk  → recorded · recorded · duplicate ·
+                                                 recorded(unexpected) · unknown
+     live counts                               → found 2, missing 8, unexpected 1
+POST /stock-takes/1/submit/                    → 200 "2 found, 8 missing, 1 unexpected"
+POST /stock-takes/1/submit/  again             → 200, identical counts (idempotent)
+POST /stock-takes/1/scan/   after submit       → 409 "…already submitted"
+GET  /stock-takes/1/report/                    → found 2 · missing 8 · unexpected 1
 ```
 
 **Frontend** — all 21 files serve over HTTP; every JS file and inline block
@@ -343,20 +1453,19 @@ passes a syntax check. Not yet clicked through in a browser (see below).
   syntax-checking every script, and exercising the exact API calls each page
   makes — but nobody has driven the real UI yet. Expect small visual fixes on
   first run.
-- Maintenance, procurement and reports screens still show a "soon" badge in the
-  sidebar; their backends aren't built.
 - Audit rows are written but never pruned. A busy register will grow this table
   indefinitely — worth a retention policy (archive or partition by month) before
-  production, and it pairs naturally with the Day 18 Celery work.
+  production. `purge_read_notifications` shows the shape; audit needs its own,
+  and needs deciding rather than defaulting, since an audit trail is usually
+  kept for a stated period.
 - The audit trail is append-only at the application layer. A DB superuser can
   still edit the table, so production should restrict grants on `audit_logs`.
-- Notifications dropdown renders an empty state; the model arrives on Day 18.
-- Attachment upload works via the API but has no UI yet — the detail page shows
-  specifications and history, not a documents tab. Worth adding with Day 26.
 - The asset form has no image upload control yet; `image` is accepted by the API.
-- Celery is configured with a beat schedule, but the tasks it names don't exist
-  yet; dev runs eagerly so nothing breaks.
-- Redis not installed locally — not needed until Day 18.
+  The Documents tab covers attachments, but the asset's own photo still cannot
+  be set from the UI.
+- Redis is installed and running locally; Celery worker and beat have been
+  verified against it. Dev still defaults to eager execution so the app runs
+  without a broker.
 - `value_over_time` is built from purchase dates (how the register grew), not a
   historical revaluation. Worth revisiting if finance wants true month-end book values.
 

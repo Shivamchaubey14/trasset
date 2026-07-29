@@ -5,40 +5,53 @@ from io import BytesIO
 from django.db.models import Count, DecimalField, Q, Sum
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import status as http_status
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 
-from common.exceptions import Conflict
+from common.exceptions import Conflict, UnprocessableEntity
 from common.permissions import HasRolePermission
 from common.responses import ok
 from common.roles import Roles
+from common.sync import UPDATED_SINCE_PARAMETER, DeltaSyncMixin
 from common.viewsets import BaseModelViewSet
 
-from .constants import TERMINAL_STATUSES, AssetStatus
+from .constants import TERMINAL_STATUSES, AssetStatus, RequestStatus
 from .filters import AssetFilter
-from .models import Asset, Attachment
+from .models import Asset, AssetRequest, Attachment
 from .serializers import (
     AssetAssignmentSerializer,
     AssetDetailSerializer,
+    AssetImportSerializer,
     AssetListSerializer,
+    AssetRequestCreateSerializer,
+    AssetRequestSerializer,
+    AssetRequestStatsSerializer,
     AssetStatsSerializer,
     AssetWriteSerializer,
     AssignSerializer,
     AttachmentSerializer,
     CheckinSerializer,
     DepreciationScheduleSerializer,
+    ImportColumnSerializer,
+    ImportResultSerializer,
+    RequestApproveSerializer,
+    RequestRejectSerializer,
     RetireSerializer,
 )
 from .services import assignment as assignment_service
+from .services import importing
+from .services import requests as request_service
 
 MONEY = DecimalField(max_digits=14, decimal_places=2)
 
 
 @extend_schema(tags=["Assets"])
-class AssetViewSet(BaseModelViewSet):
+@extend_schema_view(list=extend_schema(parameters=[UPDATED_SINCE_PARAMETER]))
+class AssetViewSet(DeltaSyncMixin, BaseModelViewSet):
     """
     The asset register.
 
@@ -65,10 +78,13 @@ class AssetViewSet(BaseModelViewSet):
 
     def get_queryset(self):
         """Join everything the serializers touch, so lists stay flat on queries."""
-        queryset = Asset.objects.select_related(
+        # `delta_manager` widens to `all_objects` only while syncing, so a
+        # client can be told about assets that were deleted since it last
+        # looked. Everywhere else soft-deleted rows stay invisible.
+        queryset = self.delta_manager(Asset).select_related(
             "category", "location", "department", "vendor", "assigned_to", "created_by"
         )
-        if self.action == "retrieve":
+        if self.action in ("retrieve", "by_tag"):
             queryset = queryset.prefetch_related("attachments__uploaded_by")
         return queryset
 
@@ -78,6 +94,25 @@ class AssetViewSet(BaseModelViewSet):
         if self.action == "list":
             return AssetListSerializer
         return AssetDetailSerializer
+
+    @extend_schema(
+        summary="Resolve a scanned asset tag",
+        description=(
+            "Exact, single-result lookup by asset tag (FR-9.2). A scan should "
+            "cost one request and land on one asset, rather than a search that "
+            "returns a page the caller has to choose from."
+        ),
+        responses={200: AssetDetailSerializer},
+    )
+    @action(detail=False, methods=["get"], url_path=r"by-tag/(?P<tag>[^/]+)")
+    def by_tag(self, request, tag=None):
+        # Case-insensitive: a tag can arrive from a barcode reader, a hand-typed
+        # box or a URL that something along the way has lowercased.
+        asset = self.get_queryset().filter(asset_tag__iexact=(tag or "").strip()).first()
+        if asset is None:
+            raise NotFound(f"No asset carries the tag {tag}.")
+        serializer = self.get_serializer(asset)
+        return ok(serializer.data, "Asset retrieved successfully")
 
     # -----------------------------------------------------------------
     # Lifecycle actions (SRS §11.2)
@@ -252,6 +287,110 @@ class AssetViewSet(BaseModelViewSet):
         return ok(totals, "Asset statistics retrieved successfully")
 
     # -----------------------------------------------------------------
+    # Bulk import (FR-10.1)
+    # -----------------------------------------------------------------
+    @extend_schema(
+        summary="Bulk import assets",
+        description=(
+            "Upload a CSV or XLSX matching the template. Every row is validated "
+            "with the same serializer the API uses, so import rules and API "
+            "rules cannot drift.\n\n"
+            "Masters are matched **by name** — 'Laptops', not an id. An unknown "
+            "name is a row error naming what was not found.\n\n"
+            "By default a single bad row aborts the whole file and nothing is "
+            "written. Send `partial=true` to import the good rows anyway, or "
+            "`dry_run=true` to see the report without writing."
+        ),
+        request={"multipart/form-data": AssetImportSerializer},
+        responses={200: ImportResultSerializer, 422: ImportResultSerializer},
+    )
+    @action(detail=False, methods=["post"], url_path="import",
+            parser_classes=[MultiPartParser, FormParser])
+    def bulk_import(self, request):
+        serializer = AssetImportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        options = serializer.validated_data
+        dry_run = options["dry_run"]
+        partial = options["partial"]
+
+        try:
+            rows = importing.read_rows(options["file"])
+        except importing.ImportError_ as exc:
+            raise UnprocessableEntity(detail=str(exc)) from exc
+
+        results = importing.validate_rows(rows, request=request)
+        has_errors = any(not row.ok for row in results)
+
+        # Nothing is written on a dry run, nor when errors exist and the caller
+        # did not opt into a partial import.
+        should_commit = not dry_run and (partial or not has_errors)
+
+        if should_commit:
+            importing.commit_rows(results, request=request)
+
+        summary = importing.summarise(results, committed=should_commit,
+                                      partial=partial)
+
+        if dry_run:
+            message = (f"Checked {summary['total_rows']} rows — "
+                       f"{summary['valid_rows']} ready, "
+                       f"{summary['invalid_rows']} with problems")
+        elif should_commit:
+            message = f"Imported {summary['created']} assets"
+            if summary["invalid_rows"]:
+                message += f", skipped {summary['invalid_rows']} rows with problems"
+        else:
+            message = (f"Nothing imported — {summary['invalid_rows']} of "
+                       f"{summary['total_rows']} rows have problems. Fix them, or "
+                       f"retry with partial import to bring in the rest.")
+
+        response = ok(summary, message)
+        if not dry_run and not should_commit:
+            # Valid request, refused because of the data in it.
+            response.status_code = http_status.HTTP_422_UNPROCESSABLE_ENTITY
+        return response
+
+    @extend_schema(
+        summary="Download the import template",
+        description="A CSV with the expected headers and one worked example row.",
+        responses={(200, "text/csv"): bytes},
+    )
+    @action(detail=False, methods=["get"], url_path="import/template")
+    def import_template(self, request):
+        content = importing.build_template_csv()
+
+        response = HttpResponse(content, content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = (
+            'attachment; filename="trasset-asset-import-template.csv"'
+        )
+        return response
+
+    @extend_schema(
+        summary="Import column reference",
+        description=(
+            "What each column means and whether it is required — so the import "
+            "wizard can explain itself without hard-coding the schema."
+        ),
+        responses={200: ImportColumnSerializer(many=True)},
+    )
+    @action(detail=False, methods=["get"], url_path="import/columns")
+    def import_columns(self, request):
+        return ok(
+            [
+                {
+                    "header": spec.header,
+                    "required": spec.required,
+                    "help_text": spec.help_text,
+                    "example": spec.example,
+                    "lookup": spec.lookup,
+                }
+                for spec in importing.COLUMNS
+            ],
+            "Import columns retrieved successfully",
+        )
+
+    # -----------------------------------------------------------------
     # Delete
     # -----------------------------------------------------------------
     def destroy(self, request, *args, **kwargs):
@@ -265,6 +404,159 @@ class AssetViewSet(BaseModelViewSet):
             )
         asset.delete()
         return ok(None, f"{asset.asset_tag} deleted successfully")
+
+
+@extend_schema(tags=["Requests"])
+@extend_schema_view(list=extend_schema(parameters=[UPDATED_SINCE_PARAMETER]))
+class AssetRequestViewSet(DeltaSyncMixin, BaseModelViewSet):
+    """
+    Employee asset requests and the approvals inbox (FR-4.4).
+
+    Visibility is scoped by role rather than by a filter the client sends:
+    employees see only their own requests, department heads see their
+    department's, and managers see everything. That scoping lives in
+    ``get_queryset`` so it cannot be bypassed by crafting a query string.
+    """
+
+    queryset = AssetRequest.objects.all()
+    resource_name = "Request"
+    permission_classes = [IsAuthenticated, HasRolePermission]
+
+    # Anyone signed in may raise a request; the decision endpoints are guarded
+    # separately by action_roles below.
+    read_roles = Roles.ALL
+    write_roles = Roles.ALL
+    action_roles = {
+        "approve": Roles.APPROVERS,
+        "reject": Roles.APPROVERS,
+        "destroy": (Roles.SUPER_ADMIN,),
+        "update": (Roles.SUPER_ADMIN,),
+        "partial_update": (Roles.SUPER_ADMIN,),
+    }
+
+    filterset_fields = ("status", "requester", "category", "asset")
+    search_fields = ("reason", "requester__full_name", "asset__asset_tag", "asset__name")
+    ordering_fields = ("created_at", "status", "needed_by")
+    ordering = ("-created_at",)
+
+    def get_queryset(self):
+        # Both `asset` and `fulfilled_asset` are serialised with the full
+        # AssetListSerializer, which reaches category, location, department and
+        # assignee. Every one of those needs joining or each row costs extra
+        # queries — measured at 6 → 15 queries before this was complete.
+        queryset = AssetRequest.objects.select_related(
+            "requester", "decided_by", "category",
+            "asset", "asset__category", "asset__location",
+            "asset__department", "asset__assigned_to",
+            "fulfilled_asset", "fulfilled_asset__category",
+            "fulfilled_asset__location", "fulfilled_asset__department",
+            "fulfilled_asset__assigned_to",
+        )
+        user = self.request.user
+        role = getattr(getattr(user, "role", None), "name", None)
+
+        if role in Roles.MANAGERS:
+            return queryset
+        if role == Roles.DEPARTMENT_HEAD and user.department_id:
+            # Their own, plus anything raised by someone in their department.
+            return queryset.filter(
+                Q(requester=user) | Q(requester__department_id=user.department_id)
+            )
+        return queryset.filter(requester=user)
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return AssetRequestCreateSerializer
+        return AssetRequestSerializer
+
+    def perform_create(self, serializer):
+        asset_request = serializer.save()
+        # Logged explicitly as "Requested" rather than a generic create.
+        request_service.record_created(asset_request)
+
+    # -----------------------------------------------------------------
+    # Decisions
+    # -----------------------------------------------------------------
+    @extend_schema(
+        summary="Approve a request",
+        description=(
+            "Approves and hands the asset over in one transaction. If the asset "
+            "was taken in the meantime the assignment raises 409 and the whole "
+            "approval rolls back, leaving the request pending."
+        ),
+        request=RequestApproveSerializer,
+        responses={200: AssetRequestSerializer},
+    )
+    @action(detail=True, methods=["post"])
+    def approve(self, request, pk=None):
+        asset_request = self.get_object()
+        serializer = RequestApproveSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        updated = request_service.approve(
+            asset_request,
+            actor=request.user,
+            asset=serializer.validated_data.get("asset_id"),
+            notes=serializer.validated_data.get("notes", ""),
+        )
+        return ok(
+            AssetRequestSerializer(updated, context=self.get_serializer_context()).data,
+            f"Request approved — {updated.fulfilled_asset.asset_tag} assigned to "
+            f"{updated.requester.full_name}",
+        )
+
+    @extend_schema(
+        summary="Reject a request",
+        request=RequestRejectSerializer,
+        responses={200: AssetRequestSerializer},
+    )
+    @action(detail=True, methods=["post"])
+    def reject(self, request, pk=None):
+        asset_request = self.get_object()
+        serializer = RequestRejectSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        updated = request_service.reject(
+            asset_request, actor=request.user,
+            notes=serializer.validated_data["notes"],
+        )
+        return ok(
+            AssetRequestSerializer(updated, context=self.get_serializer_context()).data,
+            "Request rejected",
+        )
+
+    @extend_schema(
+        summary="Cancel your own request",
+        request=None,
+        responses={200: AssetRequestSerializer},
+    )
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, pk=None):
+        asset_request = self.get_object()
+        updated = request_service.cancel(asset_request, actor=request.user)
+        return ok(
+            AssetRequestSerializer(updated, context=self.get_serializer_context()).data,
+            "Request cancelled",
+        )
+
+    @extend_schema(
+        summary="Request counts",
+        description="Totals for the cards above the list, within what the caller may see.",
+        responses={200: AssetRequestStatsSerializer},
+    )
+    @action(detail=False, methods=["get"])
+    def stats(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        return ok(
+            queryset.aggregate(
+                total=Count("id"),
+                pending=Count("id", filter=Q(status=RequestStatus.PENDING)),
+                approved=Count("id", filter=Q(status=RequestStatus.APPROVED)),
+                rejected=Count("id", filter=Q(status=RequestStatus.REJECTED)),
+                cancelled=Count("id", filter=Q(status=RequestStatus.CANCELLED)),
+            ),
+            "Request statistics retrieved successfully",
+        )
 
 
 @extend_schema(tags=["Assets"])

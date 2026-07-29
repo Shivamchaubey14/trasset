@@ -1,11 +1,18 @@
 # Software Requirements Specification (SRS)
 ## Trasset — Asset Management System
 
-**Version:** 1.0
+**Version:** 1.1
 **Status:** Draft for Development
 **Prepared for:** Engineering Team
-**Stack:** Django REST Framework (DRF) · MySQL · HTML / CSS / JavaScript / jQuery
+**Stack:** Django REST Framework (DRF) · MySQL · HTML / CSS / JavaScript / jQuery · React Native (mobile)
 **Date:** July 2026
+
+### Amendment history
+
+| Version | Change |
+|---------|--------|
+| 1.1 | **Mobile application moved into scope** and specified — see §1.2, §2.4, §12. Chart series palette extended to ten colours (§7.1.1). Surface and text colours adjusted for contrast (§7.1). |
+| 1.0 | Initial specification. |
 
 ---
 
@@ -22,6 +29,7 @@
 9. [Security Requirements](#9-security-requirements)
 10. [System Architecture](#10-system-architecture)
 11. [Appendices](#11-appendices)
+12. [Mobile Application](#12-mobile-application)
 
 ---
 
@@ -43,7 +51,13 @@ Trasset lets an organisation track physical and digital assets across their full
 - Role-based dashboards, reports, and analytics
 - Full audit trail and notifications
 
-**Out of scope (v1):** payroll integration, native mobile apps, multi-currency accounting, and IoT sensor telemetry. These are noted as future enhancements.
+A **React Native mobile application** for iOS and Android is part of the product,
+specified in §12. It is not a shrunken copy of the web dashboard: it exists for
+the work that happens away from a desk — scanning an asset in a stock room,
+handing a laptop over on the spot, photographing damage, running a stock take.
+
+**Out of scope:** payroll integration, multi-currency accounting, and IoT sensor
+telemetry. These are noted as future enhancements.
 
 ### 1.3 Definitions, Acronyms, Abbreviations
 
@@ -101,19 +115,30 @@ Trasset is a new, self-contained product with a decoupled architecture:
 
 ### 2.4 Operating Environment
 - **Server:** Linux (Ubuntu 22.04+), Python 3.11+, MySQL 8.x, Nginx + Gunicorn
-- **Client:** Any modern browser (Chrome, Edge, Firefox, Safari — last 2 versions)
+- **Web client:** Any modern browser (Chrome, Edge, Firefox, Safari — last 2 versions)
+- **Mobile client:** iOS 15+ and Android 9 (API 28)+ — React Native. Requires a
+  camera for scanning; expected to work with an unreliable connection, since the
+  places assets live are often the places signal does not.
 - **Network:** HTTPS only
 
 ### 2.5 Design & Implementation Constraints
 - Backend must use DRF; DB must be MySQL.
-- Frontend must use HTML/CSS/JS/jQuery (no heavy SPA framework).
+- Web frontend must use HTML/CSS/JS/jQuery (no heavy SPA framework).
+- Mobile must use React Native (§12.2), and must consume the **same** `/api/v1/`
+  surface as the web client — no mobile-only API and no duplicated business rules.
 - Fonts limited to **Quicksand** (headings/brand) and **Lexend** (body/UI).
 - Brand palette fixed (see §7).
 - All timestamps stored in UTC; displayed in the user's timezone.
 
 ### 2.6 Assumptions and Dependencies
-- Users have stable internet and a modern browser.
+- Web users have stable internet and a modern browser.
+- **Mobile users frequently do not have stable internet** — the app is expected
+  to work through it (§12.5), which is a design constraint rather than an
+  edge case.
 - An SMTP service is available for email notifications.
+- Apple and Google developer accounts are available for distribution, and
+  App Store review time is allowed for in release planning.
+- Assets carry physically attached QR labels for scanning to be useful.
 - Asset tags are unique organisation-wide.
 
 ---
@@ -409,6 +434,9 @@ Response `201`: full asset object including auto-generated `asset_tag` and compu
 
 ### 6.2 Hardware Interfaces
 - Optional barcode/QR scanner (acts as keyboard input) and label printer.
+- **Mobile:** device camera for QR and barcode scanning (FR-14.6, FR-14.7),
+  and for capturing condition photographs (FR-14.13). Biometric sensor where
+  present, for unlock (FR-14.4).
 
 ### 6.3 Software Interfaces
 - MySQL 8.x database.
@@ -417,6 +445,10 @@ Response `201`: full asset object including auto-generated `asset_tag` and compu
 
 ### 6.4 Communication Interfaces
 - HTTPS/TLS 1.2+ only. JSON payloads. CORS restricted to the frontend origin.
+- **Mobile:** the same HTTPS API. CORS does not apply to a native client, so it
+  must not be relied on as a control there — server-side RBAC (SEC-3) is the
+  boundary for both clients. Certificate pinning per MNFR-6.
+- **Push:** APNs (iOS) and FCM (Android), dispatched server-side via Celery.
 
 ---
 
@@ -428,12 +460,47 @@ Response `201`: full asset object including auto-generated `asset_tag` and compu
 | `--color-primary` | Nest Green | `#3BB77E` | Primary actions, active nav, success, brand |
 | `--color-accent` | Cream Yolk | `#FDC040` | Highlights, warnings, secondary CTAs, badges |
 | `--color-ink` | Ink | `#253D4E` | Text, headings, sidebar background |
-| `--color-bg` | Cloud | `#F4F6F8` | App background |
+| `--color-bg` | Cloud | `#E7EDF2` | App background |
 | `--color-surface` | White | `#FFFFFF` | Cards, panels |
-| `--color-muted` | Slate | `#7B8794` | Secondary text, borders |
+| `--surface-subtle` | Mist | `#F5F8FA` | Card headers and footers |
+| `--table-head-bg` | Column | `#E4EAF0` | Table header row |
+| `--table-head-text` | Column Ink | `#46596C` | Table header labels |
+| `--color-slate` | Slate | `#7B8794` | Status colours, chart series |
+| `--color-muted` | Slate Text | `#5C6877` | Secondary text |
 | `--color-danger` | Coral | `#E5484D` | Errors, destructive actions |
 
 **Status colours:** Available → Nest Green · Assigned → Ink · Under Maintenance → Cream Yolk · Retired/Lost/Disposed → Slate/Coral.
+
+**Surface separation.** Cloud sits far enough below White that a card reads as
+its own surface; a near-white background makes the whole page read as one flat
+sheet. Mist separates a card's header and footer from its body without
+introducing a second colour.
+
+**Slate has two roles.** As a fill — status pills for Retired and Disposed, and
+chart series — it stays the brand `#7B8794`. As *text* it fails WCAG AA badly:
+3.0–3.7:1 depending on the surface behind it, against the 4.5:1 NFR-9 requires,
+and it carries every piece of secondary copy in the product. Secondary text
+therefore uses `#5C6877`, the lightest tone that clears 4.5:1 on **all five**
+surfaces (White, Mist, Zebra, Cloud and Table head — worst case 4.68:1).
+
+### 7.1.1 Chart series palette
+
+The three brand colours run out at about four categories, and tints of them stop
+being distinguishable. Four supporting hues extend the set to ten. They are for
+**charts and category colours only** — the brand identity, buttons, status
+colours and navigation remain Nest Green, Cream Yolk and Ink.
+
+| # | Name | Hex | | # | Name | Hex |
+|---|------|-----|---|---|------|-----|
+| 1 | Nest Green | `#3BB77E` | | 6 | Amber | `#E08A3C` |
+| 2 | Ink | `#253D4E` | | 7 | Steel | `#5A7D8C` |
+| 3 | Cream Yolk | `#FDC040` | | 8 | Slate | `#7B8794` |
+| 4 | Indigo | `#6C6FD4` | | 9 | Mint | `#5FC9A0` |
+| 5 | Teal | `#2F9BB5` | | 10 | Coral | `#E5484D` |
+
+Ordered so neighbours differ in both hue and lightness, since a chart legend is
+read by adjacency. Coral sits last so it is only reached when a chart genuinely
+has ten series — it reads as an error everywhere else.
 
 ### 7.2 Typography
 - **Quicksand** (Bold 700, rounded geometric) → brand wordmark, page titles, headings, KPI numbers.
@@ -443,7 +510,13 @@ Response `201`: full asset object including auto-generated `asset_tag` and compu
 ```css
 :root {
   --color-primary:#3BB77E; --color-accent:#FDC040; --color-ink:#253D4E;
-  --color-bg:#F4F6F8; --color-surface:#FFFFFF; --color-muted:#7B8794; --color-danger:#E5484D;
+  --color-bg:#E7EDF2; --color-surface:#FFFFFF; --surface-subtle:#F5F8FA;
+  --color-slate:#7B8794;  /* fills   */
+  --color-muted:#5C6877;  /* text    */
+  --color-danger:#E5484D;
+  /* Chart-only supporting hues */
+  --color-teal:#2F9BB5; --color-indigo:#6C6FD4;
+  --color-amber:#E08A3C; --color-steel:#5A7D8C;
   --font-head:'Quicksand',sans-serif; --font-body:'Lexend',sans-serif;
   --radius:12px; --shadow:0 2px 12px rgba(37,61,78,.08); --space:16px;
 }
@@ -455,7 +528,7 @@ h1,h2,h3,.brand{font-family:var(--font-head);font-weight:700;}
 - **Grid:** fixed left sidebar (240px, Ink background, white/green active states) + fluid content.
 - **Cards:** white surface, 12px radius, soft shadow, 20–24px padding.
 - **Buttons:** primary = Nest Green fill / white text; secondary = outline Ink; accent = Cream Yolk; destructive = Coral. 10px radius, 500 weight, subtle hover lift.
-- **Tables:** zebra rows, sticky header, status pills (rounded, coloured by status), row actions on hover, per-column sort, pagination footer.
+- **Tables:** zebra rows, sticky header, status pills (rounded, coloured by status), row actions on hover, per-column sort, pagination footer. The header row is separated from the data on four axes at once — fill, size, weight and letter-spacing — because any one alone still reads as another row of data.
 - **Forms:** floating/top labels, clear focus ring in Nest Green, inline validation in Coral.
 - **Charts:** doughnut (status), bar (by category), line (value over time) — palette-consistent, using a lightweight lib (Chart.js).
 - **Empty states & skeleton loaders** for every list.
@@ -574,6 +647,40 @@ frontend/
 - Monthly depreciation recalculation.
 - Daily warranty-expiry and maintenance-due reminder scan.
 - Email dispatch queue.
+- Push notification dispatch (§12.4, BE-3).
+
+### 10.5 Mobile Client
+
+```
+┌──────────────────────┐                        ┌──────────────────────────┐
+│  React Native app    │   HTTPS / JSON         │  Nginx → Gunicorn        │
+│  iOS · Android       │ ─────────────────────▶ │  Django / DRF            │
+│                      │ ◀───────────────────── │  (the same API)          │
+│  TanStack Query      │                        └──────────────────────────┘
+│  + persisted cache   │                                    ▲
+│  + mutation queue    │        push (APNs / FCM)           │
+│  expo-secure-store   │ ◀──────────────────────────────────┘
+└──────────────────────┘
+```
+
+The mobile client consumes **the same `/api/v1/` surface as the web dashboard**.
+No mobile-specific API, no BFF layer, no duplicated business rules — the
+additions in §12.4 are extensions to the shared API, available to both clients.
+That is what the decoupling in §2.1 was for.
+
+```
+mobile/
+├─ app/                    # expo-router screens
+│  ├─ (auth)/              # sign in
+│  ├─ (tabs)/              # scan · assets · requests · notifications · profile
+│  └─ asset/[id].tsx
+├─ src/
+│  ├─ api/                 # generated OpenAPI client + query hooks
+│  ├─ offline/             # mutation queue, persistence, conflict handling
+│  ├─ components/          # brand-consistent primitives
+│  └─ theme/               # tokens mirroring css/variables.css
+└─ __tests__/
+```
 
 ---
 
@@ -607,4 +714,167 @@ REDIS_URL=redis://…      CORS_ALLOWED_ORIGINS=https://app.trasset.com
 
 ---
 
-*End of SRS — Trasset v1.0*
+## 12. Mobile Application
+
+### 12.1 Purpose and Principle
+
+The mobile app is **not a smaller dashboard**. Reproducing the web UI on a phone
+would produce something worse than the website at everything the website already
+does well. It exists for the work that happens *away from a desk*, where a laptop
+is not practical:
+
+- Standing in front of an asset, needing to know what it is and who holds it
+- Handing equipment to someone on the spot
+- Photographing damage while looking at it
+- Walking a stock room reconciling what is physically there against the register
+- Approving a request between meetings
+
+Anything that is genuinely better on a large screen — bulk import, report
+building, master-data administration, purchase-order line editing — stays on the
+web. The app should feel deliberately narrow rather than apologetically
+incomplete.
+
+### 12.2 Technology Stack
+
+| Concern | Choice | Why |
+|---------|--------|-----|
+| Framework | **React Native** | One codebase for iOS and Android |
+| Toolchain | **Expo** (managed, with dev builds) | Scanning, camera, secure storage and push all have maintained Expo modules; dev builds allow native modules if needed later |
+| Navigation | **React Navigation** (native stack + bottom tabs) | Standard, well understood |
+| Server state | **TanStack Query** | Caching, retries, background refetch and offline persistence come free, which is most of what this app needs |
+| Forms | **React Hook Form** + **Zod** | Validation mirrors the API's rules |
+| Scanning | **expo-camera** barcode scanning | QR and 1D barcodes from one component |
+| Secure storage | **expo-secure-store** (Keychain / Keystore) | Refresh tokens must not sit in AsyncStorage |
+| Push | **expo-notifications** over APNs/FCM | |
+| Offline queue | TanStack Query persistence + a durable mutation queue | See §12.5 |
+| Testing | **Jest** + React Native Testing Library; **Maestro** for end-to-end | |
+
+**Language:** TypeScript throughout. The API contract is already published as
+OpenAPI at `/api/schema/`, so client types should be **generated from it** rather
+than hand-written — that is the whole point of having kept the schema clean.
+
+### 12.3 Functional Requirements
+
+Tagged `FR-14.x`, priority as elsewhere: **[H]**igh, **[M]**edium, **[L]**ow.
+
+**Authentication**
+- **FR-14.1 [H]** Sign in with email and password, receiving the same JWT pair as the web client.
+- **FR-14.2 [H]** Store the refresh token in the platform secure store, never in plain storage.
+- **FR-14.3 [H]** Stay signed in across app restarts, refreshing silently.
+- **FR-14.4 [M]** Optionally unlock with biometrics (Face ID / fingerprint) rather than re-entering a password.
+- **FR-14.5 [H]** Sign out clears the secure store and blacklists the refresh token.
+
+**Scan-first asset lookup — the reason the app exists**
+- **FR-14.6 [H]** Scan an asset's QR code and open its detail view directly. The existing QR encodes a URL containing the asset tag (FR-9.1, FR-9.2).
+- **FR-14.7 [H]** Scan a manufacturer barcode and resolve it against `serial_number`.
+- **FR-14.8 [H]** Fall back to typing a tag or serial when a label is damaged or missing.
+- **FR-14.9 [M]** Continuous scan mode: scan many assets in sequence without returning to a menu, for stock takes.
+
+**Assets**
+- **FR-14.10 [H]** View asset detail: identity, status, holder, location, category, warranty and current value.
+- **FR-14.11 [H]** Managers assign and check in from the device, with the same 409 guards as the API.
+- **FR-14.12 [H]** "My assets" — what the signed-in user currently holds.
+- **FR-14.13 [M]** Attach photos captured with the camera to an asset.
+- **FR-14.14 [M]** Report an issue against an asset, raising a maintenance record.
+- **FR-14.15 [L]** Search and filter the register, with a deliberately narrower filter set than the web.
+
+**Requests and approvals**
+- **FR-14.16 [M]** Employees raise an asset request.
+- **FR-14.17 [M]** Approvers see a pending inbox and approve or reject with a reason.
+
+**Stock take** *(the feature that most justifies a native app)*
+- **FR-14.18 [M]** Start a stock take scoped to a location.
+- **FR-14.19 [M]** Scan assets in sequence; each is marked seen, with a live count of found, missing and unexpected.
+- **FR-14.20 [M]** Submit the session, producing a reconciliation report.
+- **FR-14.21 [H]** A stock take must work **entirely offline** and submit when signal returns — a stock room is exactly where there is no signal.
+
+**Notifications**
+- **FR-14.22 [M]** Receive push notifications for the events in FR-12.1.
+- **FR-14.23 [M]** Tapping a notification opens the relevant record (deep link).
+- **FR-14.24 [M]** In-app notification list mirroring `/notifications/`.
+
+**Offline**
+- **FR-14.25 [H]** Recently viewed assets remain readable without a connection.
+- **FR-14.26 [H]** Actions taken offline queue and replay on reconnect (§12.5).
+- **FR-14.27 [H]** Queued and failed actions are visible to the user; nothing fails silently.
+
+### 12.4 Backend Work Required
+
+The API was built decoupled and is already most of the way there — JWT auth, the
+response envelope, pagination, filtering and the QR endpoint all serve mobile
+unchanged. These additions are needed:
+
+| # | Change | Why |
+|---|--------|-----|
+| **BE-1** | Longer refresh lifetime for mobile clients (e.g. 30 days), selected by client type | A 7-day refresh means a phone logs out every week, which trains people to distrust the app |
+| **BE-2** | `POST /auth/devices/` to register a push token; `DELETE` on sign-out | Push cannot work without it |
+| **BE-3** | Send push alongside the in-app notification in `apps/notifications/services.py` | One dispatch point already exists; extend it rather than adding a parallel path |
+| **BE-4** | **Idempotency keys** on mutating endpoints (`Idempotency-Key` header) | A queued check-out replayed twice must not check out twice. This is the single most important backend change for offline support |
+| **BE-5** | `?updated_since=` on list endpoints for delta sync | Re-downloading the whole register on every launch is not viable over mobile data |
+| **BE-6** | Lookup by tag: `GET /assets/by-tag/{tag}/` | Scanning currently requires a search request and picking the first result — clumsy and ambiguous |
+| **BE-7** | `StockTake` and `StockTakeEntry` models with a submit endpoint | FR-14.18 – FR-14.21 |
+| **BE-8** | Per-device throttle scope | A sync burst on reconnect should not trip the shared user limit |
+
+### 12.5 Offline Strategy
+
+Offline is a **requirement, not a nicety** — assets live in basements, stock
+rooms and warehouses.
+
+**Reads.** TanStack Query's cache is persisted to storage. Recently viewed
+assets, the user's own assets, and any active stock take stay readable. Cached
+data is shown with its age, so nobody mistakes a stale record for a live one.
+
+**Writes.** Mutations go to a durable queue rather than straight to the network:
+
+1. The action is written to the queue with a client-generated idempotency key.
+2. The UI updates optimistically and marks the record as pending.
+3. On reconnect the queue drains in order, sending the idempotency key.
+4. A `409` is surfaced as a **conflict for the user to resolve**, not silently
+   discarded — if someone else took the asset first, the person who scanned it
+   needs to be told.
+
+**What is not queued.** Approvals and retirements are deliberately online-only.
+Both are decisions with consequences that are hard to unwind, and queueing them
+invites approving something that was already withdrawn.
+
+### 12.6 Design
+
+Same brand as §7 — Nest Green, Cream Yolk, Ink, Quicksand and Lexend — adapted
+to platform conventions rather than transplanted:
+
+- Bottom tab navigation: **Scan · Assets · Requests · Notifications · Profile**,
+  with Scan as the centre, largest target, because it is the primary action.
+- Native navigation patterns, gestures and haptics; a successful scan should
+  give haptic feedback, since the user is often not looking at the screen.
+- Minimum 44×44pt touch targets; one-handed reachability for primary actions.
+- Full offline and error states for every screen. A blank screen with a spinner
+  that never resolves is the most common failure of a mobile app on bad signal.
+- Dark mode from the start — retrofitting it is far more expensive.
+- Accessibility parity with NFR-9: screen-reader labels, dynamic type support,
+  and the same contrast ratios (§7.1).
+
+### 12.7 Non-Functional Requirements
+
+- **MNFR-1** Cold start to usable in under 3 seconds on a mid-range device.
+- **MNFR-2** Scan to asset detail in under 2 seconds on a normal connection.
+- **MNFR-3** Installed size under 60 MB per platform.
+- **MNFR-4** Support the last two major OS versions, plus the minimums in §2.4.
+- **MNFR-5** No secrets, API keys or tokens in the JavaScript bundle; a mobile app is a public binary and must be treated as one.
+- **MNFR-6** Certificate pinning against the production API.
+- **MNFR-7** Crash reporting and release-tagged error monitoring.
+- **MNFR-8** No plaintext asset data at rest beyond the encrypted cache.
+
+### 12.8 Out of Scope for Mobile v1
+
+Deliberately excluded so the app stays sharp:
+
+- Master-data administration and user management — web only
+- Purchase-order creation and line editing — a spreadsheet-shaped task
+- Bulk import and report building — web only
+- Depreciation schedule editing
+- Tablet-optimised layouts (phone-first; tablets get the phone layout)
+- Offline queueing of approvals and retirements (§12.5)
+
+---
+
+*End of SRS — Trasset v1.1*

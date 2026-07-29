@@ -49,3 +49,27 @@ class AssignmentAction(models.TextChoices):
 
     CHECKOUT = "checkout", "Check-out"
     CHECKIN = "checkin", "Check-in"
+
+
+class RequestStatus(models.TextChoices):
+    """Employee asset requests (FR-4.4)."""
+
+    PENDING = "pending", "Pending"
+    APPROVED = "approved", "Approved"
+    REJECTED = "rejected", "Rejected"
+    CANCELLED = "cancelled", "Cancelled"
+
+
+#: A request in any of these has been settled and cannot be decided again.
+DECIDED_REQUEST_STATUSES = (
+    RequestStatus.APPROVED,
+    RequestStatus.REJECTED,
+    RequestStatus.CANCELLED,
+)
+
+REQUEST_STATUS_COLORS = {
+    RequestStatus.PENDING: "#FDC040",   # Cream Yolk — needs attention
+    RequestStatus.APPROVED: "#3BB77E",  # Nest Green
+    RequestStatus.REJECTED: "#E5484D",  # Coral
+    RequestStatus.CANCELLED: "#7B8794", # Slate
+}

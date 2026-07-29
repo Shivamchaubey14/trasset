@@ -94,6 +94,21 @@ python -m http.server 5500
 
 Then open `http://127.0.0.1:5500`. The origin must appear in `CORS_ALLOWED_ORIGINS`.
 
+### Background jobs (optional in development)
+
+Notification emails and the scheduled scans run through Celery. In development
+`CELERY_TASK_ALWAYS_EAGER=True` runs them inline, so **no broker is needed** to
+use the app. To run them for real:
+
+```bash
+# Requires Redis on REDIS_URL
+celery -A config worker --loglevel=info --pool=solo   # --pool=solo on Windows
+celery -A config beat   --loglevel=info               # the scheduler
+```
+
+Scheduled jobs: monthly depreciation recalculation, a daily warranty-expiry
+scan, and a daily maintenance-due scan.
+
 ---
 
 ## Demo accounts

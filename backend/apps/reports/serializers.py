@@ -73,6 +73,68 @@ class ExpiringWarrantySerializer(serializers.Serializer):
     category = serializers.CharField(allow_null=True)
 
 
+class ReportColumnSerializer(serializers.Serializer):
+    """Column metadata, so the UI can render any report without knowing it."""
+
+    key = serializers.CharField()
+    header = serializers.CharField()
+    kind = serializers.CharField(help_text="text | number | money | date")
+
+
+class ReportDefinitionSerializer(serializers.Serializer):
+    """A report as advertised by the index — what it is and what it contains."""
+
+    key = serializers.CharField()
+    title = serializers.CharField()
+    description = serializers.CharField()
+    columns = ReportColumnSerializer(many=True)
+
+
+class ReportSerializer(serializers.Serializer):
+    """A report page: what it is, its columns, its rows and its totals."""
+
+    key = serializers.CharField()
+    title = serializers.CharField()
+    description = serializers.CharField()
+    columns = ReportColumnSerializer(many=True)
+    totals = serializers.DictField()
+    count = serializers.IntegerField()
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    total_pages = serializers.IntegerField()
+    results = serializers.ListField(child=serializers.DictField())
+
+
+class ReportFilterSerializer(serializers.Serializer):
+    """Query parameters shared by every report (FR-11.4)."""
+
+    date_from = serializers.DateField(required=False, allow_null=True)
+    date_to = serializers.DateField(required=False, allow_null=True)
+    department = serializers.IntegerField(required=False, allow_null=True)
+    location = serializers.IntegerField(required=False, allow_null=True)
+    category = serializers.IntegerField(required=False, allow_null=True)
+    # Deliberately not called `format`: DRF reserves that query parameter for
+    # content negotiation and returns 404 when no renderer matches the value.
+    export = serializers.ChoiceField(
+        choices=("json", "csv", "xlsx"), required=False, default="json",
+        help_text="csv or xlsx downloads the report; json paginates it. "
+                  "PDF is deferred to v1.1.",
+    )
+    page = serializers.IntegerField(required=False, min_value=1, default=1)
+    page_size = serializers.IntegerField(
+        required=False, min_value=1, max_value=500, default=50
+    )
+
+    def validate(self, attrs):
+        date_from = attrs.get("date_from")
+        date_to = attrs.get("date_to")
+        if date_from and date_to and date_to < date_from:
+            raise serializers.ValidationError({
+                "date_to": ["The end date cannot be before the start date."]
+            })
+        return attrs
+
+
 class DashboardStatsSerializer(serializers.Serializer):
     """Everything `GET /dashboard/stats/` returns."""
 

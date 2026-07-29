@@ -4,25 +4,25 @@ import logging
 from django.conf import settings
 from django.core.mail import send_mail
 from drf_spectacular.utils import OpenApiResponse, extend_schema
-from rest_framework import status
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from apps.audit.constants import AuditAction
 from apps.audit.services import record as audit_record
 from common.exceptions import UnprocessableEntity
 from common.permissions import HasRolePermission, IsSuperAdmin
-from common.responses import ok
+from common.responses import created, ok
 from common.roles import Roles
-from common.viewsets import BaseModelViewSet, BaseReadOnlyViewSet
+from common.viewsets import BaseModelViewSet, BaseReadOnlyViewSet, ScopedThrottleMixin
 
-from .models import Role, User
+from .models import Device, Role, User
 from .serializers import (
+    DeviceSerializer,
     LogoutSerializer,
     PasswordChangeSerializer,
     PasswordResetConfirmSerializer,
@@ -30,9 +30,11 @@ from .serializers import (
     ProfileUpdateSerializer,
     RoleSerializer,
     TrassetTokenObtainPairSerializer,
+    TrassetTokenRefreshSerializer,
     UserSerializer,
     UserWriteSerializer,
 )
+from .tokens import ClientAwareRefreshToken
 
 logger = logging.getLogger("trasset")
 
@@ -79,6 +81,7 @@ class LoginView(TokenObtainPairView):
     description="Exchange a valid refresh token for a new access token (FR-1.2).",
 )
 class RefreshView(TokenRefreshView):
+    serializer_class = TrassetTokenRefreshSerializer
     permission_classes = [AllowAny]
     throttle_scope = "auth"
     resource_name = "Token"
@@ -104,11 +107,17 @@ class LogoutView(GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            RefreshToken(serializer.validated_data["refresh"]).blacklist()
+            ClientAwareRefreshToken(serializer.validated_data["refresh"]).blacklist()
         except TokenError as exc:
             raise UnprocessableEntity(
                 detail="That refresh token is invalid or already expired."
             ) from exc
+
+        # Signing out is also where a device stops being a push target (BE-2).
+        # Scoped to the caller, so a token nobody owns simply matches nothing.
+        push_token = serializer.validated_data.get("push_token")
+        if push_token:
+            Device.objects.filter(user=request.user, push_token=push_token).delete()
 
         audit_record(AuditAction.LOGOUT, instance=request.user, entity_type="User")
         return ok(None, "Logged out successfully")
@@ -217,6 +226,75 @@ class PasswordResetConfirmView(GenericAPIView):
         audit_record(AuditAction.PASSWORD_RESET, instance=user, user=user,
                      entity_type="User")
         return ok(None, "Password reset successfully. You can now log in.")
+
+
+# ---------------------------------------------------------------------------
+# Devices (SRS §12.4, BE-2)
+# ---------------------------------------------------------------------------
+@extend_schema(tags=["Auth"])
+class DeviceViewSet(ScopedThrottleMixin,
+                    mixins.CreateModelMixin,
+                    mixins.ListModelMixin,
+                    mixins.DestroyModelMixin,
+                    viewsets.GenericViewSet):
+    """
+    Push targets belonging to the signed-in user (BE-2).
+
+    Registering is an upsert, so an app can call it on every launch without
+    accumulating rows. Signing out deletes the row, either here or by passing
+    ``push_token`` to ``/auth/logout/``.
+
+    Note the plain ``IsAuthenticated`` rather than the usual role matrix: this
+    is not a business resource. Registering a phone is something *every* role
+    does, auditors included — the read-only guard in ``HasRolePermission``
+    would otherwise stop an auditor from ever receiving a notification.
+    Ownership is enforced by scoping the queryset, so nobody can see or
+    deregister somebody else's handset.
+    """
+
+    queryset = Device.objects.all()          # narrowed per-user in get_queryset
+    serializer_class = DeviceSerializer
+    permission_classes = [IsAuthenticated]
+    resource_name = "Device"
+    pagination_class = None
+
+    def get_queryset(self):
+        return Device.objects.filter(user=self.request.user)
+
+    @extend_schema(
+        summary="Register a device for push",
+        description=(
+            "Registers this device against the signed-in user. Sending a push "
+            "token that is already on file updates that row and returns 200; a "
+            "new one returns 201."
+        ),
+        responses={200: DeviceSerializer, 201: DeviceSerializer},
+    )
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        fields = dict(serializer.validated_data)
+        device, was_created = Device.objects.register(
+            request.user, push_token=fields.pop("push_token"), **fields
+        )
+
+        body = self.get_serializer(device).data
+        if was_created:
+            return created(body, "Device registered successfully")
+        return ok(body, "Device registration updated successfully")
+
+    @extend_schema(summary="List your registered devices")
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    @extend_schema(
+        summary="Deregister a device",
+        responses={200: OpenApiResponse(description="Device removed")},
+    )
+    def destroy(self, request, *args, **kwargs):
+        self.get_object().delete()
+        return ok(None, "Device removed successfully")
 
 
 # ---------------------------------------------------------------------------

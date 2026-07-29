@@ -156,6 +156,26 @@ class AssetSoftDeleteTests(TestCase):
         self.asset.hard_delete()
         self.assertFalse(Asset.all_objects.filter(pk=pk).exists())
 
+    def test_queryset_delete_returns_djangos_shape(self):
+        """
+        ``deleted, _ = qs.delete()`` is how everyone writes this. Returning a
+        bare integer breaks that at the call site, a long way from the cause.
+        """
+        Asset.objects.create(name="Second", category=self.category)
+
+        deleted, per_model = Asset.objects.all().delete()
+        self.assertEqual(deleted, 2)
+        self.assertEqual(per_model, {"assets.Asset": 2})
+
+    def test_bulk_delete_is_soft_even_via_all_objects(self):
+        """Delete means soft-delete everywhere; hard_delete is the escape hatch."""
+        Asset.all_objects.all().delete()
+        self.assertEqual(Asset.objects.count(), 0)
+        self.assertEqual(Asset.all_objects.count(), 1)
+
+        Asset.all_objects.all().hard_delete()
+        self.assertEqual(Asset.all_objects.count(), 0)
+
 
 class WarrantyTests(TestCase):
     """FR-7.3 — flag warranties expiring within 30 days."""

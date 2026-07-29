@@ -32,7 +32,7 @@
     { key: 'under_maintenance', label: 'In maintenance', icon: 'wrench',
       accent: 'var(--color-accent)', soft: 'var(--accent-soft)' },
     { key: 'retired', label: 'Retired / lost', icon: 'clock',
-      accent: 'var(--color-muted)', soft: '#EEF1F4' }
+      accent: 'var(--color-slate)', soft: '#EEF1F4' }
   ];
 
   var state = {
@@ -291,11 +291,15 @@
     readQuerySearch();
     $('#searchIcon').html(ui.icon('search', 17));
     $('#addBtn').prepend(ui.icon('plus', 17));
+    $('#importBtn').prepend(ui.icon('download', 16));
     $('#clearFiltersBtn').prepend(ui.icon('close', 15));
 
     T.auth.requireAuth()
       .then(function () {
-        if (!session.canWrite()) { $('#addBtn').remove(); }
+        if (!session.canWrite()) {
+          $('#addBtn').remove();
+          $('#importBtn').remove();
+        }
         return populateFilters();
       })
       .then(reload)
@@ -328,6 +332,7 @@
       state.page = 1;
       $('.table thead th').removeClass('is-sorted-asc is-sorted-desc');
       $(this).addClass(state.ordering.charAt(0) === '-' ? 'is-sorted-desc' : 'is-sorted-asc');
+      ui.syncSortState('.table');
       loadTable();
     });
 
@@ -342,6 +347,10 @@
     $('#addBtn').on('click', function () { T.assetForm.open(null, reload); });
     $('#tableBody').on('click', '[data-empty-action]', function () {
       T.assetForm.open(null, reload);
+    });
+
+    $('#importBtn').on('click', function () {
+      T.importWizard.open(function () { reload(); });
     });
 
     $('#tableBody').on('click', '[data-act="edit"]', function () {

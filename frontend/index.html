@@ -9,7 +9,9 @@
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Lexend:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <!-- Noto Sans Devanagari carries the Hindi; Quicksand and Lexend have no
+       Devanagari glyphs and would render it as empty boxes. -->
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Lexend:wght@300;400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="css/variables.css">
   <link rel="stylesheet" href="css/base.css">
@@ -26,10 +28,10 @@
       <div class="flex items-center gap-3 mb-5" id="asideBrand"></div>
 
       <h1 class="auth-headline">
-        Every asset,<br>
-        <span class="hl">accounted for.</span>
+        <span data-i18n="auth.headline1">Every asset,</span><br>
+        <span class="hl" data-i18n="auth.headline2">accounted for.</span>
       </h1>
-      <p class="auth-sub">
+      <p class="auth-sub" data-i18n="auth.sub">
         Track laptops, vehicles, furniture and licences across their whole life —
         from purchase order to disposal — with depreciation, maintenance and a
         full audit trail built in.
@@ -39,17 +41,23 @@
     </div>
 
     <div class="auth-foot">
-      Trasset v1.0 · Asset Management System
+      Trasset v1.0 · <span data-i18n="app.tagline">Asset Management System</span>
     </div>
   </aside>
 
   <!-- Sign-in form -->
   <main class="auth-main">
+    <!--
+      The language control sits above the form, before anything is read or
+      typed. Putting it at the end of a form somebody cannot read is no use.
+    -->
+    <div class="auth-lang" id="langMount"></div>
+
     <div class="auth-card">
       <div class="auth-brand" id="formBrand"></div>
 
-      <h2 class="auth-title">Welcome back</h2>
-      <p class="auth-lede">Sign in to your Trasset workspace.</p>
+      <h2 class="auth-title" data-i18n="auth.welcome">Welcome back</h2>
+      <p class="auth-lede" data-i18n="auth.lede">Sign in to your Trasset workspace.</p>
 
       <div class="auth-alert" id="authAlert" role="alert">
         <span id="authAlertIcon"></span>
@@ -58,23 +66,26 @@
 
       <form id="loginForm" novalidate>
         <div class="field">
-          <label class="label" for="email">Email address</label>
+          <label class="label" for="email" data-i18n="auth.email">Email address</label>
           <div class="input-group">
             <span class="input-group-icon" id="emailIcon"></span>
             <input class="input" type="email" id="email" name="email"
-                   placeholder="you@company.com" autocomplete="email" required>
+                   placeholder="you@company.com" autocomplete="email" required
+                   data-i18n-attr="placeholder:auth.emailPlaceholder">
           </div>
           <div class="field-error"></div>
         </div>
 
         <div class="field">
-          <label class="label" for="password">Password</label>
+          <label class="label" for="password" data-i18n="auth.password">Password</label>
           <div class="input-group">
             <span class="input-group-icon" id="passwordIcon"></span>
             <input class="input" type="password" id="password" name="password"
-                   placeholder="Enter your password" autocomplete="current-password" required>
+                   placeholder="Enter your password" autocomplete="current-password" required
+                   data-i18n-attr="placeholder:auth.passwordPlaceholder">
             <button type="button" class="input-affix-btn" id="togglePassword"
-                    aria-label="Show password"></button>
+                    aria-label="Show password"
+                    data-i18n-attr="aria-label:auth.showPassword"></button>
           </div>
           <div class="field-error"></div>
         </div>
@@ -82,13 +93,14 @@
         <div class="auth-row">
           <label class="checkbox">
             <input type="checkbox" id="remember" checked>
-            <span class="text-small">Keep me signed in</span>
+            <span class="text-small" data-i18n="auth.keepSignedIn">Keep me signed in</span>
           </label>
-          <a href="forgot-password.html" class="text-small">Forgot password?</a>
+          <a href="forgot-password.html" class="text-small"
+             data-i18n="auth.forgot">Forgot password?</a>
         </div>
 
         <button type="submit" class="btn btn-primary btn-lg btn-block" id="loginBtn">
-          <span class="btn-label">Sign in</span>
+          <span class="btn-label" data-i18n="auth.signIn">Sign in</span>
         </button>
       </form>
 
@@ -97,7 +109,9 @@
         localhost, so a deployed copy never advertises credentials.
       -->
       <div class="demo-hint hidden" id="demoHint">
-        <div class="demo-hint-title">Demo accounts · click to fill</div>
+        <div class="demo-hint-title" data-i18n="auth.demoTitle">
+          Demo accounts · click to fill
+        </div>
         <div class="demo-accounts" id="demoAccounts"></div>
       </div>
     </div>
@@ -106,6 +120,7 @@
 </div>
 
 <script src="js/vendor/jquery.min.js"></script>
+<script src="js/i18n.js"></script>
 <script src="js/api.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/auth.js"></script>
@@ -204,9 +219,38 @@
     }
   }
 
+  /** Re-render the pieces built in JavaScript, in the new language. */
+  function repaintForLanguage() {
+    $('#asideFeatures').html(FEATURES.map(function (f, index) {
+      var n = index + 1;
+      return '<div class="auth-feature">' +
+               '<span class="auth-feature-icon">' + ui.icon(f.icon, 18) + '</span>' +
+               '<span>' +
+                 '<span class="auth-feature-title">' +
+                   ui.esc(T.i18n.t('auth.feature' + n + '.title', f.title)) +
+                 '</span><br>' +
+                 '<span class="auth-feature-desc">' +
+                   ui.esc(T.i18n.t('auth.feature' + n + '.desc', f.desc)) +
+                 '</span>' +
+               '</span>' +
+             '</div>';
+    }).join(''));
+
+    $('#togglePassword').attr(
+      'aria-label',
+      $('#password').attr('type') === 'password'
+        ? T.i18n.t('auth.showPassword', 'Show password')
+        : T.i18n.t('auth.hidePassword', 'Hide password')
+    );
+  }
+
   $(function () {
     paintStatic();
     readReason();
+
+    T.i18n.mount('#langMount');
+    repaintForLanguage();
+    $(document).on('trasset:lang', repaintForLanguage);
 
     // Already signed in? Go straight to the dashboard.
     T.auth.redirectIfAuthenticated();
@@ -216,7 +260,9 @@
       var toText = $input.attr('type') === 'password';
       $input.attr('type', toText ? 'text' : 'password');
       $(this).html(ui.icon(toText ? 'eyeOff' : 'eye', 17))
-             .attr('aria-label', toText ? 'Hide password' : 'Show password');
+             .attr('aria-label', toText
+               ? T.i18n.t('auth.hidePassword', 'Hide password')
+               : T.i18n.t('auth.showPassword', 'Show password'));
       $input.focus();
     });
 

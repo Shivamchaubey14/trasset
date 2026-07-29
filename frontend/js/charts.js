@@ -19,17 +19,21 @@ window.Trasset = window.Trasset || {};
     primary: token('--color-primary', '#3BB77E'),
     accent:  token('--color-accent', '#FDC040'),
     ink:     token('--color-ink', '#253D4E'),
-    muted:   token('--color-muted', '#7B8794'),
+    muted:   token('--color-muted', '#5C6877'),
+    slate:   token('--color-slate', '#7B8794'),
     danger:  token('--color-danger', '#E5484D'),
     border:  token('--border', '#E3E8EE'),
     surface: token('--color-surface', '#FFFFFF')
   };
 
+  // Ten distinguishable series: the three brand colours plus four supporting
+  // hues, ordered so neighbours differ in both hue and lightness.
   var series = [
     token('--chart-1', '#3BB77E'), token('--chart-2', '#253D4E'),
-    token('--chart-3', '#FDC040'), token('--chart-4', '#7B8794'),
-    token('--chart-5', '#5FC9A0'), token('--chart-6', '#4A6B85'),
-    token('--chart-7', '#E5484D'), token('--chart-8', '#B8C2CC')
+    token('--chart-3', '#FDC040'), token('--chart-4', '#6C6FD4'),
+    token('--chart-5', '#2F9BB5'), token('--chart-6', '#E08A3C'),
+    token('--chart-7', '#5A7D8C'), token('--chart-8', '#7B8794'),
+    token('--chart-9', '#5FC9A0'), token('--chart-10', '#E5484D')
   ];
 
   function applyDefaults() {

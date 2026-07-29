@@ -5,8 +5,8 @@ from apps.accounts.serializers import UserSerializer
 from apps.masters.models import Category, Department, Location, Vendor
 from common.validators import validate_document_upload
 
-from .constants import AssetStatus, DepreciationMethod
-from .models import Asset, AssetAssignment, Attachment
+from .constants import AssetStatus, DepreciationMethod, RequestStatus
+from .models import Asset, AssetAssignment, AssetRequest, Attachment
 
 
 class RefSerializer(serializers.Serializer):
@@ -80,9 +80,14 @@ class AssetListSerializer(serializers.ModelSerializer):
     """
 
     category = CategoryRefSerializer(read_only=True)
-    location = RefSerializer(read_only=True)
-    department = RefSerializer(read_only=True)
-    assigned_to = AssigneeRefSerializer(read_only=True)
+    # `allow_null` on a read-only field changes nothing at runtime — it exists
+    # so the generated OpenAPI schema tells the truth. Without it the schema
+    # claims these are always present, and a client generated from it (the
+    # mobile app, SRS §12.2) inherits the lie: `asset.assigned_to.full_name`
+    # type-checks and then explodes on the first unassigned asset.
+    location = RefSerializer(read_only=True, allow_null=True)
+    department = RefSerializer(read_only=True, allow_null=True)
+    assigned_to = AssigneeRefSerializer(read_only=True, allow_null=True)
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     status_color = serializers.CharField(read_only=True)
     warranty_expiring_soon = serializers.BooleanField(read_only=True)
@@ -97,6 +102,10 @@ class AssetListSerializer(serializers.ModelSerializer):
             "purchase_date", "purchase_cost", "current_value",
             "warranty_expiry", "warranty_expiring_soon", "warranty_expired",
             "image", "created_at", "updated_at",
+            # Always false on a normal list, which only ever returns live rows.
+            # It earns its place in a delta sync, where it is how a client
+            # learns to drop an asset it already holds (BE-5).
+            "is_deleted",
         )
         read_only_fields = fields
 
@@ -104,8 +113,8 @@ class AssetListSerializer(serializers.ModelSerializer):
 class AssetDetailSerializer(AssetListSerializer):
     """Everything the detail page shows."""
 
-    vendor = RefSerializer(read_only=True)
-    created_by = AssigneeRefSerializer(read_only=True)
+    vendor = RefSerializer(read_only=True, allow_null=True)
+    created_by = AssigneeRefSerializer(read_only=True, allow_null=True)
     attachments = AttachmentSerializer(many=True, read_only=True)
     depreciation_method_label = serializers.CharField(
         source="get_depreciation_method_display", read_only=True
@@ -349,6 +358,212 @@ class DepreciationScheduleSerializer(serializers.Serializer):
     current_value = serializers.CharField(read_only=True)
     accumulated_depreciation = serializers.CharField(read_only=True)
     schedule = serializers.ListField(read_only=True)
+
+
+# ---------------------------------------------------------------------------
+# Asset requests (FR-4.4)
+# ---------------------------------------------------------------------------
+class AssetRequestSerializer(serializers.ModelSerializer):
+    """Read shape for the requests list and inbox."""
+
+    requester = AssigneeRefSerializer(read_only=True)
+    decided_by = AssigneeRefSerializer(read_only=True)
+    asset = AssetListSerializer(read_only=True)
+    fulfilled_asset = AssetListSerializer(read_only=True)
+    category = CategoryRefSerializer(read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    status_color = serializers.CharField(read_only=True)
+    target_label = serializers.CharField(read_only=True)
+    is_pending = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = AssetRequest
+        fields = (
+            "id", "requester", "asset", "category", "target_label",
+            "reason", "needed_by",
+            "status", "status_label", "status_color", "is_pending",
+            "decided_by", "decided_at", "decision_notes", "fulfilled_asset",
+            "created_at", "updated_at",
+        )
+        read_only_fields = fields
+
+
+class AssetRequestCreateSerializer(serializers.ModelSerializer):
+    """
+    What an employee submits.
+
+    Either name an asset or name a category — one of the two is required, so a
+    request always says what is actually wanted.
+    """
+
+    asset_id = serializers.PrimaryKeyRelatedField(
+        source="asset", queryset=Asset.objects.all(),
+        required=False, allow_null=True,
+    )
+    category_id = serializers.PrimaryKeyRelatedField(
+        source="category", queryset=Category.objects.all(),
+        required=False, allow_null=True,
+    )
+
+    class Meta:
+        model = AssetRequest
+        fields = ("id", "asset_id", "category_id", "reason", "needed_by")
+
+    def validate_reason(self, value):
+        value = (value or "").strip()
+        if len(value) < 10:
+            raise serializers.ValidationError(
+                "Give a bit more detail — at least 10 characters, so whoever "
+                "reviews this knows why it's needed."
+            )
+        return value
+
+    def validate_needed_by(self, value):
+        from django.utils import timezone
+
+        if value and value < timezone.now().date():
+            raise serializers.ValidationError("The date needed cannot be in the past.")
+        return value
+
+    def validate(self, attrs):
+        asset = attrs.get("asset")
+        category = attrs.get("category")
+
+        if not asset and not category:
+            raise serializers.ValidationError({
+                "asset_id": ["Choose a specific asset, or a category if any one will do."]
+            })
+
+        if asset:
+            if asset.is_terminal:
+                raise serializers.ValidationError({
+                    "asset_id": [f"{asset.asset_tag} is "
+                                 f"{asset.get_status_display().lower()} and cannot be requested."]
+                })
+            # Duplicate pending requests from the same person add noise for the
+            # approver without adding information.
+            requester = self.context["request"].user
+            already = AssetRequest.objects.filter(
+                requester=requester, asset=asset, status=RequestStatus.PENDING
+            ).exists()
+            if already:
+                raise serializers.ValidationError({
+                    "asset_id": ["You already have a pending request for this asset."]
+                })
+
+        return attrs
+
+    def create(self, validated_data):
+        validated_data["requester"] = self.context["request"].user
+        return super().create(validated_data)
+
+    def to_representation(self, instance):
+        return AssetRequestSerializer(instance, context=self.context).data
+
+
+class RequestApproveSerializer(serializers.Serializer):
+    """POST /asset-requests/{id}/approve/"""
+
+    asset_id = serializers.PrimaryKeyRelatedField(
+        queryset=Asset.objects.all(), required=False, allow_null=True,
+        help_text="Required when the request named a category; also lets an "
+                  "approver substitute an equivalent asset.",
+    )
+    notes = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class RequestRejectSerializer(serializers.Serializer):
+    """POST /asset-requests/{id}/reject/"""
+
+    notes = serializers.CharField(
+        help_text="Why it was turned down — the requester sees this.",
+    )
+
+    def validate_notes(self, value):
+        value = (value or "").strip()
+        if len(value) < 5:
+            raise serializers.ValidationError(
+                "Give the requester a reason, however brief."
+            )
+        return value
+
+
+class AssetRequestStatsSerializer(serializers.Serializer):
+    """Counts for the cards above the requests table."""
+
+    total = serializers.IntegerField()
+    pending = serializers.IntegerField()
+    approved = serializers.IntegerField()
+    rejected = serializers.IntegerField()
+    cancelled = serializers.IntegerField()
+
+
+# ---------------------------------------------------------------------------
+# Bulk import (FR-10.1)
+# ---------------------------------------------------------------------------
+class AssetImportSerializer(serializers.Serializer):
+    """POST /assets/import/"""
+
+    file = serializers.FileField(
+        help_text="CSV or XLSX matching the template.",
+    )
+    dry_run = serializers.BooleanField(
+        default=False,
+        help_text="Validate and report without writing anything.",
+    )
+    partial = serializers.BooleanField(
+        default=False,
+        help_text="Import the valid rows and report the rest. Off by default, "
+                  "so one bad row aborts the whole file.",
+    )
+
+    def validate_file(self, value):
+        name = (value.name or "").lower()
+        if not name.endswith((".csv", ".xlsx", ".xlsm")):
+            raise serializers.ValidationError(
+                "Upload a .csv or .xlsx file. Download the template if you need "
+                "the right column headers."
+            )
+        # Reuse the platform upload limit rather than inventing a second one.
+        from django.conf import settings
+
+        max_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+        if value.size > max_bytes:
+            raise serializers.ValidationError(
+                f"That file is {value.size / 1024 / 1024:.1f} MB — the limit is "
+                f"{settings.MAX_UPLOAD_SIZE_MB} MB."
+            )
+        return value
+
+
+class ImportRowSerializer(serializers.Serializer):
+    row = serializers.IntegerField(help_text="Spreadsheet row number.")
+    ok = serializers.BooleanField()
+    name = serializers.CharField(allow_blank=True)
+    asset_tag = serializers.CharField(allow_blank=True)
+    errors = serializers.DictField(child=serializers.ListField())
+
+
+class ImportResultSerializer(serializers.Serializer):
+    """What the import did, row by row."""
+
+    total_rows = serializers.IntegerField()
+    valid_rows = serializers.IntegerField()
+    invalid_rows = serializers.IntegerField()
+    created = serializers.IntegerField()
+    committed = serializers.BooleanField(
+        help_text="False for a dry run, or when errors aborted the import."
+    )
+    partial = serializers.BooleanField()
+    rows = ImportRowSerializer(many=True)
+
+
+class ImportColumnSerializer(serializers.Serializer):
+    header = serializers.CharField()
+    required = serializers.BooleanField()
+    help_text = serializers.CharField(allow_blank=True)
+    example = serializers.CharField(allow_blank=True)
+    lookup = serializers.CharField(allow_blank=True)
 
 
 class AssetStatsSerializer(serializers.Serializer):

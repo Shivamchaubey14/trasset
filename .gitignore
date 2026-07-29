@@ -26,6 +26,7 @@ db.sqlite3-journal
 /backend/media/
 /backend/staticfiles/
 /backend/logs/
+/backend/tests/_media/
 celerybeat-schedule*
 
 # --- Testing / coverage ---

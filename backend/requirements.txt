@@ -1,10 +1,14 @@
 # Trasset — Backend requirements
 # Python 3.11+  |  Django REST Framework  |  MySQL 8.x
 
+# Versions below are security floors, not preferences — each was raised in
+# response to a pip-audit finding. Run `pip-audit` before every release and
+# raise them again rather than pinning downwards.
+
 # --- Core ---
-Django==5.1.6
+Django==5.1.15                        # CVE fixes over 5.1.6
 djangorestframework==3.15.2
-djangorestframework-simplejwt==5.4.0
+djangorestframework-simplejwt==5.5.1  # CVE fix over 5.4.0
 django-cors-headers==4.6.0
 django-filter==24.3
 django-environ==0.12.0
@@ -13,12 +17,13 @@ drf-spectacular==0.28.0
 # --- Database ---
 mysqlclient==2.2.7 ; platform_system != "Windows"
 PyMySQL==1.1.1
+cryptography==49.0.0                  # PyMySQL needs it for MySQL 8 caching_sha2_password
 
 # --- Security ---
 argon2-cffi==23.1.0
 
 # --- Media / files ---
-Pillow==11.1.0
+Pillow==12.3.0                        # many CVE fixes over 11.1.0
 qrcode==8.0
 openpyxl==3.1.5
 

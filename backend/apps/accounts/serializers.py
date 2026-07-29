@@ -5,11 +5,16 @@ from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.serializers import (
+    TokenObtainPairSerializer,
+    TokenRefreshSerializer,
+)
 
+from common.clients import client_from_request
 from common.roles import Roles
 
-from .models import Role, User
+from .models import Device, Role, User
+from .tokens import ClientAwareRefreshToken
 
 
 class RoleSerializer(serializers.ModelSerializer):
@@ -34,7 +39,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = (
             "id", "full_name", "email", "phone", "initials",
             "role", "role_name", "department", "department_name",
-            "avatar", "timezone_name", "email_notifications",
+            "avatar", "timezone_name", "email_notifications", "push_notifications",
             "is_active", "last_login", "created_at", "updated_at",
         )
         read_only_fields = ("id", "last_login", "created_at", "updated_at")
@@ -55,7 +60,7 @@ class UserWriteSerializer(serializers.ModelSerializer):
         fields = (
             "id", "full_name", "email", "phone", "password",
             "role_id", "department", "timezone_name",
-            "email_notifications", "is_active",
+            "email_notifications", "push_notifications", "is_active",
         )
 
     def validate_email(self, value):
@@ -111,13 +116,19 @@ class TrassetTokenObtainPairSerializer(TokenObtainPairSerializer):
     shell immediately without a second round trip.
     """
 
-    @classmethod
-    def get_token(cls, user):
+    token_class = ClientAwareRefreshToken
+
+    # Deliberately an instance method rather than the classmethod SimpleJWT
+    # declares: the refresh lifetime depends on which client is asking (BE-1),
+    # and the request only reaches us through the serializer context.
+    def get_token(self, user):
         token = super().get_token(user)
         token["email"] = user.email
         token["full_name"] = user.full_name
         token["role"] = user.role_name
-        return token
+        # The claim rides along to the access token too (SimpleJWT copies every
+        # claim but exp/jti/iat), which is what BE-8 will throttle on.
+        return token.stamp_client(client_from_request(self.context.get("request")))
 
     def validate(self, attrs):
         email = (attrs.get("email") or "").lower().strip()
@@ -146,10 +157,29 @@ class TrassetTokenObtainPairSerializer(TokenObtainPairSerializer):
         return data
 
 
+class TrassetTokenRefreshSerializer(TokenRefreshSerializer):
+    """
+    Rotation that keeps a mobile session mobile (BE-1).
+
+    Only the token class changes. SimpleJWT's rotation calls ``set_exp()`` with
+    no lifetime, and :class:`ClientAwareRefreshToken` answers that from the
+    token's own ``client`` claim — so a phone does not silently drop back to
+    the 7-day web lifetime the first time it refreshes, and no header is needed
+    on the refresh call for it to stay mobile.
+    """
+
+    token_class = ClientAwareRefreshToken
+
+
 class LogoutSerializer(serializers.Serializer):
     """Blacklist a refresh token (FR-1.6)."""
 
     refresh = serializers.CharField()
+
+    #: Optional: sign-out is also where a phone stops being a push target, so
+    #: it can hand its token back in the same call rather than needing a
+    #: separate DELETE that may not survive the app closing.
+    push_token = serializers.CharField(required=False, allow_blank=True, max_length=255)
 
 
 class PasswordChangeSerializer(serializers.Serializer):
@@ -241,12 +271,33 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         return user
 
 
+class DeviceSerializer(serializers.ModelSerializer):
+    """Register or list a push target (BE-2)."""
+
+    platform_label = serializers.CharField(source="get_platform_display", read_only=True)
+
+    # `push_token` is unique on the model, which would make ModelSerializer
+    # attach a UniqueValidator and reject re-registration with a 400. Coming
+    # back with the same token is the normal case, not an error — the view
+    # upserts — so the validator is dropped deliberately.
+    push_token = serializers.CharField(max_length=255, validators=[])
+
+    class Meta:
+        model = Device
+        fields = (
+            "id", "platform", "platform_label", "push_token",
+            "device_name", "app_version", "last_seen_at", "created_at",
+        )
+        read_only_fields = ("id", "last_seen_at", "created_at")
+
+
 class ProfileUpdateSerializer(serializers.ModelSerializer):
     """What a user may change about themselves."""
 
     class Meta:
         model = User
-        fields = ("full_name", "phone", "avatar", "timezone_name", "email_notifications")
+        fields = ("full_name", "phone", "avatar", "timezone_name",
+                  "email_notifications", "push_notifications")
 
     def to_representation(self, instance):
         return UserSerializer(instance, context=self.context).data

@@ -26,6 +26,11 @@ app.conf.beat_schedule = {
         "task": "apps.notifications.tasks.scan_due_maintenance",
         "schedule": crontab(hour=2, minute=15),
     },
+    # BE-4 — drop expired idempotency keys daily at 03:00 UTC
+    "purge-idempotency-keys-daily": {
+        "task": "common.tasks.purge_idempotency_keys",
+        "schedule": crontab(hour=3, minute=0),
+    },
 }
 
 

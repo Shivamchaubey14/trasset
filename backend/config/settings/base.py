@@ -8,6 +8,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import environ
+from corsheaders.defaults import default_headers as cors_default_headers
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -19,6 +20,7 @@ env = environ.Env(
     DEBUG=(bool, False),
     JWT_ACCESS_MIN=(int, 15),
     JWT_REFRESH_DAYS=(int, 7),
+    JWT_MOBILE_REFRESH_DAYS=(int, 30),
     LOGIN_MAX_ATTEMPTS=(int, 5),
     LOGIN_LOCKOUT_MINUTES=(int, 15),
     CORS_ALLOWED_ORIGINS=(list, []),
@@ -52,6 +54,9 @@ THIRD_PARTY_APPS = [
 ]
 
 LOCAL_APPS = [
+    # Cross-cutting infrastructure. An app because it owns a model (the
+    # idempotency ledger, BE-4), not because it is a domain.
+    "common",
     "apps.accounts",
     "apps.masters",
     "apps.assets",
@@ -60,6 +65,10 @@ LOCAL_APPS = [
     "apps.reports",
     "apps.notifications",
     "apps.audit",
+    # Its own app rather than part of `assets`, following how maintenance and
+    # procurement are organised: a distinct workflow with its own endpoints,
+    # rules and vocabulary (SRS §12.4, BE-7).
+    "apps.stocktake",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -192,8 +201,10 @@ REST_FRAMEWORK = {
     ),
     "EXCEPTION_HANDLER": "common.exceptions.envelope_exception_handler",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # Scoped, but bucketed per device so a phone draining its offline queue
+    # cannot throttle the same person's browser session (SEC-7, BE-8).
     "DEFAULT_THROTTLE_CLASSES": (
-        "rest_framework.throttling.ScopedRateThrottle",
+        "common.throttling.DeviceScopedRateThrottle",
     ),
     "DEFAULT_THROTTLE_RATES": {
         "auth": "10/min",       # SEC-7 — login/refresh/reset
@@ -217,7 +228,13 @@ SIMPLE_JWT = {
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
     "TOKEN_OBTAIN_SERIALIZER": "apps.accounts.serializers.TrassetTokenObtainPairSerializer",
+    "TOKEN_REFRESH_SERIALIZER": "apps.accounts.serializers.TrassetTokenRefreshSerializer",
 }
+
+# Mobile sessions live longer than web ones (SRS §12.4, BE-1). A phone is a
+# personal device; logging it out weekly teaches people to distrust the app.
+# Selected by the `X-Client: mobile` header on sign-in — see common/clients.py.
+JWT_MOBILE_REFRESH_LIFETIME = timedelta(days=env("JWT_MOBILE_REFRESH_DAYS"))
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Trasset API",
@@ -233,6 +250,8 @@ SPECTACULAR_SETTINGS = {
         "AssetStatusEnum": "apps.assets.constants.AssetStatus.choices",
         "DepreciationMethodEnum": "apps.assets.constants.DepreciationMethod.choices",
         "AssignmentActionEnum": "apps.assets.constants.AssignmentAction.choices",
+        "MaintenanceTypeEnum": "apps.maintenance.constants.MaintenanceType.choices",
+        "NotificationTypeEnum": "apps.notifications.constants.NotificationType.choices",
     },
     "SWAGGER_UI_SETTINGS": {
         "persistAuthorization": True,
@@ -250,6 +269,7 @@ SPECTACULAR_SETTINGS = {
         {"name": "Reports", "description": "Dashboard, reports and exports"},
         {"name": "Notifications", "description": "In-app notifications"},
         {"name": "Audit", "description": "Immutable audit trail"},
+        {"name": "Stock take", "description": "Physical counting sessions and reconciliation"},
     ],
 }
 
@@ -258,6 +278,11 @@ SPECTACULAR_SETTINGS = {
 # ---------------------------------------------------------------------------
 CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
 CORS_ALLOW_CREDENTIALS = False
+
+# Neither `X-Client` nor `Idempotency-Key` is in the default allow-list, and a
+# browser will not send an unlisted custom header at all — the preflight simply
+# fails (SRS §12.4, BE-1 and BE-4).
+CORS_ALLOW_HEADERS = (*cors_default_headers, "x-client", "idempotency-key")
 
 # ---------------------------------------------------------------------------
 # Email (FR-12.2)
@@ -273,6 +298,17 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Trasset <no-reply@trasse
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:5500")
 
 # ---------------------------------------------------------------------------
+# Push notifications (SRS §12.4, BE-3)
+# ---------------------------------------------------------------------------
+# Swappable the way EMAIL_BACKEND is. The console backend logs instead of
+# sending, so development and tests need no provider account.
+PUSH_BACKEND = env("PUSH_BACKEND",
+                   default="apps.notifications.push.ConsolePushBackend")
+# Expo fronts APNs and FCM, so the server never handles either directly.
+EXPO_PUSH_URL = env("EXPO_PUSH_URL", default="https://exp.host/--/api/v2/push/send")
+EXPO_ACCESS_TOKEN = env("EXPO_ACCESS_TOKEN", default="")
+
+# ---------------------------------------------------------------------------
 # Celery (SRS §10.4)
 # ---------------------------------------------------------------------------
 CELERY_BROKER_URL = env("REDIS_URL", default="redis://127.0.0.1:6379/0")
@@ -281,12 +317,27 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TIMEZONE = "UTC"
+# Explicit since Celery 6 stops inferring it from broker_connection_retry.
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+# A task that hangs should fail rather than hold a worker forever.
+CELERY_TASK_SOFT_TIME_LIMIT = 300
+CELERY_TASK_TIME_LIMIT = 360
 
 # ---------------------------------------------------------------------------
 # Trasset domain settings
 # ---------------------------------------------------------------------------
 ASSET_TAG_PREFIX = env("ASSET_TAG_PREFIX", default="TRA")   # FR-3.2
 WARRANTY_EXPIRY_WARN_DAYS = 30                              # FR-7.3
+
+# Idempotency (SRS §12.4, BE-4)
+# How long a stored response stays replayable. Long enough to cover a phone
+# that was offline overnight, short enough that the table does not grow without
+# bound.
+IDEMPOTENCY_TTL_HOURS = env.int("IDEMPOTENCY_TTL_HOURS", default=24)
+# How long one in-flight request holds its key. Past this a second attempt may
+# take the key over, so a worker that died mid-request does not wedge an
+# offline queue until the daily purge.
+IDEMPOTENCY_LEASE_SECONDS = env.int("IDEMPOTENCY_LEASE_SECONDS", default=60)
 
 LOGGING = {
     "version": 1,
