@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "Trasset",
+    "slug": "trasset-mobile",
+    "scheme": "trasset",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "primaryColor": "#3BB77E",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#253D4E"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "in.trasset.app"
+    },
+    "android": {
+      "package": "in.trasset.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#3BB77E"
+      }
+    },
+    "plugins": ["expo-secure-store", "expo-font"],
+    "extra": {
+      "apiUrl": "http://127.0.0.1:8000/api/v1"
+    }
+  }
+}

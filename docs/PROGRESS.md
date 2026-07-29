@@ -27,7 +27,7 @@
 | Phase 4 — Integration, Testing & Launch | 27–30 | 🟡 Days 27, 28 done · Days 29, 30 open |
 | Hindi/English toggle (added on request) | — | 🟡 Engine + chrome done · page content pending |
 | **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
-| Phase 6 — Mobile app foundation | 36–41 | ⛔ Not started — awaiting your go-ahead |
+| **Phase 6 — Mobile app foundation** | 36–41 | 🟡 Day 36 done · Days 37–41 open |
 
 **Backend test suite:** 710 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
@@ -57,16 +57,23 @@ SRS §12.4 now exists: BE-1 through BE-8. The backend is ready for a mobile
 client — sessions that survive, replayable writes, cheap sync, one-call scans,
 push, and the stock-take model.
 
-**2. ⛔ Phase 6 (Days 36–41) is waiting on you.** It stands up the React Native
-app itself — Expo, TypeScript, a generated API client, navigation — and you
-asked to be consulted before any of that begins. Nothing has been started.
+**2. Phase 6 — mobile app foundation (Days 36–41).** Day 36 is done: `mobile/`
+runs in Expo Go with the tab shell, both themes and both fonts. Next:
 
-When you give the go-ahead, Day 36 is project setup: Expo + TypeScript +
-expo-router in `mobile/` per SRS §10.5, lint and format config, EAS build
-profiles, and per-profile API base URLs. Worth deciding first: whether the
-app lives in this repo under `mobile/` as §10.5 assumes, and whether you have
-an Expo account for the dev builds and, later, the push credentials Day 34's
-`ExpoPushBackend` needs to be exercised for real.
+- **Day 37** — ⬅ **next**: the API client. Generate TypeScript types from
+  `/api/schema/` rather than hand-writing them (the payoff for keeping the
+  schema at 0 warnings), then a fetch wrapper mirroring `frontend/js/api.js` —
+  JWT header, envelope unwrapping, single-flight refresh on 401. Send
+  `X-Client: mobile` so sessions get the 30-day refresh (BE-1).
+- **Day 38** — auth: sign-in, refresh token to expo-secure-store, silent
+  refresh on launch, biometrics, sign-out that deregisters the device.
+- **Day 39** — design system primitives, light and dark.
+- **Day 40** — scanning. **Day 41** — asset detail.
+
+**Two things still needed from the user:** an **Expo account** for dev builds
+(Expo Go needs none, so Days 36–39 are unblocked), and eventually **push
+credentials**, without which Day 34's `ExpoPushBackend` cannot be exercised
+against the real service.
 
 The contract for Phase 6 is SRS §12; each day's Objective / Tasks / Definition
 of Done is in `Trasset_Build_Plan.md`.
@@ -142,6 +149,41 @@ audit row.
 ---
 
 ## Completed
+
+### Day 36 — Mobile project setup ✅
+`mobile/` exists and runs in Expo Go with the tab shell, both themes and both
+brand fonts.
+
+- **Expo SDK 54**, React Native 0.81.5, React 19.1.0, TypeScript strict.
+  Pinned to match the user's milkkart app, which is a known-good configuration
+  on this machine, rather than taking the newest template — SDK 57 was what
+  `create-expo-app` produced and was deliberately discarded.
+- **React Navigation, not expo-router.** SRS §12.2 names React Navigation;
+  Day 36 of the build plan says expo-router. The SRS is the contract, so the
+  plan line is the error. Recorded here so nobody "fixes" it later.
+- **Bottom tabs per §12.6** — Scan · Assets · Requests · Notifications ·
+  Profile, Scan centred and oversized as the primary action.
+- **Asset detail is routed at the root, not inside a tab.** It is reached from
+  a scan, a search result, an approval and a push deep link; nesting it in one
+  tab would mean either four copies or deep links landing in the wrong tab.
+  `trasset://` linking is wired for the same reason (FR-14.23).
+- **Both themes from the first screen**, following the OS setting.
+  `src/theme/tokens.ts` carries light and dark; `docs/Trasset_Design_Tokens.md`
+  documents every value with its measured contrast.
+- **Fonts are bundled, not fetched** — `@expo-google-fonts` for Quicksand and
+  Lexend, held until loaded so the first frame is not system font that reflows.
+- **The API URL is derived from the packager host**, because a phone cannot
+  reach `127.0.0.1` — that address is the phone itself. The commonest first-day
+  mobile failure, avoided by construction rather than documentation.
+- `@/` path alias through babel-module-resolver and tsconfig paths.
+
+**Verified:** `tsc --noEmit` clean, and the Android bundle actually builds
+(5.7 MB dev bundle, HTTP 200 from Metro) — the type check alone would not have
+caught a bad Babel alias.
+
+**Not yet done from Day 36's task list:** ESLint and Prettier configuration,
+and EAS build profiles. EAS needs an Expo account, which the user has not
+supplied yet; Expo Go needs none, so Days 37–39 are not blocked.
 
 ### Day 35 — Stock take API ✅ — *Phase 5 complete*
 BE-7, and the feature SRS §12.3 calls the one that most justifies a native app.
