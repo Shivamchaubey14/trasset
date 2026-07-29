@@ -39,7 +39,9 @@ function photoForm(assetId: number, bytes: Buffer, name: string) {
   const form = new FormData();
   form.append("asset", String(assetId));
   form.append("description", "Day 44 probe");
-  form.append("file", new Blob([bytes], { type: "image/jpeg" }), name);
+  // Uint8Array rather than the Buffer directly: Node's Buffer is typed over
+  // ArrayBufferLike, which does not satisfy BlobPart.
+  form.append("file", new Blob([new Uint8Array(bytes)], { type: "image/jpeg" }), name);
   return form;
 }
 
