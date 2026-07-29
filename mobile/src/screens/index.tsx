@@ -6,6 +6,8 @@ import React from "react";
 
 import { Placeholder } from "@/components/Placeholder";
 
+export { ProfileScreen } from "./ProfileScreen";
+
 export function ScanScreen() {
   return (
     <Placeholder
@@ -70,19 +72,3 @@ export function NotificationsScreen() {
   );
 }
 
-export function ProfileScreen() {
-  return (
-    <Placeholder
-      day="Day 47"
-      title="Profile"
-      subtitle="Your account, your preferences, and anything waiting to sync."
-      planned={[
-        "Profile and password change",
-        "Notification preferences — email and push are separate consents (BE-3)",
-        "Theme override; dark mode follows the system until then",
-        "Offline queue: what is pending, what failed, and why (FR-14.27)",
-        "Sign out — blacklists the refresh token and deregisters the device",
-      ]}
-    />
-  );
-}

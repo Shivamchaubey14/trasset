@@ -6,9 +6,10 @@
  * React Navigation rather than expo-router: SRS §12.2 names it explicitly, and
  * the build plan's Day 36 line saying expo-router contradicts the contract.
  */
+import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import {
   AssetsScreen,
@@ -29,46 +30,69 @@ export type TabParamList = {
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
+type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
+
 /**
- * Stand-in for the icon set (expo-symbols / a vector set lands with the design
- * system on Day 39). Kept legible and correctly sized so the tab bar's
- * proportions are real rather than provisional.
+ * Icon sizing.
+ *
+ * These are *visual* sizes only. The pressable area stays the full tab cell,
+ * which is well over the 44pt minimum (SRS §12.6) — so a smaller glyph costs
+ * nothing in reachability. Shrinking the touch target would be a different and
+ * much worse change.
  */
-function TabGlyph({
-  label,
+const ICON_SIZE = 20;
+// Comfortably above the 44pt floor: Scan is the primary action of the whole
+// app, so it should read as bigger than its neighbours, not merely different.
+const SCAN_CIRCLE = 60;
+const SCAN_ICON = 28;
+
+/**
+ * Filled when active, outlined when not — the convention on both platforms,
+ * and a second signal beyond colour, which matters for anyone who cannot rely
+ * on the green/grey distinction (NFR-9).
+ */
+function TabIcon({
+  name,
   focused,
-  emphasised,
+  size = ICON_SIZE,
 }: {
-  label: string;
+  name: string;
   focused: boolean;
-  emphasised?: boolean;
+  size?: number;
 }) {
   const { colors } = useTheme();
-  const tint = focused ? colors.primary : colors.textMuted;
+  return (
+    <Ionicons
+      name={(focused ? name : `${name}-outline`) as IoniconName}
+      size={size}
+      color={focused ? colors.primary : colors.textMuted}
+    />
+  );
+}
 
-  if (emphasised) {
-    // Scan is the centre and the largest target — one-handed reachability for
-    // the action people open the app to perform.
-    return (
-      <View
-        style={[
-          styles.scanTarget,
-          { backgroundColor: focused ? colors.primary : colors.surfaceElevated },
-        ]}
-      >
-        <Text
-          style={[
-            styles.scanGlyph,
-            { color: focused ? colors.onPrimary : colors.primary },
-          ]}
-        >
-          {label}
-        </Text>
-      </View>
-    );
-  }
-
-  return <Text style={[styles.glyph, { color: tint }]}>{label}</Text>;
+/**
+ * Scan is the centre and the largest target — one-handed reachability for the
+ * action people open the app to perform.
+ */
+function ScanIcon({ focused }: { focused: boolean }) {
+  const { colors } = useTheme();
+  return (
+    <View
+      style={[
+        styles.scanTarget,
+        {
+          backgroundColor: focused ? colors.primary : colors.surfaceElevated,
+          borderColor: colors.bg,
+        },
+      ]}
+    >
+      <Ionicons
+        name="scan"
+        size={SCAN_ICON}
+        color={focused ? colors.onPrimary : colors.primary}
+      />
+    </View>
+  );
 }
 
 export function AppTabs() {
@@ -94,7 +118,7 @@ export function AppTabs() {
         name="Assets"
         component={AssetsScreen}
         options={{
-          tabBarIcon: ({ focused }) => <TabGlyph label="▦" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon name="cube" focused={focused} />,
           tabBarAccessibilityLabel: "Assets",
         }}
       />
@@ -102,7 +126,9 @@ export function AppTabs() {
         name="Requests"
         component={RequestsScreen}
         options={{
-          tabBarIcon: ({ focused }) => <TabGlyph label="✉" focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="file-tray-full" focused={focused} />
+          ),
           tabBarAccessibilityLabel: "Requests",
         }}
       />
@@ -110,9 +136,7 @@ export function AppTabs() {
         name="Scan"
         component={ScanScreen}
         options={{
-          tabBarIcon: ({ focused }) => (
-            <TabGlyph label="⌗" focused={focused} emphasised />
-          ),
+          tabBarIcon: ({ focused }) => <ScanIcon focused={focused} />,
           tabBarLabel: () => null,
           tabBarAccessibilityLabel: "Scan an asset",
         }}
@@ -121,7 +145,9 @@ export function AppTabs() {
         name="Notifications"
         component={NotificationsScreen}
         options={{
-          tabBarIcon: ({ focused }) => <TabGlyph label="◔" focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="notifications" focused={focused} />
+          ),
           // "Notifications" clips to "Notificati…" in a fifth of the width.
           // The *route* keeps its name so `trasset://notifications` and the
           // API vocabulary are untouched; only what the user reads changes.
@@ -136,7 +162,7 @@ export function AppTabs() {
         name="Profile"
         component={ProfileScreen}
         options={{
-          tabBarIcon: ({ focused }) => <TabGlyph label="◍" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon name="person" focused={focused} />,
           tabBarAccessibilityLabel: "Profile",
         }}
       />
@@ -145,14 +171,17 @@ export function AppTabs() {
 }
 
 const styles = StyleSheet.create({
-  glyph: { fontSize: 20, lineHeight: 24 },
   scanTarget: {
-    width: MIN_TARGET + 8,
-    height: MIN_TARGET + 8,
-    borderRadius: (MIN_TARGET + 8) / 2,
+    width: SCAN_CIRCLE,
+    height: SCAN_CIRCLE,
+    borderRadius: SCAN_CIRCLE / 2,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: -18,
+    // Lifted just enough to read as raised. Any more and it detaches from the
+    // bar and starts to look like a floating action button, which it is not —
+    // it is a tab that happens to be the primary one.
+    marginTop: -12,
+    // Cuts the circle away from the bar edge so the lift is legible.
+    borderWidth: 3,
   },
-  scanGlyph: { fontSize: 24, lineHeight: 28, fontWeight: "700" },
 });

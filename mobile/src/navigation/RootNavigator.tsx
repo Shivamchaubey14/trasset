@@ -19,14 +19,18 @@ import {
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
 
+import { useAuth } from "@/auth/AuthContext";
+import { SignInScreen } from "@/screens/auth/SignInScreen";
+import { UnlockScreen } from "@/screens/auth/UnlockScreen";
 import { fonts, useTheme } from "@/theme";
 
 import { AppTabs, type TabParamList } from "./AppTabs";
 
 export type RootStackParamList = {
   App: NavigatorScreenParams<TabParamList>;
+  SignIn: undefined;
+  Unlock: undefined;
   // Arriving in later phases:
-  // Auth: undefined;
   // Asset: { id: number };
   // StockTake: { id?: number };
 };
@@ -53,6 +57,7 @@ const linking: LinkingOptions<RootStackParamList> = {
 
 export function RootNavigator() {
   const { colors, dark } = useTheme();
+  const { state } = useAuth();
 
   // React Navigation keeps its own theme; feeding it ours stops the navigator
   // chrome from flashing the wrong background on push and on cold start.
@@ -76,8 +81,24 @@ export function RootNavigator() {
 
   return (
     <NavigationContainer theme={navTheme} linking={linking}>
+      {/*
+        The auth screens and the app shell are mutually exclusive branches
+        rather than a modal over the tabs. Signing out therefore unmounts the
+        whole app tree — no screen is left alive behind a login sheet holding
+        somebody else's data in memory.
+      */}
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="App" component={AppTabs} />
+        {state === "signedIn" ? (
+          <Stack.Screen name="App" component={AppTabs} />
+        ) : state === "locked" ? (
+          <Stack.Screen name="Unlock" component={UnlockScreen} />
+        ) : (
+          <Stack.Screen
+            name="SignIn"
+            component={SignInScreen}
+            options={{ animationTypeForReplace: "pop" }}
+          />
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );

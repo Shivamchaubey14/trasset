@@ -22,7 +22,16 @@
         "backgroundColor": "#3BB77E"
       }
     },
-    "plugins": ["expo-secure-store", "expo-font"],
+    "plugins": [
+      "expo-secure-store",
+      "expo-font",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Trasset uses Face ID so you can unlock the app without typing your password."
+        }
+      ]
+    ],
     "extra": {
       "apiUrl": "http://127.0.0.1:8000/api/v1"
     }

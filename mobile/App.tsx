@@ -17,12 +17,14 @@ import {
 } from "@expo-google-fonts/quicksand";
 import { QueryClientProvider } from "@tanstack/react-query";
 import * as SecureStore from "expo-secure-store";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import React, { useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import React, { useCallback, useState } from "react";
+import { View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { configureApi, configureTokenStore, createQueryClient } from "@/api";
+import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { env } from "@/config/env";
 import { RootNavigator } from "@/navigation/RootNavigator";
 import { ThemeProvider, useTheme } from "@/theme";
@@ -37,8 +39,16 @@ import { ThemeProvider, useTheme } from "@/theme";
 configureApi({ baseUrl: env.apiUrl, client: env.client });
 configureTokenStore(SecureStore);
 
+// Held until fonts *and* the session have resolved. Without this the app shows
+// a frame of the sign-in screen before the restored session lands — which
+// reads, wrongly, as having been signed out.
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* already hidden, or unsupported — not worth failing startup over */
+});
+
 function Shell() {
-  const { colors, dark } = useTheme();
+  const { dark } = useTheme();
+  const { ready } = useAuth();
 
   const [fontsLoaded] = useFonts({
     Quicksand_600SemiBold,
@@ -48,27 +58,19 @@ function Shell() {
     Lexend_600SemiBold,
   });
 
-  if (!fontsLoaded) {
-    // Day 38 replaces this with the splash held until the session resolves.
-    return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: colors.bg,
-        }}
-      >
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
-  }
+  const onLayout = useCallback(() => {
+    if (fontsLoaded && ready) SplashScreen.hideAsync().catch(() => {});
+  }, [fontsLoaded, ready]);
+
+  // Nothing is rendered until both are settled, so the splash stays up rather
+  // than flashing an empty shell.
+  if (!fontsLoaded || !ready) return null;
 
   return (
-    <>
+    <View style={{ flex: 1 }} onLayout={onLayout}>
       <StatusBar style={dark ? "light" : "dark"} />
       <RootNavigator />
-    </>
+    </View>
   );
 }
 
@@ -81,7 +83,9 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <Shell />
+          <AuthProvider>
+            <Shell />
+          </AuthProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </QueryClientProvider>

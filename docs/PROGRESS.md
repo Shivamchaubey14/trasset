@@ -27,7 +27,7 @@
 | Phase 4 — Integration, Testing & Launch | 27–30 | 🟡 Days 27, 28 done · Days 29, 30 open |
 | Hindi/English toggle (added on request) | — | 🟡 Engine + chrome done · page content pending |
 | **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
-| **Phase 6 — Mobile app foundation** | 36–41 | 🟡 Days 36, 37 done · Days 38–41 open |
+| **Phase 6 — Mobile app foundation** | 36–41 | 🟡 Days 36–38 done · Days 39–41 open |
 
 **Backend test suite:** 710 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
@@ -61,12 +61,12 @@ push, and the stock-take model.
 runs in Expo Go with the tab shell, both themes and both fonts. Next:
 
 - **Day 37** — ✅ done: typed API client, generated from the schema.
-- **Day 38** — ⬅ **next**: auth. Sign-in screen, refresh token to
-  expo-secure-store, silent refresh on launch with the splash held, biometric
-  unlock with a password fallback, and sign-out that deregisters the device.
-  The client work is already in place — `login()`, `logout()`,
-  `restoreSession()` and `setSessionExpiredHandler()` all exist and are tested.
-- **Day 39** — design system primitives, light and dark.
+- **Day 38** — ✅ done: authentication, biometric unlock, session persistence.
+- **Day 39** — ⬅ **next**: the design system. Primitives in light and dark
+  (Button, Card, StatusPill, Avatar, Input, EmptyState, **OfflineBanner**,
+  Skeleton, Toast) and a gallery screen rendering every one in both themes.
+  `Button` and `TextField` already exist in minimal form from Day 38 and should
+  be folded in rather than duplicated.
 - **Day 40** — scanning. **Day 41** — asset detail.
 
 **Two things still needed from the user:** an **Expo account** for dev builds
@@ -148,6 +148,48 @@ audit row.
 ---
 
 ## Completed
+
+### Day 38 — Mobile authentication ✅
+Sign in, stay in, sign out cleanly.
+
+- **Four session states, not two.** `starting · signedOut · locked · signedIn`.
+  The one a web app has no equivalent of is `locked`: a phone gets picked up by
+  other people, and the alternative — signing out whenever the app is
+  backgrounded — would make the offline queue worthless.
+- **The splash is held until fonts *and* the session resolve.** Without it the
+  app shows a frame of the sign-in screen before the restored session lands,
+  which reads to the user as having been signed out.
+- **Biometrics are a lock on the door, not the key.** What authenticates
+  against the API is the refresh token in the Keychain; a fingerprint only
+  decides whether the app will use it right now. So **the password fallback
+  always works** (FR-14.4), the escape hatch is shown rather than hidden behind
+  a failure count, and a cancel stops the prompt rather than re-asking — an app
+  that re-prompts on cancel is an app people uninstall.
+- **Enabling biometric unlock is confirmed with the biometric itself.** Turning
+  on a lock the user then cannot open is the worst available outcome, so the
+  toggle proves it works before it is stored.
+- **Two ways the gate self-clears rather than stranding anyone:** if enrolment
+  was removed since opting in, the unlock screen detects it and offers the
+  password route; and signing out clears the flag, so the next person does not
+  meet an unlock screen with no session behind it.
+- **Session expiry drops the tokens and nothing else.** Anything queued offline
+  survives to be replayed after signing back in (Day 49) — a token expiring is
+  the worst possible moment to also lose a user's queued work.
+- **Auth and app are exclusive navigator branches**, not a modal over the tabs,
+  so signing out unmounts the whole app tree rather than leaving screens alive
+  behind a login sheet holding the previous user's data.
+- Minimal `Button` and `TextField` primitives were needed for the form; Day 39
+  should fold them into the design system rather than duplicate them.
+
+**Verified:** `npm run verify:api` still 18/18, including the session-restore
+path that *is* the force-quit case — access token gone, refresh token traded in
+for a new one — and sign-out leaving nothing behind. Type-check clean, bundle
+builds at 6.79 MB.
+
+**Not verifiable off-device, and honestly outstanding:** the literal DoD
+("sign in, force-quit, reopen — still signed in") and the biometric prompt
+itself both need a real handset. The logic underneath each is covered, but
+neither has been driven on hardware yet.
 
 ### Day 37 — Mobile API client ✅
 Typed access to the API, generated rather than hand-written.
