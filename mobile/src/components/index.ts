@@ -5,9 +5,11 @@
  * place. Anything a screen builds locally instead of using here is a gap in
  * this file — fix it here rather than there.
  */
+export { AssetRow } from "./AssetRow";
 export { Avatar, initialsOf } from "./Avatar";
 export { Button } from "./Button";
 export { Card } from "./Card";
+export { Chip } from "./Chip";
 export { EmptyState } from "./EmptyState";
 export { OfflineBanner } from "./OfflineBanner";
 export { Placeholder } from "./Placeholder";

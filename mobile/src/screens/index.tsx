@@ -6,24 +6,9 @@ import React from "react";
 
 import { Placeholder } from "@/components/Placeholder";
 
+export { AssetsScreen } from "./assets/AssetsScreen";
 export { ProfileScreen } from "./ProfileScreen";
 export { ScanScreen } from "./scan/ScanScreen";
-
-export function AssetsScreen() {
-  return (
-    <Placeholder
-      day="Days 41–42"
-      title="Assets"
-      subtitle="What you hold, and the register when you need to look something up."
-      planned={[
-        "My assets (FR-14.12)",
-        "Register search by name, tag or serial — a deliberately narrower filter set than the web",
-        "Asset detail: status, holder, location, warranty, value (FR-14.10)",
-        "Assign and check in with the same 409 guards as the API (FR-14.11)",
-      ]}
-    />
-  );
-}
 
 export function RequestsScreen() {
   return (

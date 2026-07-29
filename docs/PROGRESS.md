@@ -28,7 +28,7 @@
 | Hindi/English toggle (added on request) | — | 🟡 Engine + chrome done · page content pending |
 | **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
 | **Phase 6 — Mobile app foundation** | 36–41 | ✅ Complete (Days 36–41) |
-| Phase 7 — Core journeys | 42–47 | ⬜ Not started |
+| **Phase 7 — Core journeys** | 42–47 | 🟡 Day 42 done · Days 43–47 open |
 
 **Backend test suite:** 710 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
@@ -68,10 +68,15 @@ runs in Expo Go with the tab shell, both themes and both fonts. Next:
 - **Day 41** — ✅ done: asset detail with history and state/role-aware actions.
   **Phase 6 complete.**
 
-**Phase 7 — core journeys (Days 42–47) is next.** Day 42 is "My assets" and
-register search; Day 43 makes the assign and check-in buttons actually work,
-with the user picker and the 409-as-resolvable-conflict flow those buttons are
-waiting on.
+**Phase 7 — core journeys (Days 42–47).** Day 42 is ✅ done.
+
+- **Day 43** — ⬅ **next**: make the assign and check-in buttons work. User
+  picker, condition notes on check-in, optimistic UI, and **409 surfaced as a
+  conflict the user can resolve** rather than a dead end — someone else took
+  the asset first, and the person who just scanned it needs telling (§12.5).
+- **Day 44** — camera capture and report-an-issue. **Day 45** — requests and
+  approvals. **Day 46** — push registration and deep links. **Day 47** —
+  profile and settings proper.
 
 **Two things still needed from the user:** an **Expo account** for dev builds
 (Expo Go needs none, so Days 36–39 are unblocked), and eventually **push
@@ -152,6 +157,33 @@ audit row.
 ---
 
 ## Completed
+
+### Day 42 — My assets & register search ✅
+- **Two modes, one screen.** "My assets" and "Register" are versions of the
+  same question — *what am I holding* and *where is that thing* — and people
+  switch between them constantly, so a segmented control beats two tabs.
+- **The filter set is deliberately narrower than the web's** (FR-14.15). The
+  web offers status, category, location, warranty state, value band and date
+  ranges; this has search, status and location. Those are the two facts that
+  matter standing in a room. Category and warranty are *reporting* filters, and
+  a phone is not where reports get built (§12.8).
+- **Rows carry three facts, not seven columns.** A seven-column table is
+  unreadable at 375px. And when an asset is assigned the row leads with *who
+  holds it* rather than its location — if somebody has it, the location is
+  where the register thinks it is, not where it is.
+- Infinite scroll rather than a pagination footer, fetching at 40% from the
+  bottom so a fast scroller does not meet a spinner; pull-to-refresh throughout.
+- **Three distinct empty states** — nothing held, nothing matched, or the
+  request failed — reusing the tones from Day 39. Offline says so and points at
+  the cache rather than reading as an error.
+
+**Verified:** `npm run verify:list` — 15 checks against the live API, all
+passing. It issues the *exact* URLs the screen builds (repeated `?status=`
+included, since that cannot be expressed as a plain object) and proves what the
+list assumes: pages that do not overlap, `total_pages` that stops the infinite
+scroll, filters that genuinely narrow, and both halves of the DoD — finding an
+asset by tag, name and serial, and `assigned_to` returning only that person's
+assets.
 
 ### Day 41 — Asset detail ✅ — *Phase 6 complete*
 What you need while standing in front of the thing.

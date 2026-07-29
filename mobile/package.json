@@ -13,6 +13,7 @@
     "verify:api": "tsx scripts/verify-client.ts",
     "verify:scan": "tsx scripts/verify-scan.ts",
     "verify:detail": "tsx scripts/verify-detail.ts",
+    "verify:list": "tsx scripts/verify-list.ts",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
