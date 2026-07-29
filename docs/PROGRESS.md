@@ -27,7 +27,7 @@
 | Phase 4 — Integration, Testing & Launch | 27–30 | 🟡 Days 27, 28 done · Days 29, 30 open |
 | Hindi/English toggle (added on request) | — | 🟡 Engine + chrome done · page content pending |
 | **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
-| **Phase 6 — Mobile app foundation** | 36–41 | 🟡 Day 36 done · Days 37–41 open |
+| **Phase 6 — Mobile app foundation** | 36–41 | 🟡 Days 36, 37 done · Days 38–41 open |
 
 **Backend test suite:** 710 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
@@ -60,13 +60,12 @@ push, and the stock-take model.
 **2. Phase 6 — mobile app foundation (Days 36–41).** Day 36 is done: `mobile/`
 runs in Expo Go with the tab shell, both themes and both fonts. Next:
 
-- **Day 37** — ⬅ **next**: the API client. Generate TypeScript types from
-  `/api/schema/` rather than hand-writing them (the payoff for keeping the
-  schema at 0 warnings), then a fetch wrapper mirroring `frontend/js/api.js` —
-  JWT header, envelope unwrapping, single-flight refresh on 401. Send
-  `X-Client: mobile` so sessions get the 30-day refresh (BE-1).
-- **Day 38** — auth: sign-in, refresh token to expo-secure-store, silent
-  refresh on launch, biometrics, sign-out that deregisters the device.
+- **Day 37** — ✅ done: typed API client, generated from the schema.
+- **Day 38** — ⬅ **next**: auth. Sign-in screen, refresh token to
+  expo-secure-store, silent refresh on launch with the splash held, biometric
+  unlock with a password fallback, and sign-out that deregisters the device.
+  The client work is already in place — `login()`, `logout()`,
+  `restoreSession()` and `setSessionExpiredHandler()` all exist and are tested.
 - **Day 39** — design system primitives, light and dark.
 - **Day 40** — scanning. **Day 41** — asset detail.
 
@@ -149,6 +148,52 @@ audit row.
 ---
 
 ## Completed
+
+### Day 37 — Mobile API client ✅
+Typed access to the API, generated rather than hand-written.
+
+- **6,619 lines of types generated from `/api/schema/`** covering all 74
+  endpoints, by `npm run gen:api`. This is the return on keeping the schema at
+  0 warnings since Day 2 — the client cannot drift from the API, because it is
+  not written by hand. `src/api/types.ts` gives friendly aliases (`Asset`,
+  `User`) so a server-side rename surfaces as one compile error rather than
+  thirty.
+- **The request layer mirrors `frontend/js/api.js`**, which had already solved
+  envelope unwrapping, single-flight refresh and error normalisation. Three
+  things differ because this is a phone:
+  - **Every request has a timeout.** `fetch` has none, and on bad signal a call
+    hangs indefinitely — the never-resolving spinner §12.6 calls the signature
+    failure of a mobile app. A hang now surfaces as a network error the UI can
+    show an offline state for.
+  - **`X-Client: mobile` on every request**, which is what earns the 30-day
+    refresh rather than the web's 7 (BE-1).
+  - **`Idempotency-Key` is supported but never auto-generated** (BE-4). A fresh
+    key per attempt would defeat the mechanism entirely, so it has to come from
+    whoever owns the retry — the durable queue on Day 49.
+- **Refresh tokens go to the Keychain / Keystore, never AsyncStorage**
+  (FR-14.2). The web client accepts localStorage as a documented trade-off
+  because a browser has nothing better; a phone does, so that trade-off is not
+  inherited.
+- **The API layer holds no platform imports.** The base URL and the secure
+  store are injected once in `App.tsx`. That is not architecture for its own
+  sake — it is what let the client be run against the real server without a
+  device, which is how the day's DoD was actually verified.
+- **Offline is not an expired session.** A refresh that fails on the network
+  keeps the token and returns false; only a refusal from the server signs the
+  user out. Otherwise a tunnel ride would log everybody off.
+- **Mutations are never retried automatically** in TanStack Query — a blind
+  retry can apply an action twice. Queries retry only network errors and 5xx;
+  retrying a 4xx just repeats an answer the server already gave, and retrying a
+  409 would hide a conflict the user needs to resolve (§12.5).
+
+**Verified against the live server, not by type-check alone.**
+`npm run verify:api` runs the real client against the real API — 18 checks, all
+passing: unwrapped data from typed calls, field-level errors preserved, session
+restore and sign-out, and both halves of the DoD. The single-flight proof is
+worth naming: four parallel calls are made with a deliberately broken access
+token, and because refresh rotation is on (SEC-2), a second concurrent refresh
+would have presented an already-blacklisted token and failed. Surviving that
+*is* the proof.
 
 ### Day 36 — Mobile project setup ✅
 `mobile/` exists and runs in Expo Go with the tab shell, both themes and both

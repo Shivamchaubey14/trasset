@@ -58,8 +58,8 @@ export function NotificationsScreen() {
   return (
     <Placeholder
       day="Day 46"
-      title="Notifications"
-      subtitle="Mirrors the in-app list, and opens the right record when a push is tapped."
+      title="Alerts"
+      subtitle="Mirrors the in-app notification list, and opens the right record when a push is tapped."
       planned={[
         "Register this device for push against POST /auth/devices/ (BE-2)",
         "Deep links from a tapped push — trasset://assets/12 (FR-14.23, BE-3)",

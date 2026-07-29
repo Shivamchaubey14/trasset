@@ -122,7 +122,14 @@ export function AppTabs() {
         component={NotificationsScreen}
         options={{
           tabBarIcon: ({ focused }) => <TabGlyph label="◔" focused={focused} />,
-          tabBarAccessibilityLabel: "Notifications",
+          // "Notifications" clips to "Notificati…" in a fifth of the width.
+          // The *route* keeps its name so `trasset://notifications` and the
+          // API vocabulary are untouched; only what the user reads changes.
+          // The accessibility label matches the visible one deliberately —
+          // a screen reader announcing a different word from the one on
+          // screen is its own failure.
+          tabBarLabel: "Alerts",
+          tabBarAccessibilityLabel: "Alerts",
         }}
       />
       <Tab.Screen

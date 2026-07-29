@@ -9,6 +9,8 @@
     "ios": "expo start --ios",
     "tunnel": "expo start --tunnel",
     "tsc": "tsc --noEmit",
+    "gen:api": "openapi-typescript http://127.0.0.1:8000/api/schema/ -o src/api/schema.d.ts",
+    "verify:api": "tsx scripts/verify-client.ts",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
@@ -35,6 +37,8 @@
     "@babel/core": "^7.25.0",
     "@types/react": "~19.1.0",
     "babel-plugin-module-resolver": "^5.0.2",
+    "openapi-typescript": "^7.13.0",
+    "tsx": "^4.23.1",
     "typescript": "~5.9.2"
   }
 }

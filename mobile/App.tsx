@@ -15,13 +15,27 @@ import {
   Quicksand_600SemiBold,
   Quicksand_700Bold,
 } from "@expo-google-fonts/quicksand";
+import { QueryClientProvider } from "@tanstack/react-query";
+import * as SecureStore from "expo-secure-store";
 import { StatusBar } from "expo-status-bar";
-import React from "react";
+import React, { useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { configureApi, configureTokenStore, createQueryClient } from "@/api";
+import { env } from "@/config/env";
 import { RootNavigator } from "@/navigation/RootNavigator";
 import { ThemeProvider, useTheme } from "@/theme";
+
+// The API layer holds no platform imports of its own, so the two things it
+// needs from the platform are injected once, here:
+//   * where the server is — derived from the packager host in development;
+//   * where the refresh token lives — Keychain / Keystore, never AsyncStorage
+//     (FR-14.2).
+// Keeping it this way is also what lets the request layer be exercised against
+// a real server without a device.
+configureApi({ baseUrl: env.apiUrl, client: env.client });
+configureTokenStore(SecureStore);
 
 function Shell() {
   const { colors, dark } = useTheme();
@@ -59,11 +73,17 @@ function Shell() {
 }
 
 export default function App() {
+  // One client for the app's lifetime — recreating it on render would throw
+  // the cache away, which is what Day 48's offline reads depend on.
+  const [queryClient] = useState(createQueryClient);
+
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <Shell />
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <QueryClientProvider client={queryClient}>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <Shell />
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </QueryClientProvider>
   );
 }
