@@ -23,8 +23,10 @@ REST_FRAMEWORK = {**REST_FRAMEWORK}  # noqa: F405
 # override_settings. Instead every scope gets a rate of None, which DRF treats
 # as "unlimited", so the suite runs freely. tests/test_throttling.py patches
 # THROTTLE_RATES with real limits to prove the control actually fires.
+# The same class production uses — a test that exercises a different throttle
+# class from the deployed one proves nothing about the deployed one.
 REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = (
-    "rest_framework.throttling.ScopedRateThrottle",
+    "common.throttling.DeviceScopedRateThrottle",
 )
 REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
     "auth": None,

@@ -5,13 +5,14 @@ from django.db.models import Count, DecimalField, Q, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django_filters import rest_framework as filters
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 
 from common.permissions import HasRolePermission
 from common.responses import ok
 from common.roles import Roles
+from common.sync import UPDATED_SINCE_PARAMETER, DeltaSyncMixin
 from common.viewsets import BaseModelViewSet
 
 from . import services
@@ -63,7 +64,8 @@ class MaintenanceFilter(filters.FilterSet):
 
 
 @extend_schema(tags=["Maintenance"])
-class MaintenanceViewSet(BaseModelViewSet):
+@extend_schema_view(list=extend_schema(parameters=[UPDATED_SINCE_PARAMETER]))
+class MaintenanceViewSet(DeltaSyncMixin, BaseModelViewSet):
     """
     Scheduling and completing maintenance (FR-6.1 – FR-6.3).
 

@@ -5,9 +5,10 @@ from io import BytesIO
 from django.db.models import Count, DecimalField, Q, Sum
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import status as http_status
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 
@@ -15,6 +16,7 @@ from common.exceptions import Conflict, UnprocessableEntity
 from common.permissions import HasRolePermission
 from common.responses import ok
 from common.roles import Roles
+from common.sync import UPDATED_SINCE_PARAMETER, DeltaSyncMixin
 from common.viewsets import BaseModelViewSet
 
 from .constants import TERMINAL_STATUSES, AssetStatus, RequestStatus
@@ -48,7 +50,8 @@ MONEY = DecimalField(max_digits=14, decimal_places=2)
 
 
 @extend_schema(tags=["Assets"])
-class AssetViewSet(BaseModelViewSet):
+@extend_schema_view(list=extend_schema(parameters=[UPDATED_SINCE_PARAMETER]))
+class AssetViewSet(DeltaSyncMixin, BaseModelViewSet):
     """
     The asset register.
 
@@ -75,10 +78,13 @@ class AssetViewSet(BaseModelViewSet):
 
     def get_queryset(self):
         """Join everything the serializers touch, so lists stay flat on queries."""
-        queryset = Asset.objects.select_related(
+        # `delta_manager` widens to `all_objects` only while syncing, so a
+        # client can be told about assets that were deleted since it last
+        # looked. Everywhere else soft-deleted rows stay invisible.
+        queryset = self.delta_manager(Asset).select_related(
             "category", "location", "department", "vendor", "assigned_to", "created_by"
         )
-        if self.action == "retrieve":
+        if self.action in ("retrieve", "by_tag"):
             queryset = queryset.prefetch_related("attachments__uploaded_by")
         return queryset
 
@@ -88,6 +94,25 @@ class AssetViewSet(BaseModelViewSet):
         if self.action == "list":
             return AssetListSerializer
         return AssetDetailSerializer
+
+    @extend_schema(
+        summary="Resolve a scanned asset tag",
+        description=(
+            "Exact, single-result lookup by asset tag (FR-9.2). A scan should "
+            "cost one request and land on one asset, rather than a search that "
+            "returns a page the caller has to choose from."
+        ),
+        responses={200: AssetDetailSerializer},
+    )
+    @action(detail=False, methods=["get"], url_path=r"by-tag/(?P<tag>[^/]+)")
+    def by_tag(self, request, tag=None):
+        # Case-insensitive: a tag can arrive from a barcode reader, a hand-typed
+        # box or a URL that something along the way has lowercased.
+        asset = self.get_queryset().filter(asset_tag__iexact=(tag or "").strip()).first()
+        if asset is None:
+            raise NotFound(f"No asset carries the tag {tag}.")
+        serializer = self.get_serializer(asset)
+        return ok(serializer.data, "Asset retrieved successfully")
 
     # -----------------------------------------------------------------
     # Lifecycle actions (SRS §11.2)
@@ -382,7 +407,8 @@ class AssetViewSet(BaseModelViewSet):
 
 
 @extend_schema(tags=["Requests"])
-class AssetRequestViewSet(BaseModelViewSet):
+@extend_schema_view(list=extend_schema(parameters=[UPDATED_SINCE_PARAMETER]))
+class AssetRequestViewSet(DeltaSyncMixin, BaseModelViewSet):
     """
     Employee asset requests and the approvals inbox (FR-4.4).
 

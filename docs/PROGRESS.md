@@ -25,12 +25,12 @@
 | Phase 3 — Frontend | 19–26 | 🟡 Days 19–25 done · Day 26 done except browser QA |
 | Phase 4 — Integration, Testing & Launch | 27–30 | 🟡 Days 27, 28 done · Days 29, 30 open |
 | Hindi/English toggle (added on request) | — | 🟡 Engine + chrome done · page content pending |
-| **Phase 5 — Mobile API groundwork** | 31–35 | 🟡 Days 31, 32 done · Days 33–35 open |
+| **Phase 5 — Mobile API groundwork** | 31–35 | 🟡 Days 31–33 done · Days 34, 35 open |
 
-**Backend test suite:** 610 tests, all passing · **Coverage:** 89.3% (target ≥ 70%, NFR-12)
+**Backend test suite:** 638 tests, all passing · **Coverage:** 89.3% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
 **Dependencies:** `pip-audit` clean — no known vulnerabilities
-**OpenAPI schema:** 67 endpoints, 0 errors, 0 warnings (NFR-13)
+**OpenAPI schema:** 68 endpoints, 0 errors, 0 warnings (NFR-13)
 
 > **Backend feature work is complete.** Every functional requirement in SRS §3
 > has an implementation, except the `[L]`-priority printable label sheets
@@ -55,10 +55,13 @@ work inside the existing Django project, so it needs no new toolchain:
 
 - **Day 31** — ✅ done: mobile sessions and device registry (BE-1, BE-2).
 - **Day 32** — ✅ done: idempotency keys on the mutating endpoints (BE-4).
-- **Day 33** — ⬅ **next**: delta sync, asset-tag lookup, per-device throttle
+- **Day 33** — ✅ done: delta sync, asset-tag lookup, per-device throttle
   (BE-5, BE-6, BE-8).
-- **Day 34** — push dispatch (BE-3).
+- **Day 34** — ⬅ **next**: push dispatch (BE-3).
 - **Day 35** — stock-take API (BE-7).
+
+> **Stop at the end of Day 35.** Phase 6 (Days 36–41) stands up the React
+> Native app itself, and the user asked to be consulted before that starts.
 
 Then Phase 6 (Days 36–41) sets up the React Native app itself. Contract is
 SRS §12; each day's Objective / Tasks / Definition of Done is in
@@ -135,6 +138,67 @@ audit row.
 ---
 
 ## Completed
+
+### Day 33 — Delta sync, tag lookup & per-device throttle ✅
+
+**BE-5 — `?updated_since=` on the asset, request, maintenance and notification
+lists.** One `DeltaSyncMixin` in `common/sync.py` rather than four
+implementations. Three details decide whether this works in practice:
+
+- **Deleted rows are included while syncing.** A client that only hears about
+  live rows never learns anything went away, so a disposed asset would sit on
+  the phone for ever. The delta widens to `all_objects` and returns the row
+  with `is_deleted: true` for the client to drop.
+- **Only on `list`.** Honouring the parameter on a detail route would let a
+  crafted query string reach a soft-deleted record — exactly what the Day 28
+  bypass tests assert is impossible. There is a test that the detail route
+  still 404s with the parameter attached.
+- **Ordered oldest-change-first, and inclusive.** The client checkpoints on the
+  `updated_at` of the last row it saw, so the order has to be the one the
+  checkpoint comes from; `pk` breaks ties, since a bulk update can hand
+  hundreds of rows the same timestamp. The comparison is `>=` rather than `>`:
+  that repeats the boundary row, which a client applying changes by id absorbs
+  harmlessly, where `>` would silently drop a change written in the same
+  microsecond as the checkpoint. Losing a row is worse than repeating one.
+
+Accepts an ISO-8601 timestamp or a plain date; nonsense gets a 400 naming the
+formats. Two serializer fields were added to make it usable at all:
+`is_deleted` on the asset list and `updated_at` on notifications — without the
+latter a client has nothing to checkpoint on.
+
+**BE-6 — `GET /assets/by-tag/{tag}/`.** Exact, single-result, case-insensitive
+(a tag can arrive from a barcode reader, a hand-typed box, or a URL something
+has lowercased). Returns the detail shape, because scanning is how the app
+opens an asset. A soft-deleted asset still 404s.
+
+**BE-8 — per-device throttling.** `DeviceScopedRateThrottle` buckets the
+existing scopes per device, so a phone draining its offline queue cannot lock
+the same person out of the browser session they are sitting in front of.
+
+- **The device is identified by the access token's `jti`, not by a header.**
+  Each device holds its own token chain, so nothing is client-supplied and
+  there is nothing to forge. A header would have let any caller mint itself
+  unlimited budget by varying a value it controls.
+- **Anonymous callers are never split.** This is the security-relevant half:
+  `/auth/login/` is exactly where an unauthenticated request is throttled, and
+  keying that on anything the caller sends would hand an attacker unlimited
+  sign-in attempts. There is a test that varying the client header across
+  failed logins still trips the limit.
+- The trade-off is that a token rotation resets that device's counter. Refresh
+  is itself throttled under `auth`, so gaming it costs auth budget.
+- Test settings now name the **same throttle class production uses** — a test
+  exercising a different class from the deployed one proves nothing about the
+  deployed one, which is the Day 12 lesson restated.
+
+**Known limitation, deliberate:** only assets soft-delete. A hard-deleted
+request, maintenance record or notification cannot propagate through a delta,
+because there is no tombstone to send. Notifications are purged on a schedule
+anyway and are safe to treat as ephemeral; the other two are rare admin-only
+deletions. If that ever matters, it needs a tombstone table, not a patch here.
+
+`tests/test_delta_sync.py` — 28 tests. BE-8 is proved by test rather than by a
+live check: tripping a real 120/min limit against the dev server is not a
+useful thing to do by hand.
 
 ### Day 32 — Idempotency keys ✅
 BE-4, which SRS §12.4 calls the single most important backend change for
@@ -831,6 +895,16 @@ POST /assets/{id}/assign/  Idempotency-Key: K  → 200 "TRA-2026-000019 assigned
 POST  same request, same key                   → 200 identical bytes, Idempotent-Replay: true
 POST  same key, different payload              → 409 "…already been used for a different request"
 POST  same request, NO key  (the contrast)     → 409 "…is already assigned to Karan Verma"
+
+GET  /assets/?updated_since=<5 min ahead>      → 0 rows
+GET  /assets/?updated_since=<checkpoint>       → 1 row, just the asset created after it
+GET  /assets/by-tag/TRA-2026-000020/           → 200, single object (no results array)
+GET  /assets/by-tag/tra-2026-000020/           → 200 (case-insensitive)
+GET  /assets/by-tag/TRA-2026-999999/           → 404 "No asset carries the tag …"
+DELETE the asset, then the same delta          → 1 row, is_deleted: true
+    …while the normal list                     → no longer contains it
+    …and by-tag                                → 404
+GET  /assets/?updated_since=last%20tuesday     → 400 naming the accepted formats
 ```
 
 **Frontend** — all 21 files serve over HTTP; every JS file and inline block

@@ -1,10 +1,11 @@
 """Notification endpoints (SRS §5.2, FR-12.1)."""
 from django_filters import rest_framework as filters
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 
 from common.responses import ok
+from common.sync import UPDATED_SINCE_PARAMETER, DeltaSyncMixin
 from common.viewsets import ScopedThrottleMixin
 from rest_framework import mixins, viewsets
 
@@ -27,7 +28,9 @@ class NotificationFilter(filters.FilterSet):
 
 
 @extend_schema(tags=["Notifications"])
-class NotificationViewSet(ScopedThrottleMixin,
+@extend_schema_view(list=extend_schema(parameters=[UPDATED_SINCE_PARAMETER]))
+class NotificationViewSet(DeltaSyncMixin,
+                          ScopedThrottleMixin,
                           mixins.ListModelMixin,
                           mixins.RetrieveModelMixin,
                           mixins.DestroyModelMixin,

@@ -16,7 +16,9 @@ class NotificationSerializer(serializers.ModelSerializer):
             "title", "message", "link",
             "is_read", "read_at",
             "related_object_type", "related_object_id",
-            "created_at",
+            # `updated_at` is what a delta-sync client checkpoints on (BE-5);
+            # without it there is no way to ask for "everything since".
+            "created_at", "updated_at",
         )
         read_only_fields = fields
 

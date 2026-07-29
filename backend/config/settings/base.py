@@ -197,8 +197,10 @@ REST_FRAMEWORK = {
     ),
     "EXCEPTION_HANDLER": "common.exceptions.envelope_exception_handler",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # Scoped, but bucketed per device so a phone draining its offline queue
+    # cannot throttle the same person's browser session (SEC-7, BE-8).
     "DEFAULT_THROTTLE_CLASSES": (
-        "rest_framework.throttling.ScopedRateThrottle",
+        "common.throttling.DeviceScopedRateThrottle",
     ),
     "DEFAULT_THROTTLE_RATES": {
         "auth": "10/min",       # SEC-7 — login/refresh/reset

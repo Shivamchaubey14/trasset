@@ -97,6 +97,10 @@ class AssetListSerializer(serializers.ModelSerializer):
             "purchase_date", "purchase_cost", "current_value",
             "warranty_expiry", "warranty_expiring_soon", "warranty_expired",
             "image", "created_at", "updated_at",
+            # Always false on a normal list, which only ever returns live rows.
+            # It earns its place in a delta sync, where it is how a client
+            # learns to drop an asset it already holds (BE-5).
+            "is_deleted",
         )
         read_only_fields = fields
 
