@@ -5,7 +5,7 @@
 > Update this file at the end of every working session.
 
 **Started:** 2026-07-27
-**Last updated:** 2026-07-28
+**Last updated:** 2026-07-29
 **Plan:** [`Trasset_Build_Plan.md`](Trasset_Build_Plan.md) · **Contract:** [`Trasset_SRS.md`](Trasset_SRS.md)
 
 > **Scope now spans two releases.** v1.0 is the web app (Days 1–30, in progress).
@@ -25,11 +25,12 @@
 | Phase 3 — Frontend | 19–26 | 🟡 Days 19–25 done · Day 26 done except browser QA |
 | Phase 4 — Integration, Testing & Launch | 27–30 | 🟡 Days 27, 28 done · Days 29, 30 open |
 | Hindi/English toggle (added on request) | — | 🟡 Engine + chrome done · page content pending |
+| **Phase 5 — Mobile API groundwork** | 31–35 | 🟡 Day 31 done · Days 32–35 open |
 
-**Backend test suite:** 559 tests, all passing · **Coverage:** 88.9% (target ≥ 70%, NFR-12)
+**Backend test suite:** 586 tests, all passing · **Coverage:** 89.1% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
 **Dependencies:** `pip-audit` clean — no known vulnerabilities
-**OpenAPI schema:** 65 endpoints, 0 errors, 0 warnings (NFR-13)
+**OpenAPI schema:** 67 endpoints, 0 errors, 0 warnings (NFR-13)
 
 > **Backend feature work is complete.** Every functional requirement in SRS §3
 > has an implementation, except the `[L]`-priority printable label sheets
@@ -49,14 +50,15 @@
 > user's direction. Deployment is incremental from here — "we will deploy as the
 > things get done" — rather than the single Day 29 cutover the plan assumed.
 
-**1. Phase 5 — mobile API groundwork (Days 31–35).** Start here. This is backend
+**1. Phase 5 — mobile API groundwork (Days 31–35).** In progress. This is backend
 work inside the existing Django project, so it needs no new toolchain:
 
-- **Day 31** — mobile sessions and device registry (BE-1, BE-2).
-- **Day 32** — idempotency keys on the mutating endpoints (BE-3).
-- **Day 33** — delta sync, asset-tag lookup, per-device throttle (BE-4, BE-5).
-- **Day 34** — push dispatch (BE-6).
-- **Day 35** — stock-take API (BE-7, BE-8).
+- **Day 31** — ✅ done: mobile sessions and device registry (BE-1, BE-2).
+- **Day 32** — ⬅ **next**: idempotency keys on the mutating endpoints (BE-4).
+  The single most important change for offline, per SRS §12.4.
+- **Day 33** — delta sync, asset-tag lookup, per-device throttle (BE-5, BE-6, BE-8).
+- **Day 34** — push dispatch (BE-3).
+- **Day 35** — stock-take API (BE-7).
 
 Then Phase 6 (Days 36–41) sets up the React Native app itself. Contract is
 SRS §12; each day's Objective / Tasks / Definition of Done is in
@@ -133,6 +135,57 @@ audit row.
 ---
 
 ## Completed
+
+### Day 31 — Mobile sessions & device registry ✅
+First day of Release 2. Both changes are backend-only and change nothing for
+the web client.
+
+- **BE-1 — the refresh lifetime now follows the client.** A phone signing in
+  with `X-Client: mobile` gets 30 days; a browser keeps 7. The value is
+  configurable (`JWT_MOBILE_REFRESH_DAYS`) and lives in `common/clients.py`.
+- **The client is stamped into the token as a claim, not just read off the
+  header.** That matters at rotation: SimpleJWT re-derives the expiry on every
+  refresh, so a mobile session would have silently dropped back to 7 days the
+  first time it refreshed. `ClientAwareRefreshToken.set_exp()` reads the
+  lifetime from the token's own claim, which means rotation needs no header at
+  all and a proxy stripping `X-Client` cannot demote a phone to a weekly
+  logout. Overriding that one method also meant leaving SimpleJWT's rotation
+  and blacklisting code untouched.
+- **An unrecognised `X-Client` value is treated as web**, so a guessed or
+  mistyped header cannot buy the longer session. Only the *refresh* is
+  client-aware — the access token stays at 15 minutes for everyone, since a
+  long-lived access token widens the window an intercepted one is useful for.
+- **BE-2 — `Device` model** (user, platform, push token, name, app version,
+  last seen) with `POST /auth/devices/`, `GET /auth/devices/` and
+  `DELETE /auth/devices/{id}/`.
+- **Registration is an upsert.** An app registers on every launch, so a repeat
+  `push_token` updates the row and returns 200 rather than creating a second
+  one — two rows for one handset means two pushes for one event. Done through
+  `update_or_create`, which survives the unique-constraint race two
+  simultaneous launches can provoke.
+- **A push token is globally unique, not unique per user**, so a handset that
+  changes hands *moves* to the new owner. Leaving it pointed at the previous
+  owner would send them notifications about somebody else's assets.
+- **Devices deliberately sit outside the role matrix.** `HasRolePermission`
+  makes auditors read-only everywhere, which would have stopped an auditor from
+  ever registering a phone. Registering a device is not a business write;
+  ownership is enforced by scoping the queryset instead, so another user's
+  device returns 404 rather than 403 — it does not exist as far as that caller
+  is concerned.
+- Signing out takes the device with it: `/auth/logout/` accepts an optional
+  `push_token`, scoped to the caller, alongside the explicit `DELETE`.
+- `x-client` added to `CORS_ALLOW_HEADERS` — a browser will not send a custom
+  header that is not on the allow-list, and the preflight just fails.
+- `tests/test_mobile_sessions.py` — 27 tests: the two lifetimes differ and
+  survive repeated rotation, an unknown client falls back to web, the old token
+  is still blacklisted on rotation (SEC-2), a re-registered token updates
+  rather than duplicates, a handset moves owner, and every role including
+  auditor can register.
+
+**Correction to this file:** the *Next up* list had the BE numbers scrambled
+against SRS §12.4 (it credited Day 32 with BE-3 and Day 34 with BE-6, when
+idempotency is BE-4 and push is BE-3). The build plan's per-day tasks were
+right; only the summary here was wrong. Realigned above.
 
 ### Day 1 — Project setup & environment ✅
 - Directory tree at `D:\trasset` (`backend/`, `frontend/`, `docs/`).
@@ -714,6 +767,17 @@ POST approve a category request with no choice → 409 "Choose which asset…"
 POST approve/reject an already-decided one     → 409
 list scoping: employee 3 · head 3 · manager 3 · auditor 0
 audit trail reads: Requested → Approved
+
+POST /auth/login/                              → refresh 7 days,  client=web
+POST /auth/login/   X-Client: mobile           → refresh 30 days, client=mobile
+POST /auth/refresh/ (mobile token, no header)  → refresh 30 days, client=mobile
+POST /auth/login/   X-Client: sneaky           → refresh 7 days,  client=web
+POST /auth/devices/                            → 201 "Device registered successfully"
+POST /auth/devices/  same push_token           → 200 same id, name and version updated
+GET  /auth/devices/                            → 200, 1 row
+POST /auth/devices/  platform=blackberry       → 400 "…is not a valid choice."
+POST /auth/devices/  no token                  → 401
+DELETE /auth/devices/{id}/                     → 200, list empty; repeat → 404
 ```
 
 **Frontend** — all 21 files serve over HTTP; every JS file and inline block

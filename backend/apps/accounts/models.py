@@ -9,7 +9,8 @@ from django.utils import timezone
 from common.models import TimeStampedModel
 from common.roles import Roles
 
-from .managers import UserManager
+from .constants import DevicePlatform
+from .managers import DeviceManager, UserManager
 
 
 class Role(TimeStampedModel):
@@ -131,3 +132,48 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
             self.failed_login_attempts = 0
             self.locked_until = None
             self.save(update_fields=["failed_login_attempts", "locked_until", "updated_at"])
+
+
+class Device(TimeStampedModel):
+    """
+    A handset registered to receive push notifications (SRS §12.4, BE-2).
+
+    Push cannot work without somewhere to send it. This is that address book:
+    one row per physical device, holding the provider token, what it runs and
+    when it was last heard from.
+
+    The row is deleted on sign-out rather than flagged inactive. A device that
+    is not meant to receive notifications has no reason to keep its push token
+    on file, and BE-3 will prune tokens the provider rejects the same way.
+    """
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="devices",
+    )
+    platform = models.CharField(max_length=10, choices=DevicePlatform.choices)
+
+    #: Provider token to push to. Globally unique — it names one handset, not
+    #: one handset *per user* — so a phone that changes hands moves rather than
+    #: being registered twice.
+    push_token = models.CharField(max_length=255, unique=True)
+
+    #: What the owner would call it: "Priya's iPhone". Optional, purely so a
+    #: person can recognise their own devices in a list.
+    device_name = models.CharField(max_length=100, blank=True)
+    app_version = models.CharField(max_length=20, blank=True)
+
+    last_seen_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    objects = DeviceManager()
+
+    class Meta:
+        db_table = "devices"
+        ordering = ("-last_seen_at",)
+        indexes = [
+            models.Index(fields=["user", "platform"], name="idx_device_user_platform"),
+        ]
+
+    def __str__(self):
+        return f"{self.device_name or self.get_platform_display()} ({self.user.email})"

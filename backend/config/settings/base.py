@@ -8,6 +8,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import environ
+from corsheaders.defaults import default_headers as cors_default_headers
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -19,6 +20,7 @@ env = environ.Env(
     DEBUG=(bool, False),
     JWT_ACCESS_MIN=(int, 15),
     JWT_REFRESH_DAYS=(int, 7),
+    JWT_MOBILE_REFRESH_DAYS=(int, 30),
     LOGIN_MAX_ATTEMPTS=(int, 5),
     LOGIN_LOCKOUT_MINUTES=(int, 15),
     CORS_ALLOWED_ORIGINS=(list, []),
@@ -217,7 +219,13 @@ SIMPLE_JWT = {
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
     "TOKEN_OBTAIN_SERIALIZER": "apps.accounts.serializers.TrassetTokenObtainPairSerializer",
+    "TOKEN_REFRESH_SERIALIZER": "apps.accounts.serializers.TrassetTokenRefreshSerializer",
 }
+
+# Mobile sessions live longer than web ones (SRS §12.4, BE-1). A phone is a
+# personal device; logging it out weekly teaches people to distrust the app.
+# Selected by the `X-Client: mobile` header on sign-in — see common/clients.py.
+JWT_MOBILE_REFRESH_LIFETIME = timedelta(days=env("JWT_MOBILE_REFRESH_DAYS"))
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Trasset API",
@@ -260,6 +268,10 @@ SPECTACULAR_SETTINGS = {
 # ---------------------------------------------------------------------------
 CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
 CORS_ALLOW_CREDENTIALS = False
+
+# `X-Client` is not in the default allow-list, and a browser will not send an
+# unlisted custom header at all — the preflight simply fails (SRS §12.4, BE-1).
+CORS_ALLOW_HEADERS = (*cors_default_headers, "x-client")
 
 # ---------------------------------------------------------------------------
 # Email (FR-12.2)

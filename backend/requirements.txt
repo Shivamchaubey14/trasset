@@ -17,6 +17,7 @@ drf-spectacular==0.28.0
 # --- Database ---
 mysqlclient==2.2.7 ; platform_system != "Windows"
 PyMySQL==1.1.1
+cryptography==49.0.0                  # PyMySQL needs it for MySQL 8 caching_sha2_password
 
 # --- Security ---
 argon2-cffi==23.1.0

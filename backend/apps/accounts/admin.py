@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils import timezone
 
-from .models import Role, User
+from .models import Device, Role, User
 
 
 @admin.register(Role)
@@ -43,3 +43,12 @@ class UserAdmin(BaseUserAdmin):
     @admin.display(boolean=True, description="Locked")
     def locked(self, obj):
         return bool(obj.locked_until and obj.locked_until > timezone.now())
+
+
+@admin.register(Device)
+class DeviceAdmin(admin.ModelAdmin):
+    list_display = ("user", "platform", "device_name", "app_version", "last_seen_at")
+    list_filter = ("platform",)
+    search_fields = ("user__email", "user__full_name", "device_name", "push_token")
+    readonly_fields = ("last_seen_at", "created_at", "updated_at")
+    autocomplete_fields = ("user",)
