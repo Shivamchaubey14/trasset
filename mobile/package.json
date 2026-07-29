@@ -15,6 +15,7 @@
     "verify:detail": "tsx scripts/verify-detail.ts",
     "verify:list": "tsx scripts/verify-list.ts",
     "verify:lifecycle": "tsx scripts/verify-lifecycle.ts",
+    "verify:photos": "tsx scripts/verify-photos.ts",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
@@ -32,6 +33,8 @@
     "expo-device": "~8.0.10",
     "expo-font": "~14.0.12",
     "expo-haptics": "~15.0.8",
+    "expo-image-manipulator": "~14.0.8",
+    "expo-image-picker": "~17.0.11",
     "expo-local-authentication": "~17.0.8",
     "expo-secure-store": "~15.0.8",
     "expo-splash-screen": "~31.0.13",

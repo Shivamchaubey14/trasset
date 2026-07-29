@@ -7,9 +7,10 @@ from django.utils import timezone
 from django_filters import rest_framework as filters
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 
-from common.permissions import HasRolePermission
+from common.permissions import HasRolePermission, is_manager
 from common.responses import ok
 from common.roles import Roles
 from common.sync import UPDATED_SINCE_PARAMETER, DeltaSyncMixin
@@ -71,7 +72,14 @@ class MaintenanceViewSet(DeltaSyncMixin, BaseModelViewSet):
 
     Everyone signed in can see what is booked — an employee holding a laptop
     should be able to see it is going in for repair on Tuesday. Only managers
-    can book, start, complete or cancel.
+    can start, complete or cancel.
+
+    **Reporting a problem is not the same as booking work.** SRS §2.3 gives the
+    Employee role "reports issues", and FR-14.14 requires it from the phone —
+    the person holding a broken laptop is who notices first, and routing that
+    through a manager means it often never gets reported at all. So anyone may
+    *create* a record, narrowed in :meth:`perform_create` to an asset they are
+    actually holding. Everything after the report stays with managers.
     """
 
     queryset = MaintenanceRecord.objects.all()
@@ -82,7 +90,14 @@ class MaintenanceViewSet(DeltaSyncMixin, BaseModelViewSet):
 
     read_roles = Roles.ALL
     write_roles = Roles.MANAGERS
-    action_roles = {"destroy": (Roles.SUPER_ADMIN,)}
+    action_roles = {
+        # Narrowed further in perform_create — the role check only gets a
+        # reporter through the door. Auditors are still excluded: the
+        # read-only guard in HasRolePermission applies to every unsafe method
+        # regardless of what a view declares.
+        "create": Roles.ALL,
+        "destroy": (Roles.SUPER_ADMIN,),
+    }
 
     filterset_class = MaintenanceFilter
     search_fields = ("asset__asset_tag", "asset__name", "technician",
@@ -102,14 +117,33 @@ class MaintenanceViewSet(DeltaSyncMixin, BaseModelViewSet):
             return MaintenanceWriteSerializer
         return MaintenanceRecordSerializer
 
+    #: A reporter may say what is wrong and when they noticed. Everything else
+    #: on the form is a scheduling decision that belongs to a manager.
+    REPORTER_FIELDS = frozenset({"asset", "type", "scheduled_date", "notes"})
+
     def perform_create(self, serializer):
         """Routed through the service so `start_now` also moves the asset."""
         data = dict(serializer.validated_data)
         asset = data.pop("asset")
         start_now = data.pop("start_now", False)
+        user = self.request.user
+
+        if not is_manager(user):
+            # A non-manager is reporting, not booking. Two limits follow:
+            if asset.assigned_to_id != user.pk:
+                raise PermissionDenied(
+                    "You can only report an issue on an asset you are holding."
+                )
+            # Taking an asset out of service is a scheduling decision, and
+            # naming a technician or a cost is a manager's judgement. Silently
+            # dropping them is right here rather than erroring — the reporter
+            # did not put them there, a crafted request did.
+            start_now = False
+            data = {key: value for key, value in data.items()
+                    if key in self.REPORTER_FIELDS}
 
         record = services.schedule(
-            asset, actor=self.request.user, start_now=start_now, **data
+            asset, actor=user, start_now=start_now, **data
         )
         serializer.instance = record
 

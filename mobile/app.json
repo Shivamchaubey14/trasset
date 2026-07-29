@@ -42,6 +42,13 @@
         {
           "cameraPermission": "Trasset uses the camera to scan asset labels and barcodes."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Trasset uses the camera so you can photograph an asset's condition.",
+          "photosPermission": "Trasset accesses your photos so you can attach one to an asset."
+        }
       ]
     ],
     "extra": {

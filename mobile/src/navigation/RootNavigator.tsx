@@ -24,6 +24,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { AssetDetailScreen } from "@/screens/AssetDetailScreen";
 import { AssignScreen } from "@/screens/assets/AssignScreen";
 import { CheckinScreen } from "@/screens/assets/CheckinScreen";
+import { ReportIssueScreen } from "@/screens/assets/ReportIssueScreen";
 import { GalleryScreen } from "@/screens/GalleryScreen";
 import { ManualEntryScreen } from "@/screens/scan/ManualEntryScreen";
 import { SignInScreen } from "@/screens/auth/SignInScreen";
@@ -42,6 +43,7 @@ export type RootStackParamList = {
   ManualEntry: undefined;
   Assign: { assetId: number; assetTag: string };
   Checkin: { assetId: number; assetTag: string; holderName?: string | null };
+  ReportIssue: { assetId: number; assetTag: string };
   // Arriving in later phases:
   // StockTake: { id?: number };
 };
@@ -119,6 +121,7 @@ export function RootNavigator() {
             <Stack.Group screenOptions={{ presentation: "modal", headerShown: true }}>
               <Stack.Screen name="Assign" component={AssignScreen} options={{ title: "Assign" }} />
               <Stack.Screen name="Checkin" component={CheckinScreen} options={{ title: "Check in" }} />
+              <Stack.Screen name="ReportIssue" component={ReportIssueScreen} options={{ title: "Report an issue" }} />
             </Stack.Group>
             {__DEV__ ? (
               <Stack.Screen

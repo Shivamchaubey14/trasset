@@ -28,9 +28,9 @@
 | Hindi/English toggle (added on request) | — | 🟡 Engine + chrome done · page content pending |
 | **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
 | **Phase 6 — Mobile app foundation** | 36–41 | ✅ Complete (Days 36–41) |
-| **Phase 7 — Core journeys** | 42–47 | 🟡 Days 42, 43 done · Days 44–47 open |
+| **Phase 7 — Core journeys** | 42–47 | 🟡 Days 42–44 done · Days 45–47 open |
 
-**Backend test suite:** 710 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
+**Backend test suite:** 719 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
 **Dependencies:** `pip-audit` clean — no known vulnerabilities
 **OpenAPI schema:** 74 endpoints, 0 errors, 0 warnings (NFR-13)
@@ -71,12 +71,13 @@ runs in Expo Go with the tab shell, both themes and both fonts. Next:
 **Phase 7 — core journeys (Days 42–47).** Day 42 is ✅ done.
 
 - **Day 43** — ✅ done: assign and check in, with the conflict flow.
-- **Day 44** — ⬅ **next**: camera capture and report-an-issue. Photos attached
-  to an asset (FR-14.13) with **client-side resize before upload** — a 12 MP
-  photo over mobile data is unacceptable — and raising a maintenance record
-  from the phone (FR-14.14).
-- **Day 45** — requests and approvals. **Day 46** — push registration and deep
-  links. **Day 47** — profile and settings proper.
+- **Day 44** — ✅ done: photo capture and report-an-issue.
+- **Day 45** — ⬅ **next**: requests and approvals. An employee raises a request
+  (FR-14.16); an approver sees a pending inbox and approves or rejects with a
+  reason (FR-14.17). Note §12.5 excludes approvals from the offline queue —
+  they are decisions that are hard to unwind.
+- **Day 46** — push registration and deep links. **Day 47** — profile and
+  settings proper.
 
 **Two things still needed from the user:** an **Expo account** for dev builds
 (Expo Go needs none, so Days 36–39 are unblocked), and eventually **push
@@ -157,6 +158,57 @@ audit row.
 ---
 
 ## Completed
+
+### Day 44 — Photos & issue reporting ✅
+
+- **Every photo is resized before it leaves the phone.** A modern camera makes
+  a 12 MP JPEG of 4–8 MB; sending that from a stock room is slow enough to look
+  broken, expensive for whoever pays for the connection, and pointless — the
+  picture exists to show a scratch on a lid, and 1600px does that as well as
+  4032px. It would also start bouncing off the API's own 10 MB ceiling (SEC-8).
+  Measured in the verification: 32 KB against a 10 MB limit.
+- **EXIF is stripped on capture.** There is no reason to ship GPS coordinates
+  of where an asset was photographed to the server, and MNFR-8 is explicit
+  about what may sit at rest.
+- **A failed resize falls back to the original** rather than throwing — a photo
+  that is too big is better than no photo, and the server's limit is the
+  backstop.
+- Capture is offered to managers only, matching the API (`write_roles =
+  MANAGERS` on attachments); everyone can *see* the photos, because a picture
+  of the damage is exactly what the person holding the asset wants to check
+  against.
+
+**A gap between the SRS and the implementation, closed.** SRS §2.3 gives the
+Employee role "reports issues" and FR-14.14 requires it from the phone — but
+`MaintenanceViewSet` was `write_roles = MANAGERS`, so the button Day 41 showed
+every role would have been refused for most of them. That is exactly the
+client/server drift the Day 41 verification was built to catch, and it was
+caught here rather than by a user.
+
+Creating a maintenance record is now open to any role, then narrowed in
+`perform_create`:
+
+- a non-manager may only report on **an asset they are currently holding** —
+  otherwise "report an issue" quietly becomes "book work on anything";
+- `start_now` is forced off, because taking an asset out of service is a
+  scheduling decision, not part of noticing a fault;
+- technician, vendor and cost estimate are **dropped rather than rejected** for
+  a reporter — the reporter did not put them there, a crafted request did;
+- everything after the report — start, complete, cancel — stays with managers.
+
+Auditors are still excluded: the read-only guard in `HasRolePermission` applies
+to every unsafe method regardless of what a view declares. 9 backend tests
+cover it; the suite is now **719**.
+
+**Verified:** `npm run verify:photos` — 11 checks, all passing, including the
+DoD end to end: a multipart upload lands and then appears on the asset record
+the web app reads. Plus `npm run verify:lifecycle` and the rest still green.
+
+**One thing to know if the app misbehaves after a dependency is added:** Metro
+caches its module map, so a newly installed package can fail to resolve until
+the bundler is restarted with `--clear`. That happened here with
+`expo-image-picker` and cost ten minutes chasing a "missing" file that was on
+disk the whole time.
 
 ### Day 43 — Assign & check in ✅
 The buttons from Day 41 now act.

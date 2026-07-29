@@ -342,7 +342,9 @@ class MaintenancePermissionTests(MaintenanceTestCase):
                 self.login(user)
                 self.assertEqual(self.client.get(self.url).status_code, 200)
 
-    def test_only_managers_can_schedule(self):
+    def test_only_managers_can_schedule_work_on_somebody_elses_asset(self):
+        """Booking work in stays with managers. Reporting a problem on an asset
+        you are holding is a different thing — see IssueReportingTests."""
         asset = self.make_asset()
         for user in (self.head, self.employee, self.auditor):
             with self.subTest(role=user.role_name):
@@ -372,6 +374,166 @@ class MaintenancePermissionTests(MaintenanceTestCase):
 
     def test_requires_authentication(self):
         self.assertEqual(self.client.get(self.url).status_code, 401)
+
+
+class IssueReportingTests(MaintenanceTestCase):
+    """
+    FR-14.14 and SRS §2.3 — "Employee: … reports issues".
+
+    The person holding a broken laptop is who notices first, and routing that
+    through a manager means it often never gets reported. So a non-manager may
+    raise a record, but only against an asset they are actually holding, and
+    only the parts of the form that describe the problem.
+    """
+
+    def held_asset(self, holder=None):
+        asset = self.make_asset()
+        with suspend():
+            asset.assigned_to = holder or self.employee
+            asset.status = AssetStatus.ASSIGNED
+            asset.save(update_fields=["assigned_to", "status"])
+        return asset
+
+    def test_an_employee_can_report_an_issue_on_their_own_asset(self):
+        asset = self.held_asset()
+        self.login(self.employee)
+
+        response = self.client.post(
+            self.url,
+            {"asset_id": asset.id, "type": MaintenanceType.REPAIR,
+             "scheduled_date": date.today().isoformat(),
+             "notes": "Screen flickers when the lid moves."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        record = MaintenanceRecord.objects.get(asset=asset)
+        self.assertEqual(record.notes, "Screen flickers when the lid moves.")
+        self.assertEqual(record.created_by, self.employee)
+
+    def test_a_department_head_can_report_on_their_own_asset(self):
+        asset = self.held_asset(holder=self.head)
+        self.login(self.head)
+
+        response = self.client.post(
+            self.url,
+            {"asset_id": asset.id, "type": MaintenanceType.REPAIR,
+             "scheduled_date": date.today().isoformat(), "notes": "Rattling."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_an_employee_cannot_report_on_an_asset_somebody_else_holds(self):
+        """Otherwise "report an issue" becomes "book work on anything"."""
+        asset = self.held_asset(holder=self.head)
+        self.login(self.employee)
+
+        response = self.client.post(
+            self.url,
+            {"asset_id": asset.id, "type": MaintenanceType.REPAIR,
+             "scheduled_date": date.today().isoformat(), "notes": "Not mine."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("only report an issue on an asset you are holding",
+                      str(self.assertEnvelope(response, success=False)["errors"]))
+        self.assertFalse(MaintenanceRecord.objects.filter(asset=asset).exists())
+
+    def test_an_employee_cannot_report_on_an_unassigned_asset(self):
+        asset = self.make_asset()
+        self.login(self.employee)
+
+        response = self.client.post(self.url, self.payload(asset), format="json")
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_an_auditor_cannot_report_even_holding_the_asset(self):
+        """The read-only guard outranks this — it applies to every unsafe
+        method regardless of what a view declares."""
+        asset = self.held_asset(holder=self.auditor)
+        self.login(self.auditor)
+
+        response = self.client.post(
+            self.url,
+            {"asset_id": asset.id, "type": MaintenanceType.REPAIR,
+             "scheduled_date": date.today().isoformat(), "notes": "Broken."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_a_reporter_cannot_take_the_asset_out_of_service(self):
+        """`start_now` is a scheduling decision, not part of noticing a fault."""
+        asset = self.held_asset()
+        self.login(self.employee)
+
+        self.client.post(
+            self.url,
+            {"asset_id": asset.id, "type": MaintenanceType.REPAIR,
+             "scheduled_date": date.today().isoformat(),
+             "notes": "Fan noise.", "start_now": True},
+            format="json",
+        )
+
+        asset.refresh_from_db()
+        self.assertEqual(asset.status, AssetStatus.ASSIGNED)
+        self.assertEqual(
+            MaintenanceRecord.objects.get(asset=asset).status,
+            MaintenanceStatus.SCHEDULED,
+        )
+
+    def test_a_reporters_manager_only_fields_are_dropped(self):
+        """A crafted request must not let a reporter name a technician or set a
+        budget — those are a manager's judgement."""
+        asset = self.held_asset()
+        self.login(self.employee)
+
+        self.client.post(
+            self.url,
+            {"asset_id": asset.id, "type": MaintenanceType.REPAIR,
+             "scheduled_date": date.today().isoformat(), "notes": "Keys sticking.",
+             "technician": "My mate Dave", "cost_estimate": "99999.00",
+             "vendor_id": self.vendor.id},
+            format="json",
+        )
+
+        record = MaintenanceRecord.objects.get(asset=asset)
+        self.assertEqual(record.technician, "")
+        # The model defaults this to 0.00 rather than null, so the assertion is
+        # that the *crafted* figure did not land, not that the field is empty.
+        self.assertNotEqual(record.cost_estimate, Decimal("99999.00"))
+        self.assertIsNone(record.vendor)
+
+    def test_a_manager_keeps_the_full_form(self):
+        asset = self.held_asset()
+        self.login(self.manager)
+
+        response = self.client.post(self.url, self.payload(asset), format="json")
+
+        self.assertEqual(response.status_code, 201, response.data)
+        record = MaintenanceRecord.objects.get(asset=asset)
+        self.assertEqual(record.technician, "Farhan Q.")
+        self.assertEqual(record.cost_estimate, Decimal("2500.00"))
+
+    def test_reporting_does_not_let_a_reporter_start_or_complete(self):
+        """Everything after the report stays with managers."""
+        asset = self.held_asset()
+        self.login(self.employee)
+        created = self.client.post(
+            self.url,
+            {"asset_id": asset.id, "type": MaintenanceType.REPAIR,
+             "scheduled_date": date.today().isoformat(), "notes": "Overheating."},
+            format="json",
+        )
+        record_id = created.json()["data"]["id"]
+
+        for verb in ("start", "complete", "cancel"):
+            with self.subTest(action=verb):
+                response = self.client.post(f"{self.url}{record_id}/{verb}/", {},
+                                            format="json")
+                self.assertEqual(response.status_code, 403)
 
 
 class MaintenanceQueryTests(MaintenanceTestCase):

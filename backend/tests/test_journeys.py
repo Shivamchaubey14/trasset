@@ -244,12 +244,22 @@ class EmployeeJourney(JourneyTestCase):
 
     def test_an_employee_cannot_run_the_business(self):
         """SRS §11.4 — an Employee on a manager-only endpoint gets 403."""
+        # Somebody else's asset. An employee *may* report an issue on an asset
+        # they are holding (FR-14.14, SRS §2.3), so the manager-only claim is
+        # about scheduling work on the estate, not about this endpoint wholesale
+        # — see tests.test_maintenance.IssueReportingTests.
+        with suspend():
+            not_theirs = Asset.objects.create(
+                name="Somebody else's", category=self.laptops,
+                status=AssetStatus.ASSIGNED, assigned_to=self.head,
+            )
+
         self.login(self.employee)
 
         forbidden = [
             ("post", "/api/v1/assets/", {"name": "Mine", "category_id": self.laptops.id}),
             ("post", "/api/v1/categories/", {"name": "Mine"}),
-            ("post", "/api/v1/maintenance/", {"asset_id": 1, "type": "repair",
+            ("post", "/api/v1/maintenance/", {"asset_id": not_theirs.id, "type": "repair",
                                               "scheduled_date": date.today().isoformat()}),
             ("post", "/api/v1/purchase-orders/", {"vendor_id": self.vendor.id, "items": []}),
             ("get", "/api/v1/users/", None),

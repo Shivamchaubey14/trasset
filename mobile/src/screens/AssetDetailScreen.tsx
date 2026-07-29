@@ -38,6 +38,7 @@ import {
   useToast,
 } from "@/components";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
+import { AssetPhotos } from "@/screens/assets/AssetPhotos";
 import { type AssetStatus, fonts, fontSizes, radius, spacing, useTheme } from "@/theme";
 
 /**
@@ -141,10 +142,13 @@ export function AssetDetailScreen() {
           holderName: holder?.full_name ?? null,
         });
         return;
+      case "report":
+        navigation.navigate("ReportIssue", { assetId: id, assetTag: asset.asset_tag });
+        return;
       default:
-        // Report-an-issue is Day 44; retire is not in mobile v1's queue story
-        // and lands with the rest of the lifecycle work.
-        toast.show(`"${spec.label}" arrives on Day 44.`);
+        // Retire is online-only (§12.5) and lands with the rest of the
+        // lifecycle work rather than here.
+        toast.show(`"${spec.label}" is not available from the phone yet.`);
     }
   }
 
@@ -218,6 +222,11 @@ export function AssetDetailScreen() {
           <Field label="Current value" value={money(asset.current_value)} last />
         </Card>
       </Section>
+
+      <AssetPhotos
+        assetId={id}
+        attachments={((asset as { attachments?: unknown[] }).attachments ?? []) as never[]}
+      />
 
       <Specifications asset={asset} />
 
