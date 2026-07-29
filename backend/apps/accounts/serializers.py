@@ -39,7 +39,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = (
             "id", "full_name", "email", "phone", "initials",
             "role", "role_name", "department", "department_name",
-            "avatar", "timezone_name", "email_notifications",
+            "avatar", "timezone_name", "email_notifications", "push_notifications",
             "is_active", "last_login", "created_at", "updated_at",
         )
         read_only_fields = ("id", "last_login", "created_at", "updated_at")
@@ -60,7 +60,7 @@ class UserWriteSerializer(serializers.ModelSerializer):
         fields = (
             "id", "full_name", "email", "phone", "password",
             "role_id", "department", "timezone_name",
-            "email_notifications", "is_active",
+            "email_notifications", "push_notifications", "is_active",
         )
 
     def validate_email(self, value):
@@ -296,7 +296,8 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("full_name", "phone", "avatar", "timezone_name", "email_notifications")
+        fields = ("full_name", "phone", "avatar", "timezone_name",
+                  "email_notifications", "push_notifications")
 
     def to_representation(self, instance):
         return UserSerializer(instance, context=self.context).data

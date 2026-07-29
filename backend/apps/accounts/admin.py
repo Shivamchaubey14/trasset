@@ -29,7 +29,7 @@ class UserAdmin(BaseUserAdmin):
         ("Profile", {"fields": ("full_name", "phone", "avatar", "timezone_name")}),
         ("Access", {"fields": ("role", "department", "is_active", "is_staff",
                                "is_superuser", "groups", "user_permissions")}),
-        ("Preferences", {"fields": ("email_notifications",)}),
+        ("Preferences", {"fields": ("email_notifications", "push_notifications")}),
         ("Security", {"fields": ("failed_login_attempts", "locked_until")}),
         ("Timestamps", {"fields": ("last_login", "created_at", "updated_at")}),
     )

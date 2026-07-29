@@ -38,6 +38,19 @@ TYPE_STYLES = {
     NotificationType.PURCHASE_RECEIVED: ("truck", "#3BB77E"),
 }
 
+#: Deep links (FR-14.23). The app registers this scheme; tapping a push about
+#: an asset should land on that asset, not on a generic inbox.
+DEEP_LINK_SCHEME = "trasset"
+
+#: Model name → deep-link segment. A type absent here falls back to the
+#: notification list, which is always a safe place to land.
+DEEP_LINK_TARGETS = {
+    "Asset": "assets",
+    "AssetRequest": "requests",
+    "MaintenanceRecord": "maintenance",
+    "PurchaseOrder": "purchase-orders",
+}
+
 #: Types that also go out by email when the user has not opted out (FR-12.2).
 #: Deliberately not everything — an email per check-in would train people to
 #: ignore Trasset's mail entirely.

@@ -67,6 +67,12 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     # Notification preferences (FR-12.2)
     email_notifications = models.BooleanField(default=True)
 
+    # Push is a separate consent from email (BE-3). Reusing one flag would mean
+    # someone who muted email digests silently stopped receiving the alerts the
+    # mobile app exists to deliver — and the two are wanted in different places:
+    # email at a desk, push in a stock room.
+    push_notifications = models.BooleanField(default=True)
+
     # Brute-force lockout (FR-1.5)
     failed_login_attempts = models.PositiveSmallIntegerField(default=0)
     locked_until = models.DateTimeField(null=True, blank=True)

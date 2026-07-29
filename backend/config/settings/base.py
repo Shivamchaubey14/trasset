@@ -293,6 +293,17 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Trasset <no-reply@trasse
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:5500")
 
 # ---------------------------------------------------------------------------
+# Push notifications (SRS §12.4, BE-3)
+# ---------------------------------------------------------------------------
+# Swappable the way EMAIL_BACKEND is. The console backend logs instead of
+# sending, so development and tests need no provider account.
+PUSH_BACKEND = env("PUSH_BACKEND",
+                   default="apps.notifications.push.ConsolePushBackend")
+# Expo fronts APNs and FCM, so the server never handles either directly.
+EXPO_PUSH_URL = env("EXPO_PUSH_URL", default="https://exp.host/--/api/v2/push/send")
+EXPO_ACCESS_TOKEN = env("EXPO_ACCESS_TOKEN", default="")
+
+# ---------------------------------------------------------------------------
 # Celery (SRS §10.4)
 # ---------------------------------------------------------------------------
 CELERY_BROKER_URL = env("REDIS_URL", default="redis://127.0.0.1:6379/0")

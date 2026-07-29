@@ -65,6 +65,13 @@ def notify(user, notification_type, title, message="", related=None, link="",
         # leaves someone holding an email about something that never happened.
         transaction.on_commit(lambda: queue_email(notification.pk))
 
+    # Push goes out for every type, unlike email (BE-3). The reasoning differs:
+    # an email per check-in would train people to ignore Trasset's mail, but a
+    # push is the whole reason the app is on the phone, and the person can mute
+    # it per-device at the OS level as well as here.
+    if user.push_notifications:
+        transaction.on_commit(lambda: queue_push(notification.pk))
+
     return notification
 
 
@@ -143,6 +150,117 @@ def deliver_email(notification_id) -> bool:
 
     Notification.objects.filter(pk=notification.pk).update(emailed_at=timezone.now())
     return True
+
+
+# ---------------------------------------------------------------------------
+# Push (SRS §12.4, BE-3)
+# ---------------------------------------------------------------------------
+def queue_push(notification_id):
+    """
+    Fan a notification out to every device its recipient has registered.
+
+    **One task per device, not one per notification.** A single task looping
+    over devices would, on retry after a partial failure, re-send to the
+    handsets that already got it — and one dead device would delay the rest.
+    Separate tasks fail and back off independently.
+
+    **Nothing in here may raise.** It runs from ``transaction.on_commit``,
+    which fires while the action that caused it is still completing — an
+    exception escaping would fail the check-out this was only meant to report.
+    """
+    from .models import Notification
+
+    try:
+        notification = Notification.objects.select_related("user").filter(
+            pk=notification_id
+        ).first()
+        if notification is None or not notification.user.push_notifications:
+            return 0
+
+        device_ids = list(notification.user.devices.values_list("id", flat=True))
+    except Exception:  # noqa: BLE001 - see the guarantee below
+        logger.exception("Could not look up push targets for notification %s",
+                         notification_id)
+        return 0
+
+    if not device_ids:
+        # Nobody has registered a handset. Not a failure — most users are on
+        # the web only — so this stays quiet.
+        return 0
+
+    for device_id in device_ids:
+        try:
+            from .tasks import send_notification_push
+
+            send_notification_push.delay(notification_id, device_id)
+        except Exception:  # noqa: BLE001 - broker down, bad config, anything
+            logger.exception("Could not queue push for notification %s device %s; "
+                             "sending inline", notification_id, device_id)
+            try:
+                deliver_push(notification_id, device_id)
+            except Exception:  # noqa: BLE001
+                logger.exception("Inline push also failed for notification %s",
+                                 notification_id)
+
+    try:
+        Notification.objects.filter(pk=notification_id, pushed_at__isnull=True).update(
+            pushed_at=timezone.now()
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not stamp pushed_at on notification %s", notification_id)
+
+    return len(device_ids)
+
+
+def deliver_push(notification_id, device_id) -> bool:
+    """
+    Send one notification to one device.
+
+    Returns True when the provider accepted it. A dead token is pruned here
+    rather than retried — the app has been uninstalled or the token rotated,
+    and no amount of backoff will fix that.
+    """
+    from apps.accounts.models import Device
+
+    from .models import Notification
+    from .push import PushMessage, get_push_backend
+
+    notification = Notification.objects.select_related("user").filter(
+        pk=notification_id
+    ).first()
+    if notification is None:
+        return False
+    if not notification.user.push_notifications:
+        return False
+
+    device = Device.objects.filter(pk=device_id, user=notification.user).first()
+    if device is None:
+        # Deregistered between the fan-out and now, or never belonged to this
+        # user. Either way there is nothing to send to.
+        return False
+
+    result = get_push_backend().send(PushMessage(
+        token=device.push_token,
+        title=notification.title,
+        body=notification.message,
+        data=notification.push_payload(),
+    ))
+
+    if result.token_is_dead:
+        logger.info("Pruning dead push token for device %s: %s",
+                    device.pk, result.detail)
+        device.delete()
+        return False
+
+    if not result.ok:
+        # Raised so the task retries with backoff.
+        raise PushDeliveryError(result.detail or "Push was not accepted")
+
+    return True
+
+
+class PushDeliveryError(Exception):
+    """A push failed in a way that is worth retrying."""
 
 
 # ---------------------------------------------------------------------------

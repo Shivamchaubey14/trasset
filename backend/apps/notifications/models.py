@@ -5,7 +5,12 @@ from django.utils import timezone
 
 from common.models import TimeStampedModel
 
-from .constants import TYPE_STYLES, NotificationType
+from .constants import (
+    DEEP_LINK_SCHEME,
+    DEEP_LINK_TARGETS,
+    TYPE_STYLES,
+    NotificationType,
+)
 
 
 class NotificationQuerySet(models.QuerySet):
@@ -53,6 +58,11 @@ class Notification(TimeStampedModel):
     #: Whether an email was sent for this one — so a retry cannot double-send.
     emailed_at = models.DateTimeField(null=True, blank=True)
 
+    #: When push was *dispatched* — not proof of delivery. One notification can
+    #: go to several devices, each with its own task and its own fate, so this
+    #: records that the fan-out happened rather than that every handset got it.
+    pushed_at = models.DateTimeField(null=True, blank=True)
+
     objects = NotificationQuerySet.as_manager()
 
     class Meta:
@@ -74,6 +84,33 @@ class Notification(TimeStampedModel):
         self.read_at = timezone.now()
         self.save(update_fields=["is_read", "read_at", "updated_at"])
         return self
+
+    @property
+    def deep_link(self) -> str:
+        """
+        Where a tapped push should open (FR-14.23).
+
+        ``link`` cannot serve for this — it holds a web path like
+        ``asset-detail.html?id=12``, which means nothing to a native app. The
+        related object is what both clients actually have in common, so the
+        target is derived from it.
+        """
+        target = DEEP_LINK_TARGETS.get(self.related_object_type)
+        if target and self.related_object_id:
+            return f"{DEEP_LINK_SCHEME}://{target}/{self.related_object_id}"
+        return f"{DEEP_LINK_SCHEME}://notifications"
+
+    def push_payload(self) -> dict:
+        """The ``data`` an app routes on when the notification is tapped."""
+        return {
+            "notification_id": str(self.pk),
+            "type": self.type,
+            "deep_link": self.deep_link,
+            "related_object_type": self.related_object_type,
+            "related_object_id": self.related_object_id,
+            # Kept so a web view opened from the app lands in the same place.
+            "link": self.link,
+        }
 
     @property
     def icon(self) -> str:

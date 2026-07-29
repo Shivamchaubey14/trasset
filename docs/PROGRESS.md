@@ -25,9 +25,9 @@
 | Phase 3 — Frontend | 19–26 | 🟡 Days 19–25 done · Day 26 done except browser QA |
 | Phase 4 — Integration, Testing & Launch | 27–30 | 🟡 Days 27, 28 done · Days 29, 30 open |
 | Hindi/English toggle (added on request) | — | 🟡 Engine + chrome done · page content pending |
-| **Phase 5 — Mobile API groundwork** | 31–35 | 🟡 Days 31–33 done · Days 34, 35 open |
+| **Phase 5 — Mobile API groundwork** | 31–35 | 🟡 Days 31–34 done · Day 35 open |
 
-**Backend test suite:** 638 tests, all passing · **Coverage:** 89.3% (target ≥ 70%, NFR-12)
+**Backend test suite:** 671 tests, all passing · **Coverage:** 89.1% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
 **Dependencies:** `pip-audit` clean — no known vulnerabilities
 **OpenAPI schema:** 68 endpoints, 0 errors, 0 warnings (NFR-13)
@@ -57,8 +57,8 @@ work inside the existing Django project, so it needs no new toolchain:
 - **Day 32** — ✅ done: idempotency keys on the mutating endpoints (BE-4).
 - **Day 33** — ✅ done: delta sync, asset-tag lookup, per-device throttle
   (BE-5, BE-6, BE-8).
-- **Day 34** — ⬅ **next**: push dispatch (BE-3).
-- **Day 35** — stock-take API (BE-7).
+- **Day 34** — ✅ done: push dispatch (BE-3).
+- **Day 35** — ⬅ **next**: stock-take API (BE-7). Last day of Phase 5.
 
 > **Stop at the end of Day 35.** Phase 6 (Days 36–41) stands up the React
 > Native app itself, and the user asked to be consulted before that starts.
@@ -138,6 +138,59 @@ audit row.
 ---
 
 ## Completed
+
+### Day 34 — Push dispatch ✅
+BE-3. An assignment now produces an in-app record, an email **and** a push to
+every registered device — one test asserts exactly that, being the day's DoD.
+
+- **Extended the existing dispatch point, not a parallel path.** Push is queued
+  inside `notify()` next to email, so it inherits every rule already proved
+  there: nobody is notified about their own action, and a rolled-back action
+  pushes nothing (`transaction.on_commit`).
+- **A pluggable backend, the way Django does email.** `PUSH_BACKEND` names the
+  class; console for development, in-memory for tests, Expo for production
+  (SRS §12.2 — Expo fronts APNs and FCM so the server handles neither).
+  Calling the provider inline would have made the whole notification path
+  untestable without a network and pinned the app to one vendor.
+- **One Celery task per device, not per notification.** A single task looping
+  over devices would, on retry after a partial failure, re-send to the handsets
+  that already got it — and one dead device would hold up the rest. Separate
+  tasks retry and back off independently.
+- **A dead token is pruned, not retried.** Expo reports `DeviceNotRegistered`
+  when the app has been uninstalled or the token rotated; no amount of backoff
+  fixes that, so the row is deleted. Every other error raises so the task
+  retries.
+- **Deep links (FR-14.23).** `link` could not serve for this — it holds a web
+  path like `asset-detail.html?id=12`, meaningless to a native app. The target
+  is derived from the related object instead: `trasset://assets/12`. An
+  unmapped or missing target falls back to the notification list rather than
+  producing a link that goes nowhere.
+- **Push goes out for every type, unlike email.** The reasoning differs: an
+  email per check-in would train people to ignore Trasset's mail, but a push is
+  the whole reason the app is on the phone, and the OS offers its own mute.
+- **`queue_push` cannot raise.** It runs from `on_commit`, which fires while
+  the action that caused it is still completing, so anything escaping would
+  fail the check-out it was only meant to report on. Tested by making the
+  backend explode and asserting the assign still returns 200 with the asset
+  moved.
+- `tests/test_push.py` — 33 tests.
+
+**Deviation from the day's task list, flagged deliberately.** The plan said
+"respect the existing per-user notification preference", which would have meant
+reusing `email_notifications`. Added a separate `push_notifications` field
+instead: they are different consents wanted in different places — email at a
+desk, push in a stock room — and one flag would mean somebody who muted email
+digests silently stopped receiving the alerts the mobile app exists to deliver.
+Both directions are tested. Say the word if you would rather they were one
+switch.
+
+**Not verified against the real Expo service.** The console backend was
+exercised end to end on the live server (an assignment produced the in-app
+record and a logged push carrying `trasset://assets/48`), and the ticket parser
+is unit-tested against Expo's documented success, `DeviceNotRegistered` and
+rate-limit replies. But `ExpoPushBackend.send` itself has never made a real
+call — that needs an Expo account and a physical device, which arrives with
+Phase 6.
 
 ### Day 33 — Delta sync, tag lookup & per-device throttle ✅
 
@@ -905,6 +958,13 @@ DELETE the asset, then the same delta          → 1 row, is_deleted: true
     …while the normal list                     → no longer contains it
     …and by-tag                                → 404
 GET  /assets/?updated_since=last%20tuesday     → 400 naming the accepted formats
+
+POST /auth/devices/  (employee, mobile)        → 201, push_notifications: true
+POST /assets/19/assign/  (manager → employee)  → 200
+     in-app notifications                      → 6 → 7
+     server log                                → PUSH to ExponentPush… with
+                                                 data.deep_link trasset://assets/48
+PATCH /auth/me/ {push_notifications: false}    → 200, preference honoured
 ```
 
 **Frontend** — all 21 files serve over HTTP; every JS file and inline block

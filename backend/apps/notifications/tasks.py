@@ -34,6 +34,26 @@ def send_notification_email(self, notification_id):
     return {"notification_id": notification_id, "sent": sent}
 
 
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+    ignore_result=True,
+)
+def send_notification_push(self, notification_id, device_id):
+    """
+    Deliver one notification to one device, retrying with backoff (BE-3).
+
+    Scoped to a single device on purpose: a handset the provider rejects backs
+    off on its own without holding up, or re-notifying, the others.
+    """
+    from .services import deliver_push
+
+    sent = deliver_push(notification_id, device_id)
+    return {"notification_id": notification_id, "device_id": device_id, "sent": sent}
+
+
 def _already_notified_today(user, notification_type, related_id) -> bool:
     """Has this exact reminder already gone out today?"""
     from .models import Notification

@@ -37,6 +37,8 @@ REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
 }
 
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+# Same idea for push: collected in memory so a test can read what was sent.
+PUSH_BACKEND = "apps.notifications.push.LocMemPushBackend"
 
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
