@@ -32,12 +32,14 @@ import {
   Button,
   Card,
   EmptyState,
+  OfflineBanner,
   Skeleton,
   SkeletonRow,
   StatusPill,
   useToast,
 } from "@/components";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
+import { factsOf, useOfflineRead } from "@/offline/useOfflineRead";
 import { AssetPhotos } from "@/screens/assets/AssetPhotos";
 import { type AssetStatus, fonts, fontSizes, radius, spacing, useTheme } from "@/theme";
 
@@ -90,7 +92,9 @@ export function AssetDetailScreen() {
     historyQuery.refetch();
   }, [assetQuery, historyQuery]);
 
-  if (assetQuery.isLoading && !assetQuery.data) {
+  const offline = useOfflineRead(factsOf(assetQuery));
+
+  if (offline.showSpinner) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, padding: spacing.md, gap: spacing.md }}>
         <Skeleton width="45%" height={13} />
@@ -102,13 +106,30 @@ export function AssetDetailScreen() {
     );
   }
 
-  if (assetQuery.isError && !assetQuery.data) {
+  // Offline with nothing cached is its own state, and it is checked first: a
+  // request made with no signal also fails, and reporting that error would say
+  // "it may have been removed" about an asset that is simply out of reach.
+  if (offline.showOfflineEmpty) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: "center" }}>
+        <EmptyState
+          tone="offline"
+          title="You are offline"
+          message="This asset has not been opened on this phone recently, so there is nothing cached to show."
+          actionLabel="Try again"
+          onAction={refresh}
+        />
+      </View>
+    );
+  }
+
+  if (offline.showError) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: "center" }}>
         <EmptyState
           tone="error"
           title="Could not load this asset"
-          message="It may have been removed, or you may be offline."
+          message="It may have been removed."
           actionLabel="Try again"
           onAction={refresh}
         />
@@ -164,7 +185,6 @@ export function AssetDetailScreen() {
     <ScrollView
       style={{ backgroundColor: colors.bg }}
       contentContainerStyle={{
-        padding: spacing.md,
         paddingBottom: insets.bottom + spacing.xl,
         gap: spacing.md,
       }}
@@ -176,6 +196,14 @@ export function AssetDetailScreen() {
         />
       }
     >
+      {/* Outside the padding so it spans the width, and above the identity so
+          the caveat is read before the thing it caveats. */}
+      <OfflineBanner
+        visible={offline.showBanner}
+        cachedAt={new Date(assetQuery.dataUpdatedAt)}
+      />
+
+      <View style={{ paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.md }}>
       {/* Identity first: standing at a shelf, the question is "is this the
           right thing?" before anything else. */}
       <View style={{ gap: spacing.xs }}>
@@ -260,6 +288,7 @@ export function AssetDetailScreen() {
           </Card>
         )}
       </Section>
+      </View>
     </ScrollView>
   );
 }

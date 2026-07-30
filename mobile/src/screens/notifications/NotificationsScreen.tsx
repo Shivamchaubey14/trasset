@@ -32,7 +32,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ApiError, api } from "@/api";
 import type { Notification, Page } from "@/api";
-import { Chip, EmptyState, SkeletonRow, useToast } from "@/components";
+import { Chip, EmptyState, OfflineBanner, SkeletonRow, useToast } from "@/components";
+import { factsOf, useOfflineRead } from "@/offline/useOfflineRead";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
 import { routeForPayload } from "@/notifications/routing";
 import { fonts, fontSizes, radius, spacing, useTheme } from "@/theme";
@@ -121,8 +122,17 @@ export function NotificationsScreen() {
     [markRead, navigation, toast],
   );
 
+  // Row count rather than the query's `data`: one fetched empty page still
+  // counts as `data`, and a banner over nothing says nothing.
+  const offline = useOfflineRead({
+    ...factsOf(listQuery),
+    hasData: rows.length > 0,
+  });
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
+      <OfflineBanner visible={offline.showBanner} cachedAt={new Date(listQuery.dataUpdatedAt)} />
+
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <Text style={[styles.title, { color: colors.text }]}>Alerts</Text>
@@ -176,24 +186,27 @@ export function NotificationsScreen() {
           }
         }}
         ListEmptyComponent={
-          listQuery.isLoading ? (
+          // A skeleton is a promise that something is arriving. Offline with
+          // nothing cached, nothing is.
+          offline.showSpinner ? (
             <View style={{ gap: spacing.sm }}>
               <SkeletonRow />
               <SkeletonRow />
               <SkeletonRow />
             </View>
-          ) : listQuery.error ? (
+          ) : offline.showOfflineEmpty ? (
             <EmptyState
-              tone={
-                listQuery.error instanceof ApiError && listQuery.error.isNetworkError
-                  ? "offline"
-                  : "error"
-              }
-              title={
-                listQuery.error instanceof ApiError && listQuery.error.isNetworkError
-                  ? "You are offline"
-                  : "Could not load alerts"
-              }
+              tone="offline"
+              title="You are offline"
+              message="Alerts you have already received are still here once they have been fetched at least once."
+              actionLabel="Try again"
+              onAction={listQuery.refetch}
+            />
+          ) : offline.showError ? (
+            <EmptyState
+              tone="error"
+              title="Could not load alerts"
+              message={listQuery.error instanceof ApiError ? listQuery.error.message : undefined}
               actionLabel="Try again"
               onAction={listQuery.refetch}
             />

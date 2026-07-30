@@ -10,13 +10,16 @@
  * a person who checked an asset in with no signal needs to see that it has not
  * happened yet — otherwise they walk away believing it did.
  *
- * Presentational only. Real connectivity detection lands with offline reads on
- * Day 48, and the queue count with the mutation queue on Day 49.
+ * Presentational only: it is told whether to show rather than deciding. The
+ * decision belongs to `useOnline`, so a screen cannot claim to be offline while
+ * a request of its own is in flight. The queue count arrives with the mutation
+ * queue.
  */
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
+import { describeAge } from "@/offline/freshness";
 import { fonts, spacing, useTheme } from "@/theme";
 
 export function OfflineBanner({
@@ -47,21 +50,14 @@ export function OfflineBanner({
         {queued
           ? `Offline — ${pendingCount} ${pendingCount === 1 ? "change" : "changes"} waiting to send`
           : "Offline"}
-        {cachedAt ? <Text style={{ color: colors.textMuted }}>{`  ·  showing data from ${ago(cachedAt)}`}</Text> : null}
+        {cachedAt ? (
+          <Text style={{ color: colors.textMuted }}>
+            {`  ·  showing data from ${describeAge(cachedAt)}`}
+          </Text>
+        ) : null}
       </Text>
     </View>
   );
-}
-
-/** Deliberately coarse: "3 minutes ago" is a claim about freshness, not a clock. */
-function ago(when: Date): string {
-  const seconds = Math.max(0, Math.round((Date.now() - when.getTime()) / 1000));
-  if (seconds < 60) return "just now";
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
-  return `${Math.round(hours / 24)} d ago`;
 }
 
 const styles = StyleSheet.create({

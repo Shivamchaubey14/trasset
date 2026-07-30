@@ -21,9 +21,12 @@ import React, {
   useState,
 } from "react";
 
+import { useQueryClient } from "@tanstack/react-query";
+
 import { api, login as apiLogin, logout as apiLogout, restoreSession, setSessionExpiredHandler, tokens } from "@/api";
 import type { User } from "@/api";
 import { clearPushToken, currentPushToken } from "@/notifications/push";
+import { purgeCache } from "@/offline/persist";
 
 import { isBiometricEnabled, promptBiometric } from "./biometrics";
 
@@ -48,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<SessionState>("starting");
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
+  const queryClient = useQueryClient();
 
   // --- startup ------------------------------------------------------------
   useEffect(() => {
@@ -114,9 +118,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // as having nothing to deregister.
     await apiLogout(currentPushToken() ?? undefined);
     clearPushToken();
+
+    // The persisted query cache holds this person's assets, requests and
+    // notifications. On a shared handset, rehydrating it into the next
+    // session would leak them — and silently, because the screens would look
+    // entirely normal. Both halves go: memory and disk.
+    await purgeCache(queryClient);
+
     setUser(null);
     setState("signedOut");
-  }, []);
+  }, [queryClient]);
 
   const unlock = useCallback(async () => {
     const ok = await promptBiometric();
@@ -135,9 +146,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // The password route out of a biometric that will not cooperate. Clearing
     // the tokens is what makes the sign-in screen meaningful.
     await tokens.clear();
+    // Abandoning the session deliberately, so the cache goes with it — the
+    // person at the sign-in screen may not be the person who left it.
+    await purgeCache(queryClient);
     setUser(null);
     setState("signedOut");
-  }, []);
+  }, [queryClient]);
 
   const refreshUser = useCallback(async () => {
     try {

@@ -15,7 +15,7 @@ import {
   Quicksand_600SemiBold,
   Quicksand_700Bold,
 } from "@expo-google-fonts/quicksand";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import * as SecureStore from "expo-secure-store";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -28,7 +28,9 @@ import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { ToastProvider } from "@/components";
 import { env } from "@/config/env";
 import { RootNavigator } from "@/navigation/RootNavigator";
+import { watchConnectivity } from "@/net/online";
 import { PushProvider } from "@/notifications/PushProvider";
+import { persistOptions } from "@/offline/persist";
 import { ThemeProvider, useTheme } from "@/theme";
 
 // The API layer holds no platform imports of its own, so the two things it
@@ -40,6 +42,11 @@ import { ThemeProvider, useTheme } from "@/theme";
 // a real server without a device.
 configureApi({ baseUrl: env.apiUrl, client: env.client });
 configureTokenStore(SecureStore);
+
+// Point TanStack Query's onlineManager at the OS, once. Everything that asks
+// "are we online" — the query layer deciding whether to fetch, every banner
+// deciding whether to show — then reads one value and cannot disagree.
+watchConnectivity();
 
 // Held until fonts *and* the session have resolved. Without this the app shows
 // a frame of the sign-in screen before the restored session lands — which
@@ -85,11 +92,17 @@ function Shell() {
 
 export default function App() {
   // One client for the app's lifetime — recreating it on render would throw
-  // the cache away, which is what Day 48's offline reads depend on.
+  // the cache away, which is the thing offline reads depend on.
   const [queryClient] = useState(createQueryClient);
+  // Built once for the same reason: a new persister each render would mean a
+  // new subscription each render.
+  const [persist] = useState(persistOptions);
 
   return (
-    <QueryClientProvider client={queryClient}>
+    // Persisting rather than merely caching is what makes the cache survive a
+    // force-quit, which is the difference between "recently viewed assets open
+    // in aeroplane mode" and "they open until you close the app".
+    <PersistQueryClientProvider client={queryClient} persistOptions={persist}>
       <SafeAreaProvider>
         <ThemeProvider>
           {/*
@@ -103,6 +116,6 @@ export default function App() {
           </ToastProvider>
         </ThemeProvider>
       </SafeAreaProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }

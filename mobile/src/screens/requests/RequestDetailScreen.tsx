@@ -44,12 +44,14 @@ import {
   Card,
   ConflictSheet,
   EmptyState,
+  OfflineBanner,
   SkeletonRow,
   StatusPill,
   TextField,
   useToast,
 } from "@/components";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
+import { factsOf, useOfflineRead } from "@/offline/useOfflineRead";
 import { canCancel, isDecidable, stateExplanation } from "@/requests/actions";
 import {
   newIdempotencyKey,
@@ -116,11 +118,34 @@ export function RequestDetailScreen() {
 
   const candidates = useMemo(() => available.data?.results ?? [], [available.data]);
 
-  if (requestQuery.isLoading && !request) {
+  const offline = useOfflineRead({
+    ...factsOf(requestQuery),
+    // `request` may be seeded from the list row that navigated here, which is
+    // cached content in its own right.
+    hasData: Boolean(request),
+  });
+
+  if (offline.showSpinner) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, padding: spacing.md, gap: spacing.sm }}>
         <SkeletonRow />
         <SkeletonRow />
+      </View>
+    );
+  }
+
+  // Offline first: with no signal the request also fails, and reporting that
+  // would say "it may have been removed" about something merely out of reach.
+  if (!request && offline.showOfflineEmpty) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: "center" }}>
+        <EmptyState
+          tone="offline"
+          title="You are offline"
+          message="This request has not been opened on this phone recently, so there is nothing cached to show."
+          actionLabel="Try again"
+          onAction={requestQuery.refetch}
+        />
       </View>
     );
   }
@@ -131,7 +156,7 @@ export function RequestDetailScreen() {
         <EmptyState
           tone="error"
           title="Could not load this request"
-          message="It may have been removed, or you may be offline."
+          message="It may have been removed."
           actionLabel="Try again"
           onAction={requestQuery.refetch}
         />
@@ -222,6 +247,12 @@ export function RequestDetailScreen() {
       style={{ flex: 1, backgroundColor: colors.bg }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
+      {/* Above the scroll area rather than inside it: a caveat that scrolls
+          away is one the reader can miss entirely. */}
+      <OfflineBanner
+        visible={offline.showBanner}
+        cachedAt={new Date(requestQuery.dataUpdatedAt)}
+      />
       <ScrollView
         contentContainerStyle={{
           padding: spacing.md,
