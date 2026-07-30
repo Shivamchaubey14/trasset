@@ -49,3 +49,18 @@ desktop.ini
 # --- Node (frontend tooling, if ever added) ---
 node_modules/
 npm-debug.log*
+
+# --- Client data (NEVER commit) ---
+# This repository is public. Real client data must not leave the machine, so the
+# whole directory is ignored rather than named files — an ignore list that has to
+# be updated per file is one that eventually misses one.
+#
+# The README is kept so the folder's purpose is in the repo while its contents
+# stay out. Anything derived from this data — extracts, fixtures, seed scripts
+# with real rows pasted in — belongs here too, not in backend/ or docs/.
+#
+# Written as `/data/*` and not `/data/`: excluding the directory itself stops git
+# descending into it, and a negation inside a directory git never enters has no
+# effect — the README would silently stay ignored.
+/data/*
+!/data/README.md

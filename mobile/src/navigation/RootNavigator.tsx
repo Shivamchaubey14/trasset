@@ -34,6 +34,7 @@ import { UnlockScreen } from "@/screens/auth/UnlockScreen";
 import { fonts, useTheme } from "@/theme";
 
 import { AppTabs, type TabParamList } from "./AppTabs";
+import { navigationRef } from "./ref";
 
 export type RootStackParamList = {
   App: NavigatorScreenParams<TabParamList>;
@@ -106,7 +107,9 @@ export function RootNavigator() {
   };
 
   return (
-    <NavigationContainer theme={navTheme} linking={linking}>
+    // `ref` lets the push listeners route from outside the tree — including a
+    // cold-start tap, which is read back before any screen has mounted.
+    <NavigationContainer ref={navigationRef} theme={navTheme} linking={linking}>
       {/*
         The auth screens and the app shell are mutually exclusive branches
         rather than a modal over the tabs. Signing out therefore unmounts the

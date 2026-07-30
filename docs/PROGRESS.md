@@ -28,7 +28,7 @@
 | Hindi/English toggle (added on request) | — | 🟡 Engine + chrome done · page content pending |
 | **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
 | **Phase 6 — Mobile app foundation** | 36–41 | ✅ Complete (Days 36–41) |
-| **Phase 7 — Core journeys** | 42–47 | 🟡 Days 42–45 done · Days 46–47 open |
+| **Phase 7 — Core journeys** | 42–47 | 🟡 Days 42–46 done · Day 47 open |
 
 **Backend test suite:** 719 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
@@ -73,16 +73,28 @@ runs in Expo Go with the tab shell, both themes and both fonts. Next:
 - **Day 43** — ✅ done: assign and check in, with the conflict flow.
 - **Day 44** — ✅ done: photo capture and report-an-issue.
 - **Day 45** — ✅ done: requests and approvals, plus two schema lies fixed.
-- **Day 46** — ⬅ **next**: push registration and deep links. Register the
-  handset against `POST /auth/devices/` (BE-2), prime the permission, handle
-  foreground / background / cold start, and route a tapped push to the record
-  (FR-14.23). The in-app list mirrors `/notifications/` with unread badges
-  (FR-14.24). Two things already in place: `trasset://requests/:id` and
-  `trasset://assets/:id` are registered in `RootNavigator`, and the server
-  already emits both — so the remaining work is the push plumbing, not routing.
-  **Blocked on push credentials** for a real end-to-end test; everything up to
-  the dispatch can be built and verified without them.
-- **Day 47** — profile and settings proper.
+- **Day 46** — ✅ done: notifications, deep links, device registration. The one
+  part of its DoD that needs a real handset is **still open** — see below.
+- **Day 47** — ⬅ **next**: profile and settings proper. Profile, password
+  change, notification preferences, theme override, sign-out, and an about
+  screen with version and build for support. Two things are already waiting for
+  it: `ThemeProvider` takes a `scheme` override (built on Day 36 for exactly
+  this), and `registerForPush({ prompt: true })` plus `explainOutcome()` exist so
+  the notification toggle can ask for permission properly and explain any
+  refusal. `PATCH /auth/me/` already accepts `email_notifications` and
+  `push_notifications`.
+
+**Still needed from the user, and now actually blocking:**
+
+1. **An Expo account / EAS project id.** Day 46 built the whole push path, but
+   `getExpoPushTokenAsync` needs a project id and `app.json` has none, so no
+   token can be minted and `registerForPush` returns `no-project`.
+2. **A development build.** Expo Go dropped remote push in SDK 53, so push
+   cannot be tested in it at all — `registerForPush` returns `expo-go`.
+3. **Push credentials** (APNs key / FCM), without which Day 34's
+   `ExpoPushBackend` still has never run against the real service.
+
+None of these block Day 47, which is why it is next.
 
 **Two things still needed from the user:** an **Expo account** for dev builds
 (Expo Go needs none, so Days 36–39 are unblocked), and eventually **push
@@ -163,6 +175,83 @@ audit row.
 ---
 
 ## Completed
+
+### Day 46 — Notifications & deep links ✅
+
+Every tab now has a real screen; the last placeholder went with this day.
+
+- **Three arrival states, three code paths**, because they are genuinely
+  different problems. Foreground: the app is open and the OS would stay silent,
+  so the banner is shown deliberately *and* the badge and lists are refreshed,
+  so the state behind it is not stale the moment it is dismissed. Background: a
+  tap fires the response listener with the navigator already mounted. **Cold
+  start: the tap launched the app, so no listener exists yet** — it is read back
+  with `getLastNotificationResponseAsync`, and because the navigator may still be
+  mounting, the route is held and replayed until the ref is ready. That last one
+  is what the DoD names and the one that silently does nothing if you rely on the
+  listener alone.
+- **Routing is a pure function** (`routeForPayload`), which is why it could be
+  verified without a phone at all. The server sends three candidate fields and
+  they are not interchangeable: `deep_link` is native and preferred;
+  `related_object_type` + `related_object_id` is what the REST list actually
+  exposes, so an in-app row must use it; and `link` is a *web* path that is
+  never routed on. Both of the first two are supported, and an in-app tap and a
+  push tap therefore cannot disagree about where a notification leads.
+- **Unrecognised targets fall back to the Alerts list, not a crash.**
+  Maintenance records and purchase orders have deep links server-side but no
+  phone screen (desk work, §12.8). Falling back shows the message that was
+  tapped, and a new `related_object_type` added later degrades instead of
+  throwing.
+- **Permission priming.** iOS gives an app one chance to ask; once denied the
+  dialog never returns. So launch runs `registerForPush({ prompt: false })`,
+  which picks up an existing grant without spending the ask, and the explicit
+  request belongs behind Day 47's settings screen. `denied` and `blocked` are
+  separate outcomes — the difference between a button and a link to Settings.
+- **Every outcome is a value, never an exception.** A token cannot be obtained on
+  a simulator, in Expo Go, or without an EAS project id, and none of those is a
+  fault to throw about — each needs its own sentence. `explainOutcome` keeps
+  those sentences next to the outcomes so a new one is a compile error rather
+  than an empty string in the UI.
+- **Registration is an upsert** called on every launch (BE-2). Verified that
+  re-registering the same token updates the row rather than adding one — two
+  rows for one handset means two pushes for one event.
+- **Signing out deregisters the handset in the same call** that blacklists the
+  refresh token, closing the `TODO(Day 46)` left in `AuthContext`. The token is
+  cached in module scope *only after the server has it*: remembering a token
+  whose registration failed would have sign-out ask the server to forget
+  something it never knew.
+- Tapping a row marks it read **and** opens the record. Marking read separately
+  would be busywork — reading it is the act of reading it. Unread is a dot plus
+  a weight change, never colour alone (NFR-9).
+- The tab badge comes from `/notifications/count/`, which exists so the badge
+  does not have to page the list. Polled on an interval as well as invalidated
+  by the push listener, because on a build that cannot receive push at all the
+  poll is the only thing keeping it honest.
+
+**What is NOT done, and cannot be here.** The DoD's "a push arrives on a real
+device" is unmet: Expo Go dropped remote push in SDK 53, and `app.json` has no
+EAS project id, so no token can be minted. **This needs a development build, an
+Expo account and push credentials** — the two outstanding asks. Everything up to
+the dispatch is built and verified; `ExpoPushBackend` (Day 34) has still never
+run against the real service.
+
+**Verified:** `npm run verify:push` — 30 checks, all passing: the routing
+resolver against ten payload shapes *and* against every real notification on the
+account (25 of 25 resolved to a screen), the registration upsert, per-user device
+ownership, an auditor registering despite the read-only guard, the read
+transitions and badge arithmetic, and one notification raised end to end — an
+assignment notified the recipient and its payload resolved to that very asset
+(#45 → #45).
+
+All eight suites green — 170 checks: `api` 18 · `scan` 18 · `detail` 22 ·
+`list` 15 · `lifecycle` 16 · `photos` 11 · `requests` 40 · `push` 30. Backend
+**719 passing**; `npm run tsc` clean.
+
+**Dependency note.** `expo-notifications@~0.32.17` (the SDK 54 match) adds no new
+root advisory — `npm audit` flags it only *via* `expo-constants`, which was
+already present. The four roots (`brace-expansion`, `js-yaml`, `postcss`,
+`uuid`) are pre-existing transitive build tooling; the offered "fix" is
+expo-notifications 57, a different SDK major, which is not a Day 46 decision.
 
 ### Day 45 — Requests & approvals ✅
 

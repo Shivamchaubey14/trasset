@@ -8,9 +8,12 @@
  */
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { useQuery } from "@tanstack/react-query";
 import React from "react";
 import { StyleSheet, View } from "react-native";
 
+import { api } from "@/api";
+import { useAuth } from "@/auth/AuthContext";
 import {
   AssetsScreen,
   NotificationsScreen,
@@ -97,6 +100,28 @@ function ScanIcon({ focused }: { focused: boolean }) {
 
 export function AppTabs() {
   const { colors } = useTheme();
+  const { state } = useAuth();
+
+  /**
+   * The unread badge (FR-14.24).
+   *
+   * `/notifications/count/` exists precisely so this does not have to page the
+   * list to find a number. Polled on an interval as well as invalidated by the
+   * push listener, because a push can arrive while the app is backgrounded and
+   * the count would otherwise be stale until something else refetched it — and
+   * on a build that cannot receive push at all, this is the only thing keeping
+   * the badge honest.
+   */
+  const counts = useQuery({
+    queryKey: ["notificationCount"],
+    queryFn: () => api.get<{ unread: number; total: number }>("/notifications/count/"),
+    enabled: state === "signedIn",
+    refetchInterval: 60_000,
+    // A failed count should not clear a badge that was correct a minute ago.
+    placeholderData: (previous) => previous,
+  });
+
+  const unread = counts.data?.unread ?? 0;
 
   return (
     <Tab.Navigator
@@ -155,7 +180,19 @@ export function AppTabs() {
           // a screen reader announcing a different word from the one on
           // screen is its own failure.
           tabBarLabel: "Alerts",
-          tabBarAccessibilityLabel: "Alerts",
+          // The count goes in the accessibility label too: a badge is a visual
+          // signal, and "Alerts" alone would not tell a screen reader user that
+          // anything is waiting.
+          tabBarAccessibilityLabel: unread
+            ? `Alerts, ${unread} unread`
+            : "Alerts",
+          tabBarBadge: unread ? (unread > 99 ? "99+" : unread) : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: colors.accent,
+            color: colors.onAccent,
+            fontFamily: fonts.bodySemi,
+            fontSize: 10,
+          },
         }}
       />
       <Tab.Screen

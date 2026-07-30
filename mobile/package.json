@@ -17,6 +17,7 @@
     "verify:lifecycle": "tsx scripts/verify-lifecycle.ts",
     "verify:photos": "tsx scripts/verify-photos.ts",
     "verify:requests": "tsx scripts/verify-requests.ts",
+    "verify:push": "tsx scripts/verify-push.ts",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
@@ -37,6 +38,7 @@
     "expo-image-manipulator": "~14.0.8",
     "expo-image-picker": "~17.0.11",
     "expo-local-authentication": "~17.0.8",
+    "expo-notifications": "~0.32.17",
     "expo-secure-store": "~15.0.8",
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",

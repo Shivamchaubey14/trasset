@@ -28,6 +28,7 @@ import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { ToastProvider } from "@/components";
 import { env } from "@/config/env";
 import { RootNavigator } from "@/navigation/RootNavigator";
+import { PushProvider } from "@/notifications/PushProvider";
 import { ThemeProvider, useTheme } from "@/theme";
 
 // The API layer holds no platform imports of its own, so the two things it
@@ -70,7 +71,14 @@ function Shell() {
   return (
     <View style={{ flex: 1 }} onLayout={onLayout}>
       <StatusBar style={dark ? "light" : "dark"} />
-      <RootNavigator />
+      {/*
+        Inside the gate rather than outside it: PushProvider reads a cold-start
+        tap on mount, and mounting it before the session has resolved would have
+        it decide there is nobody signed in and drop the deep link.
+      */}
+      <PushProvider>
+        <RootNavigator />
+      </PushProvider>
     </View>
   );
 }
