@@ -21,6 +21,7 @@ import {
   Card,
   EmptyState,
   OfflineBanner,
+  SegmentedControl,
   Skeleton,
   SkeletonRow,
   StatusPill,
@@ -68,6 +69,9 @@ function Panel({ label, topInset = 0 }: { label: string; topInset?: number }) {
   const { colors, series } = useTheme();
   const toast = useToast();
   const [text, setText] = useState("");
+  // Local state rather than the real theme preference: a gallery should not
+  // change the app's settings as a side effect of being looked at.
+  const [segment, setSegment] = useState("system");
 
   return (
     <View
@@ -136,6 +140,19 @@ function Panel({ label, topInset = 0 }: { label: string; topInset?: number }) {
           onChangeText={() => {}}
           secure
           error="That password is incorrect."
+        />
+      </Section>
+
+      <Section title="Segmented control">
+        <SegmentedControl
+          options={[
+            { value: "system", label: "System" },
+            { value: "light", label: "Light" },
+            { value: "dark", label: "Dark" },
+          ]}
+          value={segment}
+          onChange={setSegment}
+          accessibilityLabel="Appearance (demo)"
         />
       </Section>
 

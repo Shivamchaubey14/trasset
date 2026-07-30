@@ -23,6 +23,7 @@ import React, {
 
 import { api, login as apiLogin, logout as apiLogout, restoreSession, setSessionExpiredHandler, tokens } from "@/api";
 import type { User } from "@/api";
+import { clearPushToken, currentPushToken } from "@/notifications/push";
 
 import { isBiometricEnabled, promptBiometric } from "./biometrics";
 
@@ -106,10 +107,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    // TODO(Day 46): pass this device's push token so the handset is
-    // deregistered in the same call (BE-2). Nothing is registered until push
-    // is wired, so there is nothing to pass yet.
-    await apiLogout();
+    // Deregister this handset in the same call that blacklists the refresh
+    // token (BE-2), so a signed-out phone stops receiving push immediately
+    // rather than at its next launch. Null on a build that never obtained a
+    // token, in which case `logout` omits the field — which is the same thing
+    // as having nothing to deregister.
+    await apiLogout(currentPushToken() ?? undefined);
+    clearPushToken();
     setUser(null);
     setState("signedOut");
   }, []);

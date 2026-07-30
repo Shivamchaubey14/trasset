@@ -28,7 +28,7 @@
 | Hindi/English toggle (added on request) | — | 🟡 Engine + chrome done · page content pending |
 | **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
 | **Phase 6 — Mobile app foundation** | 36–41 | ✅ Complete (Days 36–41) |
-| **Phase 7 — Core journeys** | 42–47 | 🟡 Days 42–45 done · Days 46–47 open |
+| **Phase 7 — Core journeys** | 42–47 | ✅ Complete (Days 42–47) |
 
 **Backend test suite:** 719 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
@@ -73,16 +73,34 @@ runs in Expo Go with the tab shell, both themes and both fonts. Next:
 - **Day 43** — ✅ done: assign and check in, with the conflict flow.
 - **Day 44** — ✅ done: photo capture and report-an-issue.
 - **Day 45** — ✅ done: requests and approvals, plus two schema lies fixed.
-- **Day 46** — ⬅ **next**: push registration and deep links. Register the
-  handset against `POST /auth/devices/` (BE-2), prime the permission, handle
-  foreground / background / cold start, and route a tapped push to the record
-  (FR-14.23). The in-app list mirrors `/notifications/` with unread badges
-  (FR-14.24). Two things already in place: `trasset://requests/:id` and
-  `trasset://assets/:id` are registered in `RootNavigator`, and the server
-  already emits both — so the remaining work is the push plumbing, not routing.
-  **Blocked on push credentials** for a real end-to-end test; everything up to
-  the dispatch can be built and verified without them.
-- **Day 47** — profile and settings proper.
+- **Day 46** — ✅ done: notifications, deep links, device registration. The one
+  part of its DoD that needs a real handset is **still open** — see below.
+- **Day 47** — ✅ done: profile and settings. Appearance override
+  (System / Light / Dark, device-local), notification preferences honoured by
+  the server, password change, sign-out and an about screen. **Phase 7
+  complete.**
+- **Day 48** — ⬅ **next**: offline reads. Persist the TanStack Query cache,
+  show cached data *with its age*, offline banner, and an offline state on every
+  screen rather than an endless spinner. Two things are already in place for it:
+  `OfflineBanner` takes `cachedAt` and `pendingCount`, and `createQueryClient`
+  is built once for the app's lifetime precisely so the cache is not thrown
+  away. This is also where AsyncStorage arrives, which the theme preference can
+  move onto if it ever outgrows SecureStore.
+
+**Still needed from the user, and now actually blocking:**
+
+1. **An Expo account / EAS project id.** Day 46 built the whole push path, but
+   `getExpoPushTokenAsync` needs a project id and `app.json` has none, so no
+   token can be minted and `registerForPush` returns `no-project`.
+2. **A development build.** Expo Go dropped remote push in SDK 53, so push
+   cannot be tested in it at all — `registerForPush` returns `expo-go`.
+3. **Push credentials** (APNs key / FCM), without which Day 34's
+   `ExpoPushBackend` still has never run against the real service.
+
+None of these block Day 48, which is why it is next. The settings screen now
+calls `registerForPush({ prompt: true })` when push is switched on, so each of
+those three states surfaces to the user as its own explained sentence rather
+than a silent no-op.
 
 **Two things still needed from the user:** an **Expo account** for dev builds
 (Expo Go needs none, so Days 36–39 are unblocked), and eventually **push
@@ -163,6 +181,157 @@ audit row.
 ---
 
 ## Completed
+
+### Day 47 — Profile & settings ✅
+
+Phase 7 closes. The DoD — "preferences persist and are honoured by the server" —
+is two claims, and separating them was most of the work.
+
+- **Two kinds of preference, deliberately not treated alike.** Appearance is
+  **device-local** and never leaves the phone: theme belongs to the screen you
+  are looking at, not to the account, and the same person can reasonably want
+  dark on a phone in a dim stock room and light on a tablet at a desk. The
+  server has no theme column for that reason. Notification preferences are
+  **account-wide** and go straight to `PATCH /auth/me/`, applied optimistically
+  and rolled back if the server refuses — a switch left sitting in the wrong
+  position after a failure is worse than one that moves back and says why.
+- **Three appearance states, not two.** A plain light/dark switch has to be set
+  once and then *stays* set, so anyone following the OS — which is most people,
+  and everyone at dusk if the OS schedules it — has no way back once they touch
+  the control. So "System" is a real option, it is the default, and an unset
+  preference reads as it. `resolveScheme` is a pure function of (preference, OS
+  scheme), which is why the whole decision is verifiable without a device.
+- **The OS reporting `null` is the case that bites.** Android can return no
+  scheme at all, and briefly does on both platforms during a cold start. It
+  resolves to light, because the light palette is the one every colour in
+  `tokens.ts` was measured against first.
+- **No white flash on launch for dark-mode users.** The provider holds render
+  until the stored preference is read, which is invisible because the splash is
+  still up — rendering the OS scheme and correcting it a frame later is exactly
+  what that avoids. Nested providers with a forced `scheme` skip storage
+  entirely and inherit the real preference, so the gallery cannot write to it.
+- **The flags gate dispatch, and nothing else.** This is the part a settings
+  screen gets wrong. `apps/notifications/services.py` gates `queue_email` and
+  `queue_push` only — the in-app record is always written. Verified end to end:
+  with **both** flags off, an assignment still lands in the recipient's Alerts
+  list. Muting delivery must not also hide the record, because the list is how
+  someone catches up on what they muted.
+- **Password errors are placed on the field the server named.** Django's
+  validators produce genuinely useful sentences — too short, too common, too
+  similar to your email — and collapsing them into one banner throws away which
+  input to fix. The session deliberately survives the change, since the person
+  made it themselves on this device.
+- **An about screen support can actually use.** Version, build, runtime,
+  platform, device, server URL and whether *this* handset can receive push —
+  selectable, so it can be pasted into a message. "I am not getting
+  notifications" has several causes that look identical from outside.
+
+**A trap found while writing the verification.** The first version changed a
+demo account's password and tried to change it back — and could not.
+`Trasset@2026` cannot be *set* through `/auth/password/change/` on any
+`@trasset.local` address, because Django's `UserAttributeSimilarityValidator`
+rejects it as too similar to the email. The seeded accounts only hold it because
+`bootstrap` calls `set_password` directly, which runs no validators. A script
+written that way signs in happily, then leaves every other verify script on the
+machine locked out. It now creates and stands down its own throwaway account and
+never touches a fixture. (`employee@trasset.local` was restored via the ORM.)
+
+**Also learned:** `DELETE /users/{id}/` deactivates rather than deletes, since
+someone who has held an asset must stay attributable in its history — so the
+cleanup asserts "cannot sign in", not "row is gone", and re-runs reactivate the
+same subject rather than colliding with the unique email.
+
+**Verification:** `verify:settings` **24/0** — including the preference
+round-trip, the dispatch-gating proof, all four password refusals with the
+server's own sentences, and a real change verified by signing in with the new
+password and being refused with the old. Backend **719/719**. `tsc` clean.
+
+**One measured finding, left alone deliberately.** White on Nest Green is
+**2.54:1** in light, against the 4.5:1 NFR-9 requires. It is the
+`onPrimary`-on-`primary` pairing already used by every primary `Button` label,
+every selected `Chip` and the `Avatar` initials — so it predates this work.
+Dark is fine at 7.25:1. No existing token fixes it: Ink on Nest Green is 4.45:1,
+still short. Only darkening the brand green would, which is a design decision
+affecting the web app too. Recorded by the verify script rather than patched.
+
+---
+
+### Day 46 — Notifications & deep links ✅
+
+Every tab now has a real screen; the last placeholder went with this day.
+
+- **Three arrival states, three code paths**, because they are genuinely
+  different problems. Foreground: the app is open and the OS would stay silent,
+  so the banner is shown deliberately *and* the badge and lists are refreshed,
+  so the state behind it is not stale the moment it is dismissed. Background: a
+  tap fires the response listener with the navigator already mounted. **Cold
+  start: the tap launched the app, so no listener exists yet** — it is read back
+  with `getLastNotificationResponseAsync`, and because the navigator may still be
+  mounting, the route is held and replayed until the ref is ready. That last one
+  is what the DoD names and the one that silently does nothing if you rely on the
+  listener alone.
+- **Routing is a pure function** (`routeForPayload`), which is why it could be
+  verified without a phone at all. The server sends three candidate fields and
+  they are not interchangeable: `deep_link` is native and preferred;
+  `related_object_type` + `related_object_id` is what the REST list actually
+  exposes, so an in-app row must use it; and `link` is a *web* path that is
+  never routed on. Both of the first two are supported, and an in-app tap and a
+  push tap therefore cannot disagree about where a notification leads.
+- **Unrecognised targets fall back to the Alerts list, not a crash.**
+  Maintenance records and purchase orders have deep links server-side but no
+  phone screen (desk work, §12.8). Falling back shows the message that was
+  tapped, and a new `related_object_type` added later degrades instead of
+  throwing.
+- **Permission priming.** iOS gives an app one chance to ask; once denied the
+  dialog never returns. So launch runs `registerForPush({ prompt: false })`,
+  which picks up an existing grant without spending the ask, and the explicit
+  request belongs behind Day 47's settings screen. `denied` and `blocked` are
+  separate outcomes — the difference between a button and a link to Settings.
+- **Every outcome is a value, never an exception.** A token cannot be obtained on
+  a simulator, in Expo Go, or without an EAS project id, and none of those is a
+  fault to throw about — each needs its own sentence. `explainOutcome` keeps
+  those sentences next to the outcomes so a new one is a compile error rather
+  than an empty string in the UI.
+- **Registration is an upsert** called on every launch (BE-2). Verified that
+  re-registering the same token updates the row rather than adding one — two
+  rows for one handset means two pushes for one event.
+- **Signing out deregisters the handset in the same call** that blacklists the
+  refresh token, closing the `TODO(Day 46)` left in `AuthContext`. The token is
+  cached in module scope *only after the server has it*: remembering a token
+  whose registration failed would have sign-out ask the server to forget
+  something it never knew.
+- Tapping a row marks it read **and** opens the record. Marking read separately
+  would be busywork — reading it is the act of reading it. Unread is a dot plus
+  a weight change, never colour alone (NFR-9).
+- The tab badge comes from `/notifications/count/`, which exists so the badge
+  does not have to page the list. Polled on an interval as well as invalidated
+  by the push listener, because on a build that cannot receive push at all the
+  poll is the only thing keeping it honest.
+
+**What is NOT done, and cannot be here.** The DoD's "a push arrives on a real
+device" is unmet: Expo Go dropped remote push in SDK 53, and `app.json` has no
+EAS project id, so no token can be minted. **This needs a development build, an
+Expo account and push credentials** — the two outstanding asks. Everything up to
+the dispatch is built and verified; `ExpoPushBackend` (Day 34) has still never
+run against the real service.
+
+**Verified:** `npm run verify:push` — 30 checks, all passing: the routing
+resolver against ten payload shapes *and* against every real notification on the
+account (25 of 25 resolved to a screen), the registration upsert, per-user device
+ownership, an auditor registering despite the read-only guard, the read
+transitions and badge arithmetic, and one notification raised end to end — an
+assignment notified the recipient and its payload resolved to that very asset
+(#45 → #45).
+
+All eight suites green — 170 checks: `api` 18 · `scan` 18 · `detail` 22 ·
+`list` 15 · `lifecycle` 16 · `photos` 11 · `requests` 40 · `push` 30. Backend
+**719 passing**; `npm run tsc` clean.
+
+**Dependency note.** `expo-notifications@~0.32.17` (the SDK 54 match) adds no new
+root advisory — `npm audit` flags it only *via* `expo-constants`, which was
+already present. The four roots (`brace-expansion`, `js-yaml`, `postcss`,
+`uuid`) are pre-existing transitive build tooling; the offered "fix" is
+expo-notifications 57, a different SDK major, which is not a Day 46 decision.
 
 ### Day 45 — Requests & approvals ✅
 

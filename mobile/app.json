@@ -49,6 +49,12 @@
           "cameraPermission": "Trasset uses the camera so you can photograph an asset's condition.",
           "photosPermission": "Trasset accesses your photos so you can attach one to an asset."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#3BB77E"
+        }
       ]
     ],
     "extra": {
