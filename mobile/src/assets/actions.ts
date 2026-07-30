@@ -15,14 +15,14 @@
  * asset is a form-shaped task that belongs on a large screen, and deleting is
  * not something anyone should do one-handed in a stock room.
  */
+import { isManager, isReadOnly } from "@/auth/roles";
+import { canRaise } from "@/requests/actions";
 import type { AssetStatus } from "@/theme";
 
-export type AssetAction = "assign" | "checkin" | "report" | "retire";
+export type AssetAction = "assign" | "checkin" | "report" | "retire" | "request";
 
 /** Statuses an asset cannot leave (SRS §11.2). */
 const TERMINAL: AssetStatus[] = ["retired", "lost", "disposed"];
-
-const MANAGER_ROLES = ["super_admin", "asset_manager"];
 
 export interface ActionSpec {
   action: AssetAction;
@@ -43,13 +43,19 @@ export function isTerminal(status: AssetStatus): boolean {
 }
 
 export function canWrite(roleName?: string | null): boolean {
-  return MANAGER_ROLES.includes(roleName ?? "");
+  return isManager(roleName);
 }
 
 export function availableActions(
   status: AssetStatus,
   roleName?: string | null,
 ): ActionSpec[] {
+  // A read-only role gets no actions at all, not a shorter list of them:
+  // `HasRolePermission` refuses every unsafe method for an auditor before it
+  // looks at what the view declares, so each button here would be a 403. This
+  // was previously offering them "Report an issue".
+  if (isReadOnly(roleName)) return [];
+
   const actions: ActionSpec[] = [];
 
   // Anyone signed in may report a problem with an asset (FR-14.14). An
@@ -62,7 +68,15 @@ export function availableActions(
   };
 
   if (!canWrite(roleName)) {
-    return isTerminal(status) ? [] : [report];
+    if (isTerminal(status)) return [];
+    // Someone who cannot assign can still *ask* for the thing in front of them
+    // (FR-14.16) — the natural moment to raise a request is while looking at the
+    // asset. A manager gets no Request button because they can simply assign it,
+    // and an auditor gets none because `HasRolePermission` refuses every unsafe
+    // method for a read-only role. Hence canRaise() rather than "not a manager".
+    return canRaise(roleName)
+      ? [{ action: "request", label: "Request this asset", primary: true }, report]
+      : [report];
   }
 
   if (status === "available") {

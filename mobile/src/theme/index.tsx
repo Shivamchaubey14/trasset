@@ -12,12 +12,24 @@ import {
   Colors,
   StatusColors,
   darkColors,
+  darkRequestStatusColors,
   darkSeries,
   darkStatusColors,
   lightColors,
+  lightRequestStatusColors,
   lightSeries,
   lightStatusColors,
 } from "./tokens";
+
+/** Asset and request statuses share one map; their key sets are disjoint. */
+const lightStatuses: StatusColors = {
+  ...lightStatusColors,
+  ...lightRequestStatusColors,
+};
+const darkStatuses: StatusColors = {
+  ...darkStatusColors,
+  ...darkRequestStatusColors,
+};
 
 export * from "./tokens";
 
@@ -31,7 +43,7 @@ type Theme = {
 const ThemeContext = createContext<Theme>({
   dark: false,
   colors: lightColors,
-  status: lightStatusColors,
+  status: lightStatuses,
   series: lightSeries,
 });
 
@@ -56,7 +68,7 @@ export function ThemeProvider({
     () => ({
       dark,
       colors: dark ? darkColors : lightColors,
-      status: dark ? darkStatusColors : lightStatusColors,
+      status: dark ? darkStatuses : lightStatuses,
       series: dark ? darkSeries : lightSeries,
     }),
     [dark],

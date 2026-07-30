@@ -5,7 +5,7 @@ from django.db.models import Count, DecimalField, Q, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django_filters import rest_framework as filters
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 
@@ -13,6 +13,7 @@ from apps.assets.serializers import AssetListSerializer
 from common.permissions import HasRolePermission
 from common.responses import ok
 from common.roles import Roles
+from common.schema import write_responses
 from common.viewsets import BaseModelViewSet
 
 from . import services
@@ -62,6 +63,8 @@ class PurchaseOrderFilter(filters.FilterSet):
 
 
 @extend_schema(tags=["Procurement"])
+# PurchaseOrderWriteSerializer.to_representation returns the read shape.
+@extend_schema_view(**write_responses(PurchaseOrderSerializer))
 class PurchaseOrderViewSet(BaseModelViewSet):
     """
     Purchase orders and goods receipt (FR-7.1 – FR-7.3).

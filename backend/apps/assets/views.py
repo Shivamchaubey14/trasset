@@ -16,6 +16,7 @@ from common.exceptions import Conflict, UnprocessableEntity
 from common.permissions import HasRolePermission
 from common.responses import ok
 from common.roles import Roles
+from common.schema import write_responses
 from common.sync import UPDATED_SINCE_PARAMETER, DeltaSyncMixin
 from common.viewsets import BaseModelViewSet
 
@@ -50,7 +51,11 @@ MONEY = DecimalField(max_digits=14, decimal_places=2)
 
 
 @extend_schema(tags=["Assets"])
-@extend_schema_view(list=extend_schema(parameters=[UPDATED_SINCE_PARAMETER]))
+@extend_schema_view(
+    list=extend_schema(parameters=[UPDATED_SINCE_PARAMETER]),
+    # AssetWriteSerializer.to_representation returns the detail shape.
+    **write_responses(AssetDetailSerializer),
+)
 class AssetViewSet(DeltaSyncMixin, BaseModelViewSet):
     """
     The asset register.
@@ -407,7 +412,13 @@ class AssetViewSet(DeltaSyncMixin, BaseModelViewSet):
 
 
 @extend_schema(tags=["Requests"])
-@extend_schema_view(list=extend_schema(parameters=[UPDATED_SINCE_PARAMETER]))
+@extend_schema_view(
+    list=extend_schema(parameters=[UPDATED_SINCE_PARAMETER]),
+    # AssetRequestCreateSerializer.to_representation returns the read shape, so
+    # raising a request hands back the whole record — status, requester,
+    # target_label and all. The mobile create path depends on that being true.
+    **write_responses(AssetRequestSerializer),
+)
 class AssetRequestViewSet(DeltaSyncMixin, BaseModelViewSet):
     """
     Employee asset requests and the approvals inbox (FR-4.4).
