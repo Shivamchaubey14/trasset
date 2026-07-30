@@ -58,7 +58,10 @@
       ]
     ],
     "extra": {
-      "apiUrl": "http://127.0.0.1:8000/api/v1"
+      "apiUrl": "http://127.0.0.1:8000/api/v1",
+      "eas": {
+        "projectId": "f0312cf3-0532-495f-9d7c-3ed7d571a226"
+      }
     }
   }
 }
