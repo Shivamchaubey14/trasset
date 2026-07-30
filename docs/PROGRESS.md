@@ -29,6 +29,7 @@
 | **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
 | **Phase 6 — Mobile app foundation** | 36–41 | ✅ Complete (Days 36–41) |
 | **Phase 7 — Core journeys** | 42–47 | ✅ Complete (Days 42–47) |
+| **Phase 8 — Offline & stock take** | 48–53 | 🟡 Day 48 done · Days 49–53 open |
 
 **Backend test suite:** 719 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
@@ -79,13 +80,16 @@ runs in Expo Go with the tab shell, both themes and both fonts. Next:
   (System / Light / Dark, device-local), notification preferences honoured by
   the server, password change, sign-out and an about screen. **Phase 7
   complete.**
-- **Day 48** — ⬅ **next**: offline reads. Persist the TanStack Query cache,
-  show cached data *with its age*, offline banner, and an offline state on every
-  screen rather than an endless spinner. Two things are already in place for it:
-  `OfflineBanner` takes `cachedAt` and `pendingCount`, and `createQueryClient`
-  is built once for the app's lifetime precisely so the cache is not thrown
-  away. This is also where AsyncStorage arrives, which the theme preference can
-  move onto if it ever outgrows SecureStore.
+- **Day 48** — ✅ done: offline reads. The query cache is persisted to
+  AsyncStorage and rehydrated at launch, every read screen has a real offline
+  state instead of an endless spinner, cached content is dated, and signing out
+  purges the cache from disk as well as memory.
+- **Day 49** — ⬅ **next**: the mutation queue. Durable across restarts,
+  client-generated idempotency keys, ordered drain on reconnect, optimistic
+  updates marked pending, exponential backoff. Groundwork already in place:
+  mutations are excluded from the persisted cache precisely so the queue owns
+  replay, `newIdempotencyKey` exists and is used by the lifecycle actions, and
+  `OfflineBanner` already renders a `pendingCount`.
 
 **Still needed from the user, and now actually blocking:**
 
@@ -181,6 +185,70 @@ audit row.
 ---
 
 ## Completed
+
+### Day 48 — Offline reads ✅
+
+The DoD is "in aeroplane mode, recently viewed assets and my assets still open".
+Almost none of the work is about the radio.
+
+- **The cache is persisted, not merely kept.** `gcTime` already held data for a
+  day, but that dies with the process — so the client is dehydrated into
+  AsyncStorage and rehydrated at launch. That is the difference between "opens
+  offline" and "opens offline until you close the app".
+- **A spinner is a promise that something is happening.** With no network
+  nothing is happening, so an offline screen with nothing cached shows an
+  offline state with a retry, never a skeleton. This was the single most
+  common bug the day existed to prevent, and it is now impossible by
+  construction: `offlineRead` decides it once for every screen.
+- **Offline is checked before error, everywhere.** A request made with no signal
+  also fails, so a screen that reports the error blames the server for the
+  aeroplane mode the user turned on. "It may have been removed" about an asset
+  that is simply out of reach is a lie the old code told.
+- **Connected is not reachable.** A handset on a café captive portal, or behind
+  a router whose uplink is down, is connected to something and can reach
+  nothing. `isInternetReachable` wins whenever it has an opinion; when it has
+  none — which is what Android reports while probing — the fallback is
+  `isConnected`, and a wholly unknown state is treated as **online**. Guessing
+  offline would suppress the first fetch of every screen; guessing online costs
+  one request that fails and retries.
+- **One source of truth for connectivity.** Everything reads TanStack's
+  `onlineManager`, so a screen cannot show "Offline" while a request of its own
+  is in flight.
+- **Age travels with the data.** `describeAge` is deliberately coarse — "3 min
+  ago" is a claim about freshness, not a clock — and clamps a backwards clock so
+  it can never say "in 3 minutes". `dataUpdatedAt` of 0 means never fetched, not
+  1970, so no age is invented for data that does not exist.
+
+**The security consequence of persisting, handled.** The cache holds one
+person's assets, requests and notifications. Signing out now purges it from
+memory *and* disk; on a shared handset, rehydrating the previous user's cache
+into the next user's session would be a leak, and a silent one, because every
+screen would look entirely normal. `forgetSession` purges for the same reason.
+Session *expiry* deliberately does not — it is the same person signing back in,
+and Day 49's queue must survive it.
+
+**Mutations are never persisted.** Replaying a write from a restored cache would
+apply it twice. The durable queue owns replay, because only it holds the
+idempotency key that makes it safe (BE-4).
+
+**A boundary re-drawn.** The first cut put the pure decisions in the same files
+as the platform imports, and the verification could not even load — `tsx` pulls
+in `react-native` and fails on its Flow types. Split as the codebase already
+does elsewhere: `reachability.ts`, `read.ts` and `policy.ts` hold the decisions
+and import nothing from the platform; `online.ts` and `persist.ts` hold the
+wiring. The rule earns itself twice — the logic is testable, and the split is
+what made the failure obvious.
+
+**Verification:** `verify:offline` **30/0**, without a phone — every combination
+of (online, cached, loading, error), the captive-portal case, the age
+boundaries including a backwards clock, what is allowed onto disk, and a real
+`QueryClient` round-tripped through dehydrate → JSON → hydrate with its
+`dataUpdatedAt` intact. Backend **719/719**. `tsc` clean.
+
+**Not covered without a handset:** the OS actually reporting aeroplane mode, and
+AsyncStorage surviving a real force-quit.
+
+---
 
 ### Day 47 — Profile & settings ✅
 

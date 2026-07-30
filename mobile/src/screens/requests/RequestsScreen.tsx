@@ -35,7 +35,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ApiError, api } from "@/api";
 import type { AssetRequest, Page } from "@/api";
 import { useAuth } from "@/auth/AuthContext";
-import { Button, Chip, EmptyState, RequestRow, SkeletonRow } from "@/components";
+import { Button, Chip, EmptyState, OfflineBanner, RequestRow, SkeletonRow } from "@/components";
+import { factsOf, useOfflineRead } from "@/offline/useOfflineRead";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
 import { canApprove, canRaise } from "@/requests/actions";
 import { type RequestStatus, fonts, fontSizes, radius, spacing, useTheme } from "@/theme";
@@ -138,8 +139,17 @@ export function RequestsScreen() {
 
   const pending = stats.data?.pending ?? 0;
 
+  // Row count rather than the query's `data`: an infinite query that fetched
+  // one empty page still has `data`, and a banner over nothing says nothing.
+  const offline = useOfflineRead({
+    ...factsOf(listQuery),
+    hasData: rows.length > 0,
+  });
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
+      <OfflineBanner visible={offline.showBanner} cachedAt={new Date(listQuery.dataUpdatedAt)} />
+
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Requests</Text>
 
@@ -236,7 +246,8 @@ export function RequestsScreen() {
           ) : null
         }
         ListEmptyComponent={
-          listQuery.isLoading ? (
+          // Skeletons only while something can actually arrive.
+          offline.showSpinner ? (
             <View style={{ gap: spacing.sm }}>
               <SkeletonRow />
               <SkeletonRow />
@@ -247,6 +258,7 @@ export function RequestsScreen() {
               mode={mode}
               filtered={statuses.length > 0}
               mayRaise={mayRaise}
+              offline={offline.showOfflineEmpty}
               error={listQuery.error}
               onClear={() => setStatuses([])}
               onRetry={listQuery.refetch}
@@ -286,6 +298,7 @@ function Empty({
   mode,
   filtered,
   mayRaise,
+  offline,
   error,
   onClear,
   onRetry,
@@ -293,23 +306,32 @@ function Empty({
   mode: Mode;
   filtered: boolean;
   mayRaise: boolean;
+  /** No network *and* nothing cached — checked before any error. */
+  offline: boolean;
   error: unknown;
   onClear: () => void;
   onRetry: () => void;
 }) {
-  if (error) {
-    const offline = error instanceof ApiError && error.isNetworkError;
+  // First, because it is the true explanation whenever it applies: a request
+  // made with no signal also fails, and the error would blame the server.
+  if (offline) {
     return (
       <EmptyState
-        tone={offline ? "offline" : "error"}
-        title={offline ? "You are offline" : "Could not load requests"}
-        message={
-          offline
-            ? "Requests will load again once you have signal."
-            : error instanceof ApiError
-              ? error.message
-              : undefined
-        }
+        tone="offline"
+        title="You are offline"
+        message="Requests will load again once you have signal."
+        actionLabel="Try again"
+        onAction={onRetry}
+      />
+    );
+  }
+
+  if (error) {
+    return (
+      <EmptyState
+        tone="error"
+        title="Could not load requests"
+        message={error instanceof ApiError ? error.message : undefined}
         actionLabel="Try again"
         onAction={onRetry}
       />

@@ -33,9 +33,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ApiError, api } from "@/api";
 import type { Asset, Location, Page } from "@/api";
 import { useAuth } from "@/auth/AuthContext";
-import { AssetRow, Chip, EmptyState, SkeletonRow } from "@/components";
+import { AssetRow, Chip, EmptyState, OfflineBanner, SkeletonRow } from "@/components";
 import { useDebounced } from "@/hooks/useDebounced";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
+import { factsOf, useOfflineRead } from "@/offline/useOfflineRead";
 import { type AssetStatus, fonts, fontSizes, radius, spacing, useTheme } from "@/theme";
 
 type Mode = "mine" | "all";
@@ -117,8 +118,18 @@ export function AssetsScreen() {
 
   const hasFilters = Boolean(search || statuses.length || locationId);
 
+  // `hasData` is the row count, not the query's `data`: an infinite query that
+  // has fetched one empty page still has `data`, and calling that "cached
+  // content" would show a banner over nothing.
+  const offline = useOfflineRead({
+    ...factsOf(listQuery),
+    hasData: rows.length > 0,
+  });
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
+      <OfflineBanner visible={offline.showBanner} cachedAt={new Date(listQuery.dataUpdatedAt)} />
+
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Assets</Text>
 
@@ -231,7 +242,10 @@ export function AssetsScreen() {
           ) : null
         }
         ListEmptyComponent={
-          listQuery.isLoading ? (
+          // Skeletons only while something can actually arrive. Offline with
+          // nothing cached, a skeleton is a promise the app cannot keep — it
+          // would sit there until the signal came back.
+          offline.showSpinner ? (
             <View style={{ gap: spacing.sm }}>
               <SkeletonRow />
               <SkeletonRow />
@@ -241,6 +255,7 @@ export function AssetsScreen() {
             <Empty
               mode={mode}
               hasFilters={hasFilters}
+              offline={offline.showOfflineEmpty}
               error={listQuery.error}
               onClear={clearFilters}
               onRetry={listQuery.refetch}
@@ -257,20 +272,38 @@ export function AssetsScreen() {
   );
 }
 
-/** The three different "nothing here" conditions, told apart. */
+/** The four different "nothing here" conditions, told apart. */
 function Empty({
   mode,
   hasFilters,
+  offline,
   error,
   onClear,
   onRetry,
 }: {
   mode: Mode;
   hasFilters: boolean;
+  /** No network *and* nothing cached — checked before any error. */
+  offline: boolean;
   error: unknown;
   onClear: () => void;
   onRetry: () => void;
 }) {
+  // First, because it is the true explanation whenever it applies. A request
+  // made with no signal also produces an error, and reporting that instead
+  // would blame the server for the aeroplane mode the user turned on.
+  if (offline) {
+    return (
+      <EmptyState
+        tone="offline"
+        title="You are offline"
+        message="Assets you have opened recently are still available. This list needs a connection."
+        actionLabel="Try again"
+        onAction={onRetry}
+      />
+    );
+  }
+
   if (error) {
     const offline = error instanceof ApiError && error.isNetworkError;
     return (
