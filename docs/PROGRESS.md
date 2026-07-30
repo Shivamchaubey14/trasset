@@ -28,7 +28,7 @@
 | Hindi/English toggle (added on request) | — | 🟡 Engine + chrome done · page content pending |
 | **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
 | **Phase 6 — Mobile app foundation** | 36–41 | ✅ Complete (Days 36–41) |
-| **Phase 7 — Core journeys** | 42–47 | 🟡 Days 42–46 done · Day 47 open |
+| **Phase 7 — Core journeys** | 42–47 | ✅ Complete (Days 42–47) |
 
 **Backend test suite:** 719 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
@@ -75,14 +75,17 @@ runs in Expo Go with the tab shell, both themes and both fonts. Next:
 - **Day 45** — ✅ done: requests and approvals, plus two schema lies fixed.
 - **Day 46** — ✅ done: notifications, deep links, device registration. The one
   part of its DoD that needs a real handset is **still open** — see below.
-- **Day 47** — ⬅ **next**: profile and settings proper. Profile, password
-  change, notification preferences, theme override, sign-out, and an about
-  screen with version and build for support. Two things are already waiting for
-  it: `ThemeProvider` takes a `scheme` override (built on Day 36 for exactly
-  this), and `registerForPush({ prompt: true })` plus `explainOutcome()` exist so
-  the notification toggle can ask for permission properly and explain any
-  refusal. `PATCH /auth/me/` already accepts `email_notifications` and
-  `push_notifications`.
+- **Day 47** — ✅ done: profile and settings. Appearance override
+  (System / Light / Dark, device-local), notification preferences honoured by
+  the server, password change, sign-out and an about screen. **Phase 7
+  complete.**
+- **Day 48** — ⬅ **next**: offline reads. Persist the TanStack Query cache,
+  show cached data *with its age*, offline banner, and an offline state on every
+  screen rather than an endless spinner. Two things are already in place for it:
+  `OfflineBanner` takes `cachedAt` and `pendingCount`, and `createQueryClient`
+  is built once for the app's lifetime precisely so the cache is not thrown
+  away. This is also where AsyncStorage arrives, which the theme preference can
+  move onto if it ever outgrows SecureStore.
 
 **Still needed from the user, and now actually blocking:**
 
@@ -94,7 +97,10 @@ runs in Expo Go with the tab shell, both themes and both fonts. Next:
 3. **Push credentials** (APNs key / FCM), without which Day 34's
    `ExpoPushBackend` still has never run against the real service.
 
-None of these block Day 47, which is why it is next.
+None of these block Day 48, which is why it is next. The settings screen now
+calls `registerForPush({ prompt: true })` when push is switched on, so each of
+those three states surfaces to the user as its own explained sentence rather
+than a silent no-op.
 
 **Two things still needed from the user:** an **Expo account** for dev builds
 (Expo Go needs none, so Days 36–39 are unblocked), and eventually **push
@@ -175,6 +181,80 @@ audit row.
 ---
 
 ## Completed
+
+### Day 47 — Profile & settings ✅
+
+Phase 7 closes. The DoD — "preferences persist and are honoured by the server" —
+is two claims, and separating them was most of the work.
+
+- **Two kinds of preference, deliberately not treated alike.** Appearance is
+  **device-local** and never leaves the phone: theme belongs to the screen you
+  are looking at, not to the account, and the same person can reasonably want
+  dark on a phone in a dim stock room and light on a tablet at a desk. The
+  server has no theme column for that reason. Notification preferences are
+  **account-wide** and go straight to `PATCH /auth/me/`, applied optimistically
+  and rolled back if the server refuses — a switch left sitting in the wrong
+  position after a failure is worse than one that moves back and says why.
+- **Three appearance states, not two.** A plain light/dark switch has to be set
+  once and then *stays* set, so anyone following the OS — which is most people,
+  and everyone at dusk if the OS schedules it — has no way back once they touch
+  the control. So "System" is a real option, it is the default, and an unset
+  preference reads as it. `resolveScheme` is a pure function of (preference, OS
+  scheme), which is why the whole decision is verifiable without a device.
+- **The OS reporting `null` is the case that bites.** Android can return no
+  scheme at all, and briefly does on both platforms during a cold start. It
+  resolves to light, because the light palette is the one every colour in
+  `tokens.ts` was measured against first.
+- **No white flash on launch for dark-mode users.** The provider holds render
+  until the stored preference is read, which is invisible because the splash is
+  still up — rendering the OS scheme and correcting it a frame later is exactly
+  what that avoids. Nested providers with a forced `scheme` skip storage
+  entirely and inherit the real preference, so the gallery cannot write to it.
+- **The flags gate dispatch, and nothing else.** This is the part a settings
+  screen gets wrong. `apps/notifications/services.py` gates `queue_email` and
+  `queue_push` only — the in-app record is always written. Verified end to end:
+  with **both** flags off, an assignment still lands in the recipient's Alerts
+  list. Muting delivery must not also hide the record, because the list is how
+  someone catches up on what they muted.
+- **Password errors are placed on the field the server named.** Django's
+  validators produce genuinely useful sentences — too short, too common, too
+  similar to your email — and collapsing them into one banner throws away which
+  input to fix. The session deliberately survives the change, since the person
+  made it themselves on this device.
+- **An about screen support can actually use.** Version, build, runtime,
+  platform, device, server URL and whether *this* handset can receive push —
+  selectable, so it can be pasted into a message. "I am not getting
+  notifications" has several causes that look identical from outside.
+
+**A trap found while writing the verification.** The first version changed a
+demo account's password and tried to change it back — and could not.
+`Trasset@2026` cannot be *set* through `/auth/password/change/` on any
+`@trasset.local` address, because Django's `UserAttributeSimilarityValidator`
+rejects it as too similar to the email. The seeded accounts only hold it because
+`bootstrap` calls `set_password` directly, which runs no validators. A script
+written that way signs in happily, then leaves every other verify script on the
+machine locked out. It now creates and stands down its own throwaway account and
+never touches a fixture. (`employee@trasset.local` was restored via the ORM.)
+
+**Also learned:** `DELETE /users/{id}/` deactivates rather than deletes, since
+someone who has held an asset must stay attributable in its history — so the
+cleanup asserts "cannot sign in", not "row is gone", and re-runs reactivate the
+same subject rather than colliding with the unique email.
+
+**Verification:** `verify:settings` **24/0** — including the preference
+round-trip, the dispatch-gating proof, all four password refusals with the
+server's own sentences, and a real change verified by signing in with the new
+password and being refused with the old. Backend **719/719**. `tsc` clean.
+
+**One measured finding, left alone deliberately.** White on Nest Green is
+**2.54:1** in light, against the 4.5:1 NFR-9 requires. It is the
+`onPrimary`-on-`primary` pairing already used by every primary `Button` label,
+every selected `Chip` and the `Avatar` initials — so it predates this work.
+Dark is fine at 7.25:1. No existing token fixes it: Ink on Nest Green is 4.45:1,
+still short. Only darkening the brand green would, which is a design decision
+affecting the web app too. Recorded by the verify script rather than patched.
+
+---
 
 ### Day 46 — Notifications & deep links ✅
 

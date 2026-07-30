@@ -21,7 +21,9 @@ import React from "react";
 
 import type { AssetDetail, AssetRequest } from "@/api";
 import { useAuth } from "@/auth/AuthContext";
+import { AboutScreen } from "@/screens/AboutScreen";
 import { AssetDetailScreen } from "@/screens/AssetDetailScreen";
+import { ChangePasswordScreen } from "@/screens/ChangePasswordScreen";
 import { AssignScreen } from "@/screens/assets/AssignScreen";
 import { CheckinScreen } from "@/screens/assets/CheckinScreen";
 import { ReportIssueScreen } from "@/screens/assets/ReportIssueScreen";
@@ -51,6 +53,8 @@ export type RootStackParamList = {
   Request: { id: number; request?: AssetRequest };
   /** Prefilled when raised from an asset's own screen rather than the tab. */
   NewRequest: { assetId?: number; assetTag?: string };
+  ChangePassword: undefined;
+  About: undefined;
   // Arriving in later phases:
   // StockTake: { id?: number };
 };
@@ -136,6 +140,18 @@ export function RootNavigator() {
               name="Request"
               component={RequestDetailScreen}
               options={{ headerShown: true, title: "Request" }}
+            />
+            {/* Settings detail — pushed, because both are places you go from
+                Profile and come back from, not decisions on top of a record. */}
+            <Stack.Screen
+              name="ChangePassword"
+              component={ChangePasswordScreen}
+              options={{ headerShown: true, title: "Change password" }}
+            />
+            <Stack.Screen
+              name="About"
+              component={AboutScreen}
+              options={{ headerShown: true, title: "About" }}
             />
             {/* Presented as sheets: both are a short decision on top of the
                 asset you are looking at, not a place you navigate to. */}

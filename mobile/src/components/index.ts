@@ -15,6 +15,8 @@ export { EmptyState } from "./EmptyState";
 export { OfflineBanner } from "./OfflineBanner";
 export { Placeholder } from "./Placeholder";
 export { RequestRow } from "./RequestRow";
+export { SegmentedControl } from "./SegmentedControl";
+export type { SegmentedOption } from "./SegmentedControl";
 export { Skeleton, SkeletonRow } from "./Skeleton";
 export { StatusPill } from "./StatusPill";
 export { TextField } from "./TextField";

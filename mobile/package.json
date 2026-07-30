@@ -18,6 +18,7 @@
     "verify:photos": "tsx scripts/verify-photos.ts",
     "verify:requests": "tsx scripts/verify-requests.ts",
     "verify:push": "tsx scripts/verify-push.ts",
+    "verify:settings": "tsx scripts/verify-settings.ts",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
