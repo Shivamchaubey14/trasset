@@ -8,22 +8,8 @@ import { Placeholder } from "@/components/Placeholder";
 
 export { AssetsScreen } from "./assets/AssetsScreen";
 export { ProfileScreen } from "./ProfileScreen";
+export { RequestsScreen } from "./requests/RequestsScreen";
 export { ScanScreen } from "./scan/ScanScreen";
-
-export function RequestsScreen() {
-  return (
-    <Placeholder
-      day="Day 45"
-      title="Requests"
-      subtitle="Raise a request, or approve one between meetings."
-      planned={[
-        "Raise a request for a specific asset or a category (FR-14.16)",
-        "Approvals inbox with approve and reject-with-reason (FR-14.17)",
-        "Role-aware: the same screen reads differently for an employee and an approver",
-      ]}
-    />
-  );
-}
 
 export function NotificationsScreen() {
   return (

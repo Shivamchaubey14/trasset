@@ -64,6 +64,23 @@ async function serverAllowsAssign(assetId: number, userId: number): Promise<bool
   }
 }
 
+/**
+ * Does the server let this session perform `write`?
+ *
+ * A 403 is the role being refused, which is what "the button should not have
+ * been offered" means here. Anything else is a real fault and rethrown — a
+ * permission check that swallows a 500 proves nothing.
+ */
+async function serverAllows(write: () => Promise<unknown>): Promise<boolean> {
+  try {
+    await write();
+    return true;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 403) return false;
+    throw error;
+  }
+}
+
 async function main() {
   configureApi({ baseUrl: BASE, client: "mobile" });
   configureTokenStore(memoryStore);
@@ -75,8 +92,16 @@ async function main() {
     ["under_maintenance", "asset_manager", ["report", "retire"]],
     ["retired", "asset_manager", []],
     ["disposed", "super_admin", []],
-    ["available", "employee", ["report"]],
-    ["assigned", "auditor", ["report"]],
+    // Day 45: a non-manager can now ask for the asset in front of them
+    // (FR-14.16), so Request joins Report and is the primary action.
+    ["available", "employee", ["request", "report"]],
+    ["assigned", "employee", ["request", "report"]],
+    // An auditor gets *nothing*, not a shorter list: `HasRolePermission`
+    // refuses every unsafe method for a read-only role before it consults the
+    // view's own `write_roles`, so both Request and Report would be a 403.
+    // This previously offered them Report.
+    ["assigned", "auditor", []],
+    ["available", "auditor", []],
     ["retired", "employee", []],
   ];
   for (const [status, role, expected] of cases) {
@@ -121,6 +146,28 @@ async function main() {
   check("employee: client hides assign AND server refuses it",
     !clientAllowsEmployee && !serverAllowsEmployee,
     `client=${clientAllowsEmployee} server=${serverAllowsEmployee}`);
+
+  // Auditor: the client now offers nothing at all. Confirm the server would
+  // indeed have refused the two buttons it used to show — reporting an issue
+  // and raising a request — so the empty list is agreement, not a guess.
+  await logout();
+  await login("auditor@trasset.local", PASSWORD);
+  const clientOffersAuditor = availableActions("available", "auditor").length;
+  const auditorMayReport = await serverAllows(() =>
+    api.post("/maintenance/", {
+      asset_id: available.id,
+      type: "repair",
+      scheduled_date: new Date().toISOString().slice(0, 10),
+      notes: "Read-only role should never get here.",
+    }));
+  const auditorMayRequest = await serverAllows(() =>
+    api.post("/asset-requests/", {
+      asset_id: available.id,
+      reason: "Read-only role should never get here either.",
+    }));
+  check("auditor: client offers nothing AND server refuses both writes",
+    clientOffersAuditor === 0 && !auditorMayReport && !auditorMayRequest,
+    `client=${clientOffersAuditor} report=${auditorMayReport} request=${auditorMayRequest}`);
 
   console.log("\n3. Detail and history load for the screen");
   await logout();

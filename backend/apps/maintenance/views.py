@@ -13,6 +13,7 @@ from rest_framework.permissions import IsAuthenticated
 from common.permissions import HasRolePermission, is_manager
 from common.responses import ok
 from common.roles import Roles
+from common.schema import write_responses
 from common.sync import UPDATED_SINCE_PARAMETER, DeltaSyncMixin
 from common.viewsets import BaseModelViewSet
 
@@ -65,7 +66,11 @@ class MaintenanceFilter(filters.FilterSet):
 
 
 @extend_schema(tags=["Maintenance"])
-@extend_schema_view(list=extend_schema(parameters=[UPDATED_SINCE_PARAMETER]))
+@extend_schema_view(
+    list=extend_schema(parameters=[UPDATED_SINCE_PARAMETER]),
+    # MaintenanceWriteSerializer.to_representation returns the read shape.
+    **write_responses(MaintenanceRecordSerializer),
+)
 class MaintenanceViewSet(DeltaSyncMixin, BaseModelViewSet):
     """
     Scheduling and completing maintenance (FR-6.1 – FR-6.3).

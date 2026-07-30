@@ -14,6 +14,7 @@ export { ConflictSheet } from "./ConflictSheet";
 export { EmptyState } from "./EmptyState";
 export { OfflineBanner } from "./OfflineBanner";
 export { Placeholder } from "./Placeholder";
+export { RequestRow } from "./RequestRow";
 export { Skeleton, SkeletonRow } from "./Skeleton";
 export { StatusPill } from "./StatusPill";
 export { TextField } from "./TextField";

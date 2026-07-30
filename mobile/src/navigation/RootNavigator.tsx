@@ -19,13 +19,15 @@ import {
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
 
-import type { AssetDetail } from "@/api";
+import type { AssetDetail, AssetRequest } from "@/api";
 import { useAuth } from "@/auth/AuthContext";
 import { AssetDetailScreen } from "@/screens/AssetDetailScreen";
 import { AssignScreen } from "@/screens/assets/AssignScreen";
 import { CheckinScreen } from "@/screens/assets/CheckinScreen";
 import { ReportIssueScreen } from "@/screens/assets/ReportIssueScreen";
 import { GalleryScreen } from "@/screens/GalleryScreen";
+import { NewRequestScreen } from "@/screens/requests/NewRequestScreen";
+import { RequestDetailScreen } from "@/screens/requests/RequestDetailScreen";
 import { ManualEntryScreen } from "@/screens/scan/ManualEntryScreen";
 import { SignInScreen } from "@/screens/auth/SignInScreen";
 import { UnlockScreen } from "@/screens/auth/UnlockScreen";
@@ -44,6 +46,10 @@ export type RootStackParamList = {
   Assign: { assetId: number; assetTag: string };
   Checkin: { assetId: number; assetTag: string; holderName?: string | null };
   ReportIssue: { assetId: number; assetTag: string };
+  /** `request` is the row the list already has, so detail paints instantly. */
+  Request: { id: number; request?: AssetRequest };
+  /** Prefilled when raised from an asset's own screen rather than the tab. */
+  NewRequest: { assetId?: number; assetTag?: string };
   // Arriving in later phases:
   // StockTake: { id?: number };
 };
@@ -66,6 +72,11 @@ const linking: LinkingOptions<RootStackParamList> = {
       },
       // `trasset://assets/12` from a tapped push (FR-14.23, BE-3).
       Asset: "assets/:id",
+      // `trasset://requests/7` — what `Notification.deep_link` emits for an
+      // AssetRequest, per `DEEP_LINK_TARGETS`. Registered with the route rather
+      // than waiting for Day 46: the server already sends it, and an
+      // unregistered path silently lands on the tab instead of the record.
+      Request: "requests/:id",
     },
   },
 };
@@ -116,12 +127,20 @@ export function RootNavigator() {
               component={ManualEntryScreen}
               options={{ headerShown: true, title: "Find an asset" }}
             />
+            {/* A request is a record you read and act on, like an asset — a
+                pushed screen, not a sheet. */}
+            <Stack.Screen
+              name="Request"
+              component={RequestDetailScreen}
+              options={{ headerShown: true, title: "Request" }}
+            />
             {/* Presented as sheets: both are a short decision on top of the
                 asset you are looking at, not a place you navigate to. */}
             <Stack.Group screenOptions={{ presentation: "modal", headerShown: true }}>
               <Stack.Screen name="Assign" component={AssignScreen} options={{ title: "Assign" }} />
               <Stack.Screen name="Checkin" component={CheckinScreen} options={{ title: "Check in" }} />
               <Stack.Screen name="ReportIssue" component={ReportIssueScreen} options={{ title: "Report an issue" }} />
+              <Stack.Screen name="NewRequest" component={NewRequestScreen} options={{ title: "Raise a request" }} />
             </Stack.Group>
             {__DEV__ ? (
               <Stack.Screen

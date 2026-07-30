@@ -5,7 +5,7 @@
 > Update this file at the end of every working session.
 
 **Started:** 2026-07-27
-**Last updated:** 2026-07-29
+**Last updated:** 2026-07-30
 **Plan:** [`Trasset_Build_Plan.md`](Trasset_Build_Plan.md) · **Contract:** [`Trasset_SRS.md`](Trasset_SRS.md)
 
 > **Scope now spans two releases.** v1.0 is the web app (Days 1–30, in progress).
@@ -28,7 +28,7 @@
 | Hindi/English toggle (added on request) | — | 🟡 Engine + chrome done · page content pending |
 | **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
 | **Phase 6 — Mobile app foundation** | 36–41 | ✅ Complete (Days 36–41) |
-| **Phase 7 — Core journeys** | 42–47 | 🟡 Days 42–44 done · Days 45–47 open |
+| **Phase 7 — Core journeys** | 42–47 | 🟡 Days 42–45 done · Days 46–47 open |
 
 **Backend test suite:** 719 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
@@ -72,12 +72,17 @@ runs in Expo Go with the tab shell, both themes and both fonts. Next:
 
 - **Day 43** — ✅ done: assign and check in, with the conflict flow.
 - **Day 44** — ✅ done: photo capture and report-an-issue.
-- **Day 45** — ⬅ **next**: requests and approvals. An employee raises a request
-  (FR-14.16); an approver sees a pending inbox and approves or rejects with a
-  reason (FR-14.17). Note §12.5 excludes approvals from the offline queue —
-  they are decisions that are hard to unwind.
-- **Day 46** — push registration and deep links. **Day 47** — profile and
-  settings proper.
+- **Day 45** — ✅ done: requests and approvals, plus two schema lies fixed.
+- **Day 46** — ⬅ **next**: push registration and deep links. Register the
+  handset against `POST /auth/devices/` (BE-2), prime the permission, handle
+  foreground / background / cold start, and route a tapped push to the record
+  (FR-14.23). The in-app list mirrors `/notifications/` with unread badges
+  (FR-14.24). Two things already in place: `trasset://requests/:id` and
+  `trasset://assets/:id` are registered in `RootNavigator`, and the server
+  already emits both — so the remaining work is the push plumbing, not routing.
+  **Blocked on push credentials** for a real end-to-end test; everything up to
+  the dispatch can be built and verified without them.
+- **Day 47** — profile and settings proper.
 
 **Two things still needed from the user:** an **Expo account** for dev builds
 (Expo Go needs none, so Days 36–39 are unblocked), and eventually **push
@@ -158,6 +163,110 @@ audit row.
 ---
 
 ## Completed
+
+### Day 45 — Requests & approvals ✅
+
+The workflow now runs end to end from a phone: an employee asks, an approver
+decides, and the asset changes hands.
+
+- **One screen, read two ways.** An employee gets their own requests and a
+  pinned button to raise another. An approver gets a second mode — decisions
+  waiting on them — and lands on it first, because someone opening this tab with
+  an approver's role is almost always answering something rather than browsing
+  their own history. The mode switch is *absent* for a role that cannot decide,
+  not shown-and-disabled: a control that is visible but never usable invites a
+  tap and then explains why not.
+- **Pending is the inbox default**, not a filter to apply. A settled request is
+  history, and history is not what an inbox is for.
+- **Scoping stays on the server.** `AssetRequestViewSet.get_queryset` decides
+  who sees what — employees their own, a department head their department,
+  managers everything. The client sends no `?requester=` for the inbox, because
+  a scope the client sends is a scope the client can lift.
+- **Approving a category request picks the asset inline.** "Any Laptop" cannot
+  be approved without saying which laptop; the server refuses with a 409 and a
+  sentence saying so, so the picker sits in the decision rather than letting
+  someone press Approve into a guaranteed error.
+- **A 409 on a decision gets the conflict sheet**, as a contested assign does.
+  Between raising and deciding, someone may have taken the asset — the approval
+  then rolls back whole and the request stays pending, which is a different
+  thing from a failure the approver caused.
+- **No optimistic update on a decision**, unlike the asset lifecycle. The
+  lifecycle mutations can guess because their outcome follows from the input; an
+  approval's does not, and an optimistic "Approved" that the server then rolls
+  back is a lie on screen.
+- **Decisions are online-only** (§12.5) and the screen says so, rather than
+  letting someone believe a tap will apply hours later.
+- **"Needed by" is relative choices, not a calendar.** The question is *how
+  soon*; a date picker to express "next week" is three taps and a mental date
+  calculation for something the app can work out — and it keeps a native
+  date-picker dependency out of the build.
+- Requesting is reachable from an asset's own screen too, prefilled — a
+  non-manager looking at a thing they want is the natural moment. Managers get
+  no Request button, because they can simply assign it.
+- `trasset://requests/:id` is registered now rather than on Day 46: the server
+  already emits it (`DEEP_LINK_TARGETS`), and an unregistered path silently
+  lands on the tab instead of the record.
+
+**Two lying schemas, found and fixed.** Both were silent under
+`--fail-on-warn`, which is what makes this class of bug expensive:
+
+1. **`AssetRequest.status` was generated as `AssetStatusEnum`** — a mobile
+   client reading a request's status was typed against
+   `available`/`assigned`/… instead of `pending`/`approved`/`rejected`/
+   `cancelled`. Cause: `ENUM_NAME_OVERRIDES` named only *some* choice sets, and
+   an unlisted set colliding on field name (`status`) resolves to a listed one
+   rather than getting its own name. Every choice set reachable from a
+   serializer now has an entry. Audited the rest: 26 enum-backed properties, one
+   flagged (`RetireRequest.status`, narrowed to the three terminal statuses on
+   purpose), no other lies.
+2. **Every create/update response was documented as the *write* shape.** Six
+   write serializers return their read counterpart from `to_representation`, so
+   `POST /asset-requests/` hands back the whole record — status, requester,
+   `target_label` and all — but the schema said it returned only the fields
+   submitted. drf-spectacular cannot see through `to_representation`.
+   `common/schema.write_responses` now states the real response once per
+   viewset; applied to assets, requests, maintenance, purchase orders and users.
+   (`ProfileUpdateSerializer` was already correct at its call site.)
+
+This is the same failure mode as Day 43's `assign` schema: the generated client
+is only as honest as the schema, and a schema that lies quietly is worse than
+one that fails loudly.
+
+**A third divergence, found by the Day 41 verification and fixed.** Adding the
+Request button surfaced that an **auditor was being offered write buttons it can
+never use**. `AssetRequestViewSet` declares `write_roles = Roles.ALL`, which
+reads as "everyone" — but `HasRolePermission` refuses every unsafe method for a
+read-only role *before* it consults what the view declares. Reading
+`write_roles` alone and concluding an auditor may post is exactly the wrong
+inference, and it was already live: since Day 41 an auditor saw **"Report an
+issue"**, which the server would have refused with 403.
+
+`availableActions` now returns **nothing at all** for a read-only role, rather
+than a shorter list. Role logic moved to `src/auth/roles.ts`, mirroring
+`common/roles.py`, because the rules that matter are *combinations* of roles and
+they had started being spelled out per feature — `assets/actions.ts` knew about
+managers, `requests/actions.ts` about approvers, and neither knew about the
+read-only guard that overrides both. `verify-detail` now asserts the empty list
+*and* that the server refuses both writes, so the emptiness is agreement rather
+than a guess.
+
+**Verified:** `npm run verify:requests` — 40 checks, all passing, including the
+DoD end to end (employee raises → manager approves → asset is assigned to the
+requester), both schema fixes, the role scoping, the 403/409 boundaries, the
+idempotent replay, and the validation messages the forms mirror.
+
+Every earlier script re-run green, so none of the above regressed an earlier day:
+`verify:api` 18 · `verify:scan` 18 · `verify:detail` 22 · `verify:list` 15 ·
+`verify:lifecycle` 16 · `verify:photos` 11 · `verify:requests` 40. Backend suite
+**719 passing**; `npm run tsc` clean.
+
+> `verify:photos` needs a real JPEG: `PROBE_JPEG=/path/to/photo.jpg npm run
+> verify:photos`. It exits 1 with a one-line message otherwise, which reads like
+> a failure in a batch run — it is not.
+
+**Not done:** substituting a different asset on a *specific-asset* request. The
+API supports it; it is a judgement call made while comparing inventory, which is
+desk work (§12.8).
 
 ### Day 44 — Photos & issue reporting ✅
 

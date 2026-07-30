@@ -83,7 +83,43 @@ export const darkStatusColors = {
 } as const;
 
 export type AssetStatus = keyof typeof lightStatusColors;
-export type StatusColors = Record<AssetStatus, string>;
+
+// ---------------------------------------------------------------------------
+// Request statuses (FR-4.4). A separate vocabulary from the asset statuses
+// above — a request is pending/approved/rejected/cancelled, an asset is
+// available/assigned/… — so they are separate maps rather than one loose
+// string map. Values mirror `apps/assets/constants.REQUEST_STATUS_COLORS`.
+//
+// The dark values are derived the same way the asset statuses were: Coral and
+// Slate are fill-only on dark (3.29:1 and below), so they lift to the same
+// replacements used there. Pending stays Cream Yolk because it needs to read as
+// "waiting on you", which is the whole point of the inbox.
+// ---------------------------------------------------------------------------
+export const lightRequestStatusColors = {
+  pending: "#FDC040", // Cream Yolk — needs attention
+  approved: "#3BB77E", // Nest Green
+  rejected: "#E5484D", // Coral
+  cancelled: "#7B8794", // Slate
+} as const;
+
+export const darkRequestStatusColors = {
+  pending: "#FDC040",
+  approved: "#3BB77E",
+  rejected: "#FF8085", // as `lost` — Coral is fill-only on dark
+  cancelled: "#9AA6B2", // as `retired`
+} as const;
+
+export type RequestStatus = keyof typeof lightRequestStatusColors;
+
+/**
+ * Both vocabularies in one map.
+ *
+ * The key sets are disjoint, so a pill can colour either kind without the
+ * caller telling it which it holds — and a status that belongs to neither is a
+ * compile error rather than a silently grey dot.
+ */
+export type StatusColors = Record<AssetStatus, string> &
+  Record<RequestStatus, string>;
 
 // ---------------------------------------------------------------------------
 // Category / chart series (SRS §7.1.1). Ordered so neighbours differ in hue

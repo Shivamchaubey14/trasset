@@ -20,15 +20,32 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import { type AssetStatus, fonts, radius, useTheme } from "@/theme";
+import {
+  type AssetStatus,
+  type RequestStatus,
+  fonts,
+  radius,
+  useTheme,
+} from "@/theme";
 
-const LABELS: Record<AssetStatus, string> = {
+/**
+ * Both vocabularies, in one map.
+ *
+ * An asset is available/assigned/…; a request is pending/approved/…. The key
+ * sets are disjoint, so one pill serves both and the caller does not have to
+ * say which kind it is holding.
+ */
+const LABELS: Record<AssetStatus | RequestStatus, string> = {
   available: "Available",
   assigned: "Assigned",
   under_maintenance: "Under maintenance",
   retired: "Retired",
   lost: "Lost",
   disposed: "Disposed",
+  pending: "Pending",
+  approved: "Approved",
+  rejected: "Rejected",
+  cancelled: "Cancelled",
 };
 
 export function StatusPill({
@@ -36,7 +53,7 @@ export function StatusPill({
   label,
   small,
 }: {
-  status: AssetStatus;
+  status: AssetStatus | RequestStatus;
   /** Override when the server supplies its own display label. */
   label?: string;
   small?: boolean;

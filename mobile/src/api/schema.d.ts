@@ -1002,7 +1002,14 @@ export interface paths {
          *
          *     Everyone signed in can see what is booked — an employee holding a laptop
          *     should be able to see it is going in for repair on Tuesday. Only managers
-         *     can book, start, complete or cancel.
+         *     can start, complete or cancel.
+         *
+         *     **Reporting a problem is not the same as booking work.** SRS §2.3 gives the
+         *     Employee role "reports issues", and FR-14.14 requires it from the phone —
+         *     the person holding a broken laptop is who notices first, and routing that
+         *     through a manager means it often never gets reported at all. So anyone may
+         *     *create* a record, narrowed in :meth:`perform_create` to an asset they are
+         *     actually holding. Everything after the report stays with managers.
          */
         get: operations["maintenance_list"];
         put?: never;
@@ -1011,7 +1018,14 @@ export interface paths {
          *
          *     Everyone signed in can see what is booked — an employee holding a laptop
          *     should be able to see it is going in for repair on Tuesday. Only managers
-         *     can book, start, complete or cancel.
+         *     can start, complete or cancel.
+         *
+         *     **Reporting a problem is not the same as booking work.** SRS §2.3 gives the
+         *     Employee role "reports issues", and FR-14.14 requires it from the phone —
+         *     the person holding a broken laptop is who notices first, and routing that
+         *     through a manager means it often never gets reported at all. So anyone may
+         *     *create* a record, narrowed in :meth:`perform_create` to an asset they are
+         *     actually holding. Everything after the report stays with managers.
          */
         post: operations["maintenance_create"];
         delete?: never;
@@ -1052,7 +1066,14 @@ export interface paths {
          *
          *     Everyone signed in can see what is booked — an employee holding a laptop
          *     should be able to see it is going in for repair on Tuesday. Only managers
-         *     can book, start, complete or cancel.
+         *     can start, complete or cancel.
+         *
+         *     **Reporting a problem is not the same as booking work.** SRS §2.3 gives the
+         *     Employee role "reports issues", and FR-14.14 requires it from the phone —
+         *     the person holding a broken laptop is who notices first, and routing that
+         *     through a manager means it often never gets reported at all. So anyone may
+         *     *create* a record, narrowed in :meth:`perform_create` to an asset they are
+         *     actually holding. Everything after the report stays with managers.
          */
         get: operations["maintenance_retrieve"];
         /**
@@ -1060,7 +1081,14 @@ export interface paths {
          *
          *     Everyone signed in can see what is booked — an employee holding a laptop
          *     should be able to see it is going in for repair on Tuesday. Only managers
-         *     can book, start, complete or cancel.
+         *     can start, complete or cancel.
+         *
+         *     **Reporting a problem is not the same as booking work.** SRS §2.3 gives the
+         *     Employee role "reports issues", and FR-14.14 requires it from the phone —
+         *     the person holding a broken laptop is who notices first, and routing that
+         *     through a manager means it often never gets reported at all. So anyone may
+         *     *create* a record, narrowed in :meth:`perform_create` to an asset they are
+         *     actually holding. Everything after the report stays with managers.
          */
         put: operations["maintenance_update"];
         post?: never;
@@ -1069,7 +1097,14 @@ export interface paths {
          *
          *     Everyone signed in can see what is booked — an employee holding a laptop
          *     should be able to see it is going in for repair on Tuesday. Only managers
-         *     can book, start, complete or cancel.
+         *     can start, complete or cancel.
+         *
+         *     **Reporting a problem is not the same as booking work.** SRS §2.3 gives the
+         *     Employee role "reports issues", and FR-14.14 requires it from the phone —
+         *     the person holding a broken laptop is who notices first, and routing that
+         *     through a manager means it often never gets reported at all. So anyone may
+         *     *create* a record, narrowed in :meth:`perform_create` to an asset they are
+         *     actually holding. Everything after the report stays with managers.
          */
         delete: operations["maintenance_destroy"];
         options?: never;
@@ -1079,7 +1114,14 @@ export interface paths {
          *
          *     Everyone signed in can see what is booked — an employee holding a laptop
          *     should be able to see it is going in for repair on Tuesday. Only managers
-         *     can book, start, complete or cancel.
+         *     can start, complete or cancel.
+         *
+         *     **Reporting a problem is not the same as booking work.** SRS §2.3 gives the
+         *     Employee role "reports issues", and FR-14.14 requires it from the phone —
+         *     the person holding a broken laptop is who notices first, and routing that
+         *     through a manager means it often never gets reported at all. So anyone may
+         *     *create* a record, narrowed in :meth:`perform_create` to an asset they are
+         *     actually holding. Everything after the report stays with managers.
          */
         patch: operations["maintenance_partial_update"];
         trace?: never;
@@ -1099,7 +1141,14 @@ export interface paths {
          *
          *     Everyone signed in can see what is booked — an employee holding a laptop
          *     should be able to see it is going in for repair on Tuesday. Only managers
-         *     can book, start, complete or cancel.
+         *     can start, complete or cancel.
+         *
+         *     **Reporting a problem is not the same as booking work.** SRS §2.3 gives the
+         *     Employee role "reports issues", and FR-14.14 requires it from the phone —
+         *     the person holding a broken laptop is who notices first, and routing that
+         *     through a manager means it often never gets reported at all. So anyone may
+         *     *create* a record, narrowed in :meth:`perform_create` to an asset they are
+         *     actually holding. Everything after the report stays with managers.
          */
         post: operations["maintenance_cancel_create"];
         delete?: never;
@@ -1874,7 +1923,7 @@ export interface components {
             readonly reason: string;
             /** Format: date */
             readonly needed_by: string | null;
-            readonly status: components["schemas"]["AssetStatusEnum"];
+            readonly status: components["schemas"]["RequestStatusEnum"];
             readonly status_label: string;
             readonly status_color: string;
             readonly is_pending: boolean;
@@ -1887,21 +1936,6 @@ export interface components {
             readonly created_at: string;
             /** Format: date-time */
             readonly updated_at: string;
-        };
-        /**
-         * @description What an employee submits.
-         *
-         *     Either name an asset or name a category — one of the two is required, so a
-         *     request always says what is actually wanted.
-         */
-        AssetRequestCreate: {
-            readonly id: number;
-            asset_id?: number | null;
-            category_id?: number | null;
-            /** @description Why the requester needs it. */
-            reason: string;
-            /** Format: date */
-            needed_by?: string | null;
         };
         /**
          * @description What an employee submits.
@@ -1944,40 +1978,6 @@ export interface components {
          * @enum {string}
          */
         AssetStatusEnum: "available" | "assigned" | "under_maintenance" | "retired" | "lost" | "disposed";
-        /**
-         * @description Create/update payload.
-         *
-         *     Related records are set by id (``category_id``, ``location_id``, …) to match
-         *     the SRS §5.3 example, while reads return nested objects.
-         */
-        AssetWrite: {
-            readonly id: number;
-            asset_tag?: string;
-            name: string;
-            description?: string;
-            serial_number?: string;
-            model_number?: string;
-            manufacturer?: string;
-            category_id: number;
-            status?: components["schemas"]["AssetStatusEnum"];
-            location_id?: number | null;
-            department_id?: number | null;
-            vendor_id?: number | null;
-            /** Format: date */
-            purchase_date?: string | null;
-            /** Format: decimal */
-            purchase_cost?: string;
-            /** Format: decimal */
-            salvage_value?: string;
-            useful_life_years?: number;
-            depreciation_method?: components["schemas"]["DepreciationMethodEnum"];
-            /** Format: date */
-            warranty_expiry?: string | null;
-            /** Format: uri */
-            image?: string | null;
-            custom_data?: unknown;
-            notes?: string;
-        };
         /**
          * @description Create/update payload.
          *
@@ -2424,28 +2424,6 @@ export interface components {
          * @enum {string}
          */
         MaintenanceTypeEnum: "preventive" | "corrective" | "repair" | "inspection" | "calibration" | "upgrade" | "other";
-        /**
-         * @description Booking work in (FR-6.1).
-         *
-         *     ``status`` is not writable — the lifecycle runs through the start, complete
-         *     and cancel actions so the asset's status stays in step.
-         */
-        MaintenanceWrite: {
-            readonly id: number;
-            asset_id: number;
-            type?: components["schemas"]["MaintenanceTypeEnum"];
-            /**
-             * Format: date
-             * @description When the work is booked for.
-             */
-            scheduled_date: string;
-            /** @description Person doing the work, when it isn't a vendor. */
-            technician?: string;
-            vendor_id?: number | null;
-            /** Format: decimal */
-            cost_estimate?: string;
-            notes?: string;
-        };
         /**
          * @description Booking work in (FR-6.1).
          *
@@ -3040,30 +3018,6 @@ export interface components {
          *     so a client cannot claim an order is worth something it isn't. ``status`` is
          *     likewise driven by the place / receive / cancel actions.
          */
-        PurchaseOrderWrite: {
-            readonly id: number;
-            po_number?: string;
-            vendor_id: number;
-            /** Format: date */
-            po_date?: string;
-            /** Format: date */
-            expected_delivery?: string | null;
-            /** @description Warranty length to stamp on assets created on receipt. */
-            warranty_months?: number;
-            location_id?: number | null;
-            department_id?: number | null;
-            /** @description Supplier quote or invoice reference. */
-            reference?: string;
-            notes?: string;
-            items: components["schemas"]["PurchaseOrderItem"][];
-        };
-        /**
-         * @description Create/update an order together with its lines.
-         *
-         *     ``total_amount`` is deliberately absent: it is derived from the line items,
-         *     so a client cannot claim an order is worth something it isn't. ``status`` is
-         *     likewise driven by the place / receive / cancel actions.
-         */
         PurchaseOrderWriteRequest: {
             po_number?: string;
             vendor_id: number;
@@ -3152,6 +3106,14 @@ export interface components {
             /** @description Why it was turned down — the requester sees this. */
             notes: string;
         };
+        /**
+         * @description * `pending` - Pending
+         *     * `approved` - Approved
+         *     * `rejected` - Rejected
+         *     * `cancelled` - Cancelled
+         * @enum {string}
+         */
+        RequestStatusEnum: "pending" | "approved" | "rejected" | "cancelled";
         /** @description POST /assets/{id}/retire/ (FR-4.5). */
         RetireRequest: {
             /** @default retired */
@@ -3356,20 +3318,6 @@ export interface components {
             department?: number | null;
             /** Format: binary */
             avatar?: string | null;
-            timezone_name?: string;
-            email_notifications?: boolean;
-            push_notifications?: boolean;
-            is_active?: boolean;
-        };
-        /** @description Create/update payload — Super Admin only (FR-2.1). */
-        UserWrite: {
-            readonly id: number;
-            full_name: string;
-            /** Format: email */
-            email: string;
-            phone?: string;
-            role_id: number;
-            department?: number | null;
             timezone_name?: string;
             email_notifications?: boolean;
             push_notifications?: boolean;
@@ -3781,7 +3729,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UserWrite"];
+                    "application/json": components["schemas"]["User"];
                 };
             };
         };
@@ -3831,7 +3779,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UserWrite"];
+                    "application/json": components["schemas"]["User"];
                 };
             };
         };
@@ -3880,7 +3828,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UserWrite"];
+                    "application/json": components["schemas"]["User"];
                 };
             };
         };
@@ -4693,7 +4641,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AssetWrite"];
+                    "application/json": components["schemas"]["AssetDetail"];
                 };
             };
         };
@@ -4901,7 +4849,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AssetWrite"];
+                    "application/json": components["schemas"]["AssetDetail"];
                 };
             };
         };
@@ -4950,7 +4898,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AssetWrite"];
+                    "application/json": components["schemas"]["AssetDetail"];
                 };
             };
         };
@@ -5217,7 +5165,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AssetRequestCreate"];
+                    "application/json": components["schemas"]["AssetRequest"];
                 };
             };
         };
@@ -5635,7 +5583,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MaintenanceWrite"];
+                    "application/json": components["schemas"]["MaintenanceRecord"];
                 };
             };
         };
@@ -5704,7 +5652,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MaintenanceWrite"];
+                    "application/json": components["schemas"]["MaintenanceRecord"];
                 };
             };
         };
@@ -5753,7 +5701,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MaintenanceWrite"];
+                    "application/json": components["schemas"]["MaintenanceRecord"];
                 };
             };
         };
@@ -5899,7 +5847,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PurchaseOrderWrite"];
+                    "application/json": components["schemas"]["PurchaseOrder"];
                 };
             };
         };
@@ -5968,7 +5916,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PurchaseOrderWrite"];
+                    "application/json": components["schemas"]["PurchaseOrder"];
                 };
             };
         };
@@ -6017,7 +5965,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PurchaseOrderWrite"];
+                    "application/json": components["schemas"]["PurchaseOrder"];
                 };
             };
         };

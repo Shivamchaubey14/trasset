@@ -145,6 +145,14 @@ export function AssetDetailScreen() {
       case "report":
         navigation.navigate("ReportIssue", { assetId: id, assetTag: asset.asset_tag });
         return;
+      case "request":
+        // Prefilled, so the form does not ask them to find the asset they are
+        // already looking at.
+        navigation.navigate("NewRequest", {
+          assetId: id,
+          assetTag: `${asset.asset_tag} — ${asset.name}`,
+        });
+        return;
       default:
         // Retire is online-only (§12.5) and lands with the rest of the
         // lifecycle work rather than here.

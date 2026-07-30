@@ -28,6 +28,16 @@ export type Attachment = Schemas["Attachment"];
 
 // --- Requests ---------------------------------------------------------------
 export type AssetRequest = Schemas["AssetRequest"];
+export type RequestStatus = Schemas["RequestStatusEnum"];
+/**
+ * The body `POST /asset-requests/` accepts — asset **or** category, never both.
+ *
+ * The *response* is a full `AssetRequest`, not this: the create serializer's
+ * `to_representation` returns the read shape, so raising a request hands back
+ * the complete record. The schema said otherwise until the write responses were
+ * annotated (`common/schema.write_responses`).
+ */
+export type AssetRequestCreate = Schemas["AssetRequestCreateRequest"];
 
 // --- Masters ----------------------------------------------------------------
 export type Category = Schemas["Category"];

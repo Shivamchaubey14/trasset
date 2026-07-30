@@ -3,7 +3,7 @@ import logging
 
 from django.conf import settings
 from django.core.mail import send_mail
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.generics import GenericAPIView
@@ -18,6 +18,7 @@ from common.exceptions import UnprocessableEntity
 from common.permissions import HasRolePermission, IsSuperAdmin
 from common.responses import created, ok
 from common.roles import Roles
+from common.schema import write_responses
 from common.viewsets import BaseModelViewSet, BaseReadOnlyViewSet, ScopedThrottleMixin
 
 from .models import Device, Role, User
@@ -301,6 +302,8 @@ class DeviceViewSet(ScopedThrottleMixin,
 # Users & roles
 # ---------------------------------------------------------------------------
 @extend_schema(tags=["Users"])
+# UserWriteSerializer.to_representation returns the read shape.
+@extend_schema_view(**write_responses(UserSerializer))
 class UserViewSet(BaseModelViewSet):
     """User administration — Super Admin only (FR-2.1)."""
 

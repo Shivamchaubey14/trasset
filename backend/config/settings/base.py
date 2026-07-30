@@ -246,8 +246,18 @@ SPECTACULAR_SETTINGS = {
     "SORT_OPERATIONS": False,
     # Several serializers expose a "status" field over different choice sets;
     # name them explicitly so the generated client isn't full of StatusA6bEnum.
+    #
+    # Every choice set reachable from a serializer needs an entry here, not just
+    # the ones with awkward auto-names. An unlisted set does not merely get an
+    # ugly name — when it collides on field name with a listed one it is
+    # silently resolved to *that* one instead, and the schema then states
+    # something false. `AssetRequest.status` claimed the asset statuses
+    # (available/assigned/…) rather than its own pending/approved/rejected/
+    # cancelled, and `--fail-on-warn` reported nothing, because from
+    # spectacular's point of view nothing was ambiguous.
     "ENUM_NAME_OVERRIDES": {
         "AssetStatusEnum": "apps.assets.constants.AssetStatus.choices",
+        "RequestStatusEnum": "apps.assets.constants.RequestStatus.choices",
         "DepreciationMethodEnum": "apps.assets.constants.DepreciationMethod.choices",
         "AssignmentActionEnum": "apps.assets.constants.AssignmentAction.choices",
         "MaintenanceTypeEnum": "apps.maintenance.constants.MaintenanceType.choices",
