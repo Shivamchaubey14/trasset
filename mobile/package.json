@@ -21,6 +21,7 @@
     "verify:settings": "tsx scripts/verify-settings.ts",
     "verify:offline": "tsx scripts/verify-offline.ts",
     "verify:queue": "tsx scripts/verify-queue.ts",
+    "verify:conflicts": "tsx scripts/verify-conflicts.ts",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },

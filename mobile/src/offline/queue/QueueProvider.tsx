@@ -20,17 +20,32 @@ import React, { useEffect } from "react";
 import { AppState } from "react-native";
 import { useSyncExternalStore } from "react";
 
+import { useToast } from "@/components";
+
 import { queue } from ".";
-import { pendingCount as countPending } from "./policy";
+import { failedCount as countFailed, pendingCount as countPending } from "./policy";
 
 export function QueueProvider({ children }: { children: React.ReactNode }) {
+  const toast = useToast();
+
   useEffect(() => {
     let cancelled = false;
 
     const kick = () => {
       if (cancelled) return;
       if (!onlineManager.isOnline()) return;
-      void queue.drain();
+      void queue.drain().then((report) => {
+        // Told at the moment it happens, not left to be discovered. A refusal
+        // that surfaces only if you happen to open the right screen is, from
+        // the user's side, indistinguishable from having been dropped
+        // (FR-14.27) — they walked away believing the action was done.
+        if (cancelled || report.failed === 0) return;
+        toast.error(
+          report.failed === 1
+            ? "An action could not be sent. Open Unsent actions to see why."
+            : `${report.failed} actions could not be sent. Open Unsent actions to see why.`,
+        );
+      });
     };
 
     void queue.load().then(kick);
@@ -53,7 +68,7 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
       appState.remove();
       clearInterval(timer);
     };
-  }, []);
+  }, [toast]);
 
   return <>{children}</>;
 }
@@ -63,6 +78,21 @@ export function usePendingCount(): number {
   return useSyncExternalStore(
     (callback) => queue.subscribe(callback),
     () => countPending(queue.getItems()),
+    () => 0,
+  );
+}
+
+/**
+ * How many actions the queue cannot resolve on its own.
+ *
+ * Separate from the pending count on purpose: pending is "wait", failed is
+ * "you". Collapsing them into one number would bury the refusals behind work
+ * that is going to succeed anyway.
+ */
+export function useAttentionCount(): number {
+  return useSyncExternalStore(
+    (callback) => queue.subscribe(callback),
+    () => countFailed(queue.getItems()),
     () => 0,
   );
 }
