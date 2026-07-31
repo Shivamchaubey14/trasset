@@ -31,6 +31,7 @@ import { RootNavigator } from "@/navigation/RootNavigator";
 import { watchConnectivity } from "@/net/online";
 import { PushProvider } from "@/notifications/PushProvider";
 import { persistOptions } from "@/offline/persist";
+import { QueueProvider } from "@/offline/queue/QueueProvider";
 import { ThemeProvider, useTheme } from "@/theme";
 
 // The API layer holds no platform imports of its own, so the two things it
@@ -84,7 +85,11 @@ function Shell() {
         it decide there is nobody signed in and drop the deep link.
       */}
       <PushProvider>
-        <RootNavigator />
+        {/* Inside the session gate: draining while signed out would send one
+            user's queued actions under another user's token. */}
+        <QueueProvider>
+          <RootNavigator />
+        </QueueProvider>
       </PushProvider>
     </View>
   );

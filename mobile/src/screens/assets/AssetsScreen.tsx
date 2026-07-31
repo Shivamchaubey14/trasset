@@ -36,6 +36,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { AssetRow, Chip, EmptyState, OfflineBanner, SkeletonRow } from "@/components";
 import { useDebounced } from "@/hooks/useDebounced";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
+import { usePendingCount } from "@/offline/queue/QueueProvider";
 import { factsOf, useOfflineRead } from "@/offline/useOfflineRead";
 import { type AssetStatus, fonts, fontSizes, radius, spacing, useTheme } from "@/theme";
 
@@ -121,6 +122,7 @@ export function AssetsScreen() {
   // `hasData` is the row count, not the query's `data`: an infinite query that
   // has fetched one empty page still has `data`, and calling that "cached
   // content" would show a banner over nothing.
+  const pending = usePendingCount();
   const offline = useOfflineRead({
     ...factsOf(listQuery),
     hasData: rows.length > 0,
@@ -128,7 +130,11 @@ export function AssetsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
-      <OfflineBanner visible={offline.showBanner} cachedAt={new Date(listQuery.dataUpdatedAt)} />
+      <OfflineBanner
+        visible={offline.showBanner || pending > 0}
+        pendingCount={pending}
+        cachedAt={new Date(listQuery.dataUpdatedAt)}
+      />
 
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Assets</Text>

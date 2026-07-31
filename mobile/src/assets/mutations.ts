@@ -14,11 +14,13 @@
  *   refetch on failure is another request that can also fail, leaving the UI
  *   showing a state that never existed.
  */
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { onlineManager, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 
 import { ApiError, api } from "@/api";
 import type { AssetDetail, User } from "@/api";
+import { queue, queuedMutation } from "@/offline/queue";
+import type { QueuedMutation } from "@/offline/queue";
 
 export function newIdempotencyKey(): string {
   return Crypto.randomUUID();
@@ -45,14 +47,28 @@ export function isConflict(error: unknown): error is ApiError {
   return error instanceof ApiError && error.isConflict;
 }
 
+/** Non-null when the action was queued rather than sent. */
+export type MutationOutcome = { queued: true } | { queued: false; asset: AssetDetail };
+
 function useAssetMutation<TInput extends { assetId: number }>(
   run: (input: TInput) => Promise<AssetDetail>,
   optimistic: (previous: AssetDetail, input: TInput) => AssetDetail,
+  describe: (input: TInput) => QueuedMutation,
 ) {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: run,
+  return useMutation<MutationOutcome, unknown, TInput, { previous?: AssetDetail }>({
+    async mutationFn(input) {
+      // Offline, the action is written to the queue instead of thrown away.
+      // The optimistic update below stays on screen, marked pending, and the
+      // queue sends it when the signal returns — carrying the idempotency key
+      // minted here, so a resend after a crash applies once.
+      if (!onlineManager.isOnline()) {
+        await queue.enqueue(describe(input));
+        return { queued: true };
+      }
+      return { queued: false, asset: await run(input) };
+    },
 
     async onMutate(input) {
       const key = ["asset", input.assetId];
@@ -74,13 +90,22 @@ function useAssetMutation<TInput extends { assetId: number }>(
       }
     },
 
-    onSuccess(asset, input) {
+    onSuccess(outcome, input) {
+      // Nothing came back from a queued action, so the optimistic value is the
+      // best truth available and must be left alone. Overwriting it with the
+      // server's stale copy would undo the change in front of the user.
+      if (outcome.queued) return;
+
       // The server's own copy wins over the optimistic guess.
-      queryClient.setQueryData(["asset", input.assetId], asset);
+      queryClient.setQueryData(["asset", input.assetId], outcome.asset);
       queryClient.invalidateQueries({ queryKey: ["asset", input.assetId, "history"] });
     },
 
-    onSettled(_data, _error, input) {
+    onSettled(outcome, _error, input) {
+      // Refetching a queued action's asset would replace the optimistic state
+      // with the server's unchanged copy — the change would visibly vanish.
+      if (outcome?.queued) return;
+
       // Lists show status and holder, so they are stale either way — including
       // after a 409, where the truth is whatever the other person did.
       queryClient.invalidateQueries({ queryKey: ["assets"] });
@@ -104,6 +129,14 @@ export function useAssignAsset() {
       assigned_to: user,
       assigned_at: new Date().toISOString(),
     }) as AssetDetail,
+    ({ assetId, user, notes }) =>
+      queuedMutation({
+        method: "POST",
+        path: `/assets/${assetId}/assign/`,
+        body: { user_id: user.id, notes: notes ?? "" },
+        kind: "assign",
+        subject: { type: "asset", id: assetId },
+      }),
   );
 }
 
@@ -125,5 +158,13 @@ export function useCheckinAsset() {
       assigned_to: null,
       assigned_at: null,
     }) as AssetDetail,
+    ({ assetId, notes, locationId }) =>
+      queuedMutation({
+        method: "POST",
+        path: `/assets/${assetId}/checkin/`,
+        body: { notes: notes ?? "", ...(locationId ? { location_id: locationId } : {}) },
+        kind: "checkin",
+        subject: { type: "asset", id: assetId },
+      }),
   );
 }

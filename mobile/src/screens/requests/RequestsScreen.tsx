@@ -36,6 +36,7 @@ import { ApiError, api } from "@/api";
 import type { AssetRequest, Page } from "@/api";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Chip, EmptyState, OfflineBanner, RequestRow, SkeletonRow } from "@/components";
+import { usePendingCount } from "@/offline/queue/QueueProvider";
 import { factsOf, useOfflineRead } from "@/offline/useOfflineRead";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
 import { canApprove, canRaise } from "@/requests/actions";
@@ -141,6 +142,7 @@ export function RequestsScreen() {
 
   // Row count rather than the query's `data`: an infinite query that fetched
   // one empty page still has `data`, and a banner over nothing says nothing.
+  const queuedCount = usePendingCount();
   const offline = useOfflineRead({
     ...factsOf(listQuery),
     hasData: rows.length > 0,
@@ -148,7 +150,11 @@ export function RequestsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
-      <OfflineBanner visible={offline.showBanner} cachedAt={new Date(listQuery.dataUpdatedAt)} />
+      <OfflineBanner
+        visible={offline.showBanner || queuedCount > 0}
+        pendingCount={queuedCount}
+        cachedAt={new Date(listQuery.dataUpdatedAt)}
+      />
 
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Requests</Text>

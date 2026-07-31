@@ -51,6 +51,7 @@ import {
   useToast,
 } from "@/components";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
+import { usePendingCount } from "@/offline/queue/QueueProvider";
 import { factsOf, useOfflineRead } from "@/offline/useOfflineRead";
 import { canCancel, isDecidable, stateExplanation } from "@/requests/actions";
 import {
@@ -117,6 +118,8 @@ export function RequestDetailScreen() {
   });
 
   const candidates = useMemo(() => available.data?.results ?? [], [available.data]);
+
+  const pending = usePendingCount();
 
   const offline = useOfflineRead({
     ...factsOf(requestQuery),
@@ -250,7 +253,8 @@ export function RequestDetailScreen() {
       {/* Above the scroll area rather than inside it: a caveat that scrolls
           away is one the reader can miss entirely. */}
       <OfflineBanner
-        visible={offline.showBanner}
+        visible={offline.showBanner || pending > 0}
+        pendingCount={pending}
         cachedAt={new Date(requestQuery.dataUpdatedAt)}
       />
       <ScrollView

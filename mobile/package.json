@@ -20,6 +20,7 @@
     "verify:push": "tsx scripts/verify-push.ts",
     "verify:settings": "tsx scripts/verify-settings.ts",
     "verify:offline": "tsx scripts/verify-offline.ts",
+    "verify:queue": "tsx scripts/verify-queue.ts",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
