@@ -160,6 +160,19 @@ export function ScanScreen() {
           <Ionicons name="keypad-outline" size={18} color={colors.text} />
           <Text style={[styles.manualLabel, { color: colors.text }]}>Enter by hand</Text>
         </Pressable>
+
+        {/* Counting is a different job from looking one asset up, and it starts
+            from here because this is where someone already has the camera
+            open and is standing in the room. */}
+        <Pressable
+          onPress={() => navigation.navigate("StartStockTake")}
+          style={[styles.manualButton, { backgroundColor: colors.surface }]}
+          accessibilityRole="button"
+          accessibilityLabel="Start a stock take"
+        >
+          <Ionicons name="clipboard-outline" size={18} color={colors.text} />
+          <Text style={[styles.manualLabel, { color: colors.text }]}>Stock take</Text>
+        </Pressable>
       </View>
 
       {outcome && outcome.status !== "found" ? (
