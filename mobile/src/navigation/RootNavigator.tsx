@@ -25,6 +25,8 @@ import { AboutScreen } from "@/screens/AboutScreen";
 import { AssetDetailScreen } from "@/screens/AssetDetailScreen";
 import { ChangePasswordScreen } from "@/screens/ChangePasswordScreen";
 import { ConflictsScreen } from "@/screens/ConflictsScreen";
+import { StartStockTakeScreen } from "@/screens/stocktake/StartStockTakeScreen";
+import { StockTakeScanScreen } from "@/screens/stocktake/StockTakeScanScreen";
 import { AssignScreen } from "@/screens/assets/AssignScreen";
 import { CheckinScreen } from "@/screens/assets/CheckinScreen";
 import { ReportIssueScreen } from "@/screens/assets/ReportIssueScreen";
@@ -57,6 +59,8 @@ export type RootStackParamList = {
   ChangePassword: undefined;
   About: undefined;
   Conflicts: undefined;
+  StartStockTake: undefined;
+  StockTakeScan: undefined;
   // Arriving in later phases:
   // StockTake: { id?: number };
 };
@@ -159,6 +163,18 @@ export function RootNavigator() {
               name="Conflicts"
               component={ConflictsScreen}
               options={{ headerShown: true, title: "Unsent actions" }}
+            />
+            <Stack.Screen
+              name="StartStockTake"
+              component={StartStockTakeScreen}
+              options={{ headerShown: true, title: "Stock take" }}
+            />
+            {/* No header: the counting screen owns its whole surface, and a
+                back arrow above a live count invites leaving it by accident. */}
+            <Stack.Screen
+              name="StockTakeScan"
+              component={StockTakeScanScreen}
+              options={{ headerShown: false, gestureEnabled: false }}
             />
             {/* Presented as sheets: both are a short decision on top of the
                 asset you are looking at, not a place you navigate to. */}

@@ -29,7 +29,7 @@
 | **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
 | **Phase 6 — Mobile app foundation** | 36–41 | ✅ Complete (Days 36–41) |
 | **Phase 7 — Core journeys** | 42–47 | ✅ Complete (Days 42–47) |
-| **Phase 8 — Offline & stock take** | 48–53 | 🟡 Days 48–50 done · Days 51–53 open |
+| **Phase 8 — Offline & stock take** | 48–53 | 🟡 Days 48–51 done · Days 52–53 open |
 
 **Backend test suite:** 719 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
@@ -91,11 +91,17 @@ runs in Expo Go with the tab shell, both themes and both fonts. Next:
 - **Day 50** — ✅ done: the conflict screen. Refused actions are listed with
   what happened and what to do, retry is offered only where it could work, and
   a drain that fails says so at the time.
-- **Day 51** — ⬅ **next**: stock take, part 1. A session scoped to a location,
-  the expected asset list downloaded for offline use, a continuous scan loop
-  (FR-14.9) with running found / missing / unexpected counts, and duplicate
-  scans recognised rather than double-counted. `apps/stocktake/` already exists
-  on the server from the mobile API groundwork.
+- **Day 51** — ✅ done: stock take, part 1. A session scoped to one location,
+  the expected list downloaded up front, a continuous scan loop that never
+  leaves the screen, running counts, and duplicates recognised rather than
+  double-counted.
+- **Day 52** — ⬅ **next**: stock take, part 2. Full offline operation
+  (FR-14.21), submitting the batch on reconnect, a reconciliation summary, and
+  resuming an interrupted session. The groundwork is deliberate: `SessionState`
+  is a plain serialisable object so it can be stored without reshaping,
+  `scanPayload()` already produces the batch the server wants, and
+  `/stock-takes/{id}/submit/` is idempotent precisely because an offline client
+  will replay it.
 
 **Still needed from the user, and now actually blocking:**
 
@@ -191,6 +197,65 @@ audit row.
 ---
 
 ## Completed
+
+### Day 51 — Stock take, part 1 ✅
+
+The DoD is a hundred assets scanned in sequence **without leaving the screen**,
+and nearly every decision here follows from that one sentence.
+
+- **The expected list is downloaded before counting starts, not during.** A
+  session that discovers page three is missing halfway round a store room is
+  worse than one that refused to open — by then the person has counted things
+  they will have to count again. It also means the loop works with no signal,
+  which is the only condition a store room reliably offers.
+- **No request per scan.** Reconciliation happens on the phone against that
+  list, so the loop runs at the speed of the camera rather than the network. A
+  hundred scans is **one** call at the end, not a hundred. Verified: 14 scans,
+  1 request.
+- **Duplicates are recognised, not counted.** A camera reads the same label
+  thirty times a second while it is held in frame. The session returns its state
+  **unchanged by reference** for a repeat, so React does no work for the
+  commonest event on the screen, and a cheap time guard stops the store being
+  touched at all. Case and stray whitespace normalise to the same key —
+  otherwise one shelf is counted twice and its twin reported missing, which are
+  the two worst outcomes this screen can produce, from a single scan.
+- **`missing` is derived, never recorded.** It is expected-minus-found, so it
+  falls as the count rises. Recording it during the session would mean every
+  asset was "missing" until the moment somebody happened to reach it.
+- **An asset from another room counts as unexpected rather than being
+  discarded.** It is physically in the counter's hand; refusing it would throw
+  away a real finding — and unexpected deliberately does not reduce this room's
+  `missing`, because it belongs to a different room's tally.
+- **Three haptics for three meanings**, because the user is looking at a shelf
+  and not at the phone (SRS §12.6): a tick for a hit, a warning for something
+  that does not belong here, and **silence for a repeat** — which is the correct
+  answer to "you already have that one".
+- **The counting screen has no header and no back gesture.** A back arrow above
+  a live count invites leaving it by accident, and the session is not yet
+  persisted.
+
+**A real bug the verification caught.** `startStockTake` posted `location`; the
+create serializer takes `location_id` and maps it with `source="location"`.
+The app would have failed to open a single session. Nothing but a round trip
+against the real server would have found it — the field name is right there in
+the OpenAPI schema and still went unnoticed.
+
+**Verification:** `verify:stocktake` **23/0**. A hundred scans really are run in
+sequence and the tally checked exactly; one label read thirty times counts once
+(29 of 30 recognised as repeats); and against the real server the phone's
+arithmetic and the server's reconciliation agree on all three numbers —
+found 13, missing 1, unexpected 1. If those two ever disagree, the person
+counting has been lied to by one of them.
+
+Backend **719/719**. `tsc` clean. Mobile suite now 300 checks across twelve
+scripts.
+
+**Not covered without a handset:** the camera and the haptics.
+
+**Deliberately left for the next day:** the session lives in memory, so a
+force-quit still loses it, and submitting needs a connection at the end.
+
+---
 
 ### Day 50 — Conflicts ✅
 
