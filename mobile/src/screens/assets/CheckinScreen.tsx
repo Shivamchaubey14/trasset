@@ -48,8 +48,12 @@ export function CheckinScreen() {
     checkin.mutate(
       { assetId, notes, locationId, idempotencyKey },
       {
-        onSuccess() {
-          toast.success(`${assetTag} checked in`);
+        onSuccess(outcome) {
+          // Told apart on purpose. "Checked in" when nothing has reached the
+          // server yet is the lie FR-14.27 exists to prevent — the person walks
+          // away believing it is done.
+          if (outcome.queued) toast.show(`${assetTag} will check in when you are back online`);
+          else toast.success(`${assetTag} checked in`);
           navigation.goBack();
         },
         onError(error) {

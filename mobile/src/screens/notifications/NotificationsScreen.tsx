@@ -33,6 +33,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ApiError, api } from "@/api";
 import type { Notification, Page } from "@/api";
 import { Chip, EmptyState, OfflineBanner, SkeletonRow, useToast } from "@/components";
+import { usePendingCount } from "@/offline/queue/QueueProvider";
 import { factsOf, useOfflineRead } from "@/offline/useOfflineRead";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
 import { routeForPayload } from "@/notifications/routing";
@@ -124,6 +125,7 @@ export function NotificationsScreen() {
 
   // Row count rather than the query's `data`: one fetched empty page still
   // counts as `data`, and a banner over nothing says nothing.
+  const pending = usePendingCount();
   const offline = useOfflineRead({
     ...factsOf(listQuery),
     hasData: rows.length > 0,
@@ -131,7 +133,11 @@ export function NotificationsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
-      <OfflineBanner visible={offline.showBanner} cachedAt={new Date(listQuery.dataUpdatedAt)} />
+      <OfflineBanner
+        visible={offline.showBanner || pending > 0}
+        pendingCount={pending}
+        cachedAt={new Date(listQuery.dataUpdatedAt)}
+      />
 
       <View style={styles.header}>
         <View style={styles.titleRow}>

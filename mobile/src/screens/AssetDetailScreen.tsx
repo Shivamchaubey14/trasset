@@ -39,6 +39,7 @@ import {
   useToast,
 } from "@/components";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
+import { usePendingCount } from "@/offline/queue/QueueProvider";
 import { factsOf, useOfflineRead } from "@/offline/useOfflineRead";
 import { AssetPhotos } from "@/screens/assets/AssetPhotos";
 import { type AssetStatus, fonts, fontSizes, radius, spacing, useTheme } from "@/theme";
@@ -91,6 +92,8 @@ export function AssetDetailScreen() {
     assetQuery.refetch();
     historyQuery.refetch();
   }, [assetQuery, historyQuery]);
+
+  const pending = usePendingCount();
 
   const offline = useOfflineRead(factsOf(assetQuery));
 
@@ -199,7 +202,8 @@ export function AssetDetailScreen() {
       {/* Outside the padding so it spans the width, and above the identity so
           the caveat is read before the thing it caveats. */}
       <OfflineBanner
-        visible={offline.showBanner}
+        visible={offline.showBanner || pending > 0}
+        pendingCount={pending}
         cachedAt={new Date(assetQuery.dataUpdatedAt)}
       />
 

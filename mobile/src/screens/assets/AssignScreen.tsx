@@ -67,8 +67,13 @@ export function AssignScreen() {
     assign.mutate(
       { assetId, user: selected, notes, idempotencyKey },
       {
-        onSuccess() {
-          toast.success(`${assetTag} assigned to ${selected.full_name}`);
+        onSuccess(outcome) {
+          // Queued is not done, and must not be reported as done.
+          if (outcome.queued) {
+            toast.show(`${assetTag} will be assigned to ${selected.full_name} when you are back online`);
+          } else {
+            toast.success(`${assetTag} assigned to ${selected.full_name}`);
+          }
           navigation.goBack();
         },
         onError(error) {

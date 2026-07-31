@@ -29,7 +29,7 @@
 | **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
 | **Phase 6 — Mobile app foundation** | 36–41 | ✅ Complete (Days 36–41) |
 | **Phase 7 — Core journeys** | 42–47 | ✅ Complete (Days 42–47) |
-| **Phase 8 — Offline & stock take** | 48–53 | 🟡 Day 48 done · Days 49–53 open |
+| **Phase 8 — Offline & stock take** | 48–53 | 🟡 Days 48–49 done · Days 50–53 open |
 
 **Backend test suite:** 719 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
@@ -84,12 +84,15 @@ runs in Expo Go with the tab shell, both themes and both fonts. Next:
   AsyncStorage and rehydrated at launch, every read screen has a real offline
   state instead of an endless spinner, cached content is dated, and signing out
   purges the cache from disk as well as memory.
-- **Day 49** — ⬅ **next**: the mutation queue. Durable across restarts,
-  client-generated idempotency keys, ordered drain on reconnect, optimistic
-  updates marked pending, exponential backoff. Groundwork already in place:
-  mutations are excluded from the persisted cache precisely so the queue owns
-  replay, `newIdempotencyKey` exists and is used by the lifecycle actions, and
-  `OfflineBanner` already renders a `pendingCount`.
+- **Day 49** — ✅ done: the durable mutation queue. Survives a restart, keys
+  minted at enqueue so a resend applies once, serial oldest-first drain on
+  reconnect, exponential backoff, and refusals kept for a person rather than
+  dropped.
+- **Day 50** — ⬅ **next**: the conflict screen. Most of its data already
+  exists — `failed` and `blocked` items carry the server's own sentence and a
+  status code, `queue.retry(id)` and `queue.discard(id)` are written and
+  unused, and `useQueueItems()` exposes the list. What is missing is the screen
+  itself and a way to reach it.
 
 **Still needed from the user, and now actually blocking:**
 
@@ -185,6 +188,67 @@ audit row.
 ---
 
 ## Completed
+
+### Day 49 — Mutation queue ✅
+
+The DoD is: check an asset in with no signal, force-quit, reconnect, and it
+syncs **exactly once**. Every clause of that sentence is a separate problem.
+
+- **A queued action is a description of a request, never a closure.** Method,
+  path, body and key are data, because a closure cannot be written to disk and
+  surviving the process being killed is the entire point.
+- **The idempotency key is minted when the user commits, not when the request is
+  sent.** This one decision is where "exactly once" is actually won. A key
+  generated at send time would be new on every retry, the server would see each
+  attempt as a different action, and a check-in resent after a crash would apply
+  twice. Every retry — in this process or one three days later — carries the
+  same key.
+- **Anything left `sending` at launch becomes `pending` again.** A `sending`
+  item is one the app died in the middle of; it may or may not have reached the
+  server, and nothing on the device can tell. Resending is the only option, and
+  it is *safe* only because the key came back with it.
+- **The queue is written to disk before the request goes out.** Coalescing those
+  writes would open precisely the window this exists to close: a crash after the
+  server acted but before the record existed.
+- **Serial, oldest first.** Concurrency here would be faster and wrong — two
+  actions on one asset would race and the loser would apply to a state that no
+  longer exists.
+- **409 is not retryable.** It means someone else took the asset; repeating the
+  request cannot fix that, so it needs a person. A refused action is marked
+  `failed` and kept with the server's own sentence, and **later actions on the
+  same asset are blocked rather than applied out of order** — assigning after a
+  refused check-in would put an asset somewhere nobody asked for. Unrelated
+  assets are untouched.
+- **Nothing is ever silently dropped** (FR-14.27). Not on refusal, not at the
+  attempt limit, not even when the stored queue comes from a version this build
+  does not understand — those surface as `failed` with an explanation instead of
+  vanishing. An action retried forever would be indistinguishable from one that
+  is stuck, and the user can see neither.
+- **A drain halts on an outage** rather than grinding through forty items to
+  collect forty identical failures and pushing them all towards the attempt
+  limit for one lost signal.
+- **"Queued" is never reported as "done".** Offline, the check-in screen says it
+  *will* check in when back online. Telling someone it is done when nothing has
+  reached the server is the exact lie FR-14.27 exists to prevent.
+- **Sign-out clears the queue** as well as the cache, and for a sharper reason:
+  a queued action carries no identity of its own, so anything left would be sent
+  under whichever account signs in next.
+
+**Verification:** `verify:queue` **41/0**, most of it against the real server.
+The one that matters: an action is queued offline, the in-memory queue is thrown
+away and rebuilt from its bytes — which is what a relaunch does — it drains and
+the asset changes, and then **the same item is sent a second time**, the crash
+window where the app dies after the server acted but before recording it. The
+server recognised the key and the asset's history went 5 rows → 5 rows. Two
+sends, one effect, proven by the history rather than by trusting a 2xx.
+
+Backend **719/719**. `tsc` clean. Full mobile suite 254 checks across ten
+scripts.
+
+**Not covered without a handset:** a literal force-quit and literal aeroplane
+mode.
+
+---
 
 ### Day 48 — Offline reads ✅
 

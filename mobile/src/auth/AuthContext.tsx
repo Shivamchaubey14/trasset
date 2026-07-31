@@ -27,6 +27,7 @@ import { api, login as apiLogin, logout as apiLogout, restoreSession, setSession
 import type { User } from "@/api";
 import { clearPushToken, currentPushToken } from "@/notifications/push";
 import { purgeCache } from "@/offline/persist";
+import { queue } from "@/offline/queue";
 
 import { isBiometricEnabled, promptBiometric } from "./biometrics";
 
@@ -124,6 +125,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // session would leak them — and silently, because the screens would look
     // entirely normal. Both halves go: memory and disk.
     await purgeCache(queryClient);
+    // The queue goes too, and for a sharper reason than the cache: a queued
+    // action carries no identity of its own, so anything left here would be
+    // sent under whichever account signs in next.
+    await queue.clear();
 
     setUser(null);
     setState("signedOut");
