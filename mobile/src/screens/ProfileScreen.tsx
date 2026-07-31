@@ -43,6 +43,7 @@ import {
 } from "@/auth/biometrics";
 import { Button, SegmentedControl, type SegmentedOption, useToast } from "@/components";
 import { explainOutcome, registerForPush } from "@/notifications/push";
+import { useAttentionCount, usePendingCount } from "@/offline/queue/QueueProvider";
 import {
   THEME_PREFERENCES,
   THEME_PREFERENCE_LABELS,
@@ -87,6 +88,11 @@ export function ProfileScreen() {
   const [pushOn, setPushOn] = useState(user?.push_notifications ?? true);
   const [saving, setSaving] = useState<NotificationField | null>(null);
   const [pushNote, setPushNote] = useState<string | null>(null);
+
+  // Two different things, deliberately shown as two: work that is on its way,
+  // and work that has stopped and needs a decision.
+  const queued = usePendingCount();
+  const needsAttention = useAttentionCount();
 
   useEffect(() => {
     (async () => {
@@ -332,6 +338,19 @@ export function ProfileScreen() {
         />
       </View>
 
+      {/* --- Unsent actions ----------------------------------------------
+          Always present, even at zero. A route that appears only when
+          something is wrong is one nobody knows exists when it matters, and
+          the count is how a refusal gets noticed at all (FR-14.27). */}
+      <View style={[...card, styles.stack]}>
+        <NavRow
+          label="Unsent actions"
+          badge={needsAttention || queued || undefined}
+          tone={needsAttention ? "alert" : "normal"}
+          onPress={() => navigation.navigate("Conflicts")}
+        />
+      </View>
+
       {/* --- About -------------------------------------------------------- */}
       <View style={[...card, styles.stack]}>
         <NavRow label="About Trasset" onPress={() => navigation.navigate("About")} />
@@ -360,10 +379,15 @@ function NavRow({
   label,
   onPress,
   topBorder,
+  badge,
+  tone = "normal",
 }: {
   label: string;
   onPress: () => void;
   topBorder?: boolean;
+  badge?: number;
+  /** `alert` when the row is reporting something stuck rather than in flight. */
+  tone?: "normal" | "alert";
 }) {
   const { colors } = useTheme();
   return (
@@ -381,6 +405,23 @@ function NavRow({
       ]}
     >
       <Text style={[styles.settingLabel, { color: colors.text }]}>{label}</Text>
+      {badge ? (
+        <View
+          style={[
+            styles.badge,
+            { backgroundColor: tone === "alert" ? colors.danger : colors.surfaceElevated },
+          ]}
+        >
+          <Text
+            style={[
+              styles.badgeText,
+              { color: tone === "alert" ? colors.onPrimary : colors.textMuted },
+            ]}
+          >
+            {badge > 99 ? "99+" : badge}
+          </Text>
+        </View>
+      ) : null}
       <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
     </Pressable>
   );
@@ -429,6 +470,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     padding: spacing.sm,
   },
+  badge: { minWidth: 22, alignItems: "center", borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 2 },
+  badgeText: { fontFamily: fonts.bodySemi, fontSize: 12 },
   pill: { alignSelf: "flex-start", borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 3, marginTop: 4 },
   pillText: { fontFamily: fonts.bodyMedium, fontSize: 11, textTransform: "capitalize" },
 });

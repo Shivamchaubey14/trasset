@@ -24,6 +24,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { AboutScreen } from "@/screens/AboutScreen";
 import { AssetDetailScreen } from "@/screens/AssetDetailScreen";
 import { ChangePasswordScreen } from "@/screens/ChangePasswordScreen";
+import { ConflictsScreen } from "@/screens/ConflictsScreen";
 import { AssignScreen } from "@/screens/assets/AssignScreen";
 import { CheckinScreen } from "@/screens/assets/CheckinScreen";
 import { ReportIssueScreen } from "@/screens/assets/ReportIssueScreen";
@@ -55,6 +56,7 @@ export type RootStackParamList = {
   NewRequest: { assetId?: number; assetTag?: string };
   ChangePassword: undefined;
   About: undefined;
+  Conflicts: undefined;
   // Arriving in later phases:
   // StockTake: { id?: number };
 };
@@ -152,6 +154,11 @@ export function RootNavigator() {
               name="About"
               component={AboutScreen}
               options={{ headerShown: true, title: "About" }}
+            />
+            <Stack.Screen
+              name="Conflicts"
+              component={ConflictsScreen}
+              options={{ headerShown: true, title: "Unsent actions" }}
             />
             {/* Presented as sheets: both are a short decision on top of the
                 asset you are looking at, not a place you navigate to. */}

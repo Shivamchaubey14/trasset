@@ -29,7 +29,7 @@
 | **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
 | **Phase 6 — Mobile app foundation** | 36–41 | ✅ Complete (Days 36–41) |
 | **Phase 7 — Core journeys** | 42–47 | ✅ Complete (Days 42–47) |
-| **Phase 8 — Offline & stock take** | 48–53 | 🟡 Days 48–49 done · Days 50–53 open |
+| **Phase 8 — Offline & stock take** | 48–53 | 🟡 Days 48–50 done · Days 51–53 open |
 
 **Backend test suite:** 719 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
@@ -88,11 +88,14 @@ runs in Expo Go with the tab shell, both themes and both fonts. Next:
   minted at enqueue so a resend applies once, serial oldest-first drain on
   reconnect, exponential backoff, and refusals kept for a person rather than
   dropped.
-- **Day 50** — ⬅ **next**: the conflict screen. Most of its data already
-  exists — `failed` and `blocked` items carry the server's own sentence and a
-  status code, `queue.retry(id)` and `queue.discard(id)` are written and
-  unused, and `useQueueItems()` exposes the list. What is missing is the screen
-  itself and a way to reach it.
+- **Day 50** — ✅ done: the conflict screen. Refused actions are listed with
+  what happened and what to do, retry is offered only where it could work, and
+  a drain that fails says so at the time.
+- **Day 51** — ⬅ **next**: stock take, part 1. A session scoped to a location,
+  the expected asset list downloaded for offline use, a continuous scan loop
+  (FR-14.9) with running found / missing / unexpected counts, and duplicate
+  scans recognised rather than double-counted. `apps/stocktake/` already exists
+  on the server from the mobile API groundwork.
 
 **Still needed from the user, and now actually blocking:**
 
@@ -188,6 +191,58 @@ audit row.
 ---
 
 ## Completed
+
+### Day 50 — Conflicts ✅
+
+The queue already kept refused actions rather than dropping them. This is where
+a person finally sees them, and the only place they can be resolved.
+
+- **Three sentences per row: what you tried, what happened, what to do.** A
+  status code next to an identifier satisfies the letter of FR-14.27 and none of
+  its intent — it tells a developer everything and a store keeper nothing. What
+  happened uses the **server's own sentence**, which names the asset and the
+  person who took it, and is far more useful than anything invented on the
+  client.
+- **Retry is not offered on a 409, deliberately.** Re-sending would be refused
+  identically; the button would do nothing but move the item to the back of the
+  queue while looking like progress. Those rows offer *Open the asset* instead,
+  because the only honest next step is to see where it stands now and decide
+  again. A network failure or a 5xx does get a retry — there the request itself
+  was fine.
+- **Every refusal reason gets its own advice.** 403 says your role may have
+  changed; 404 says the thing is gone; a blocked action explains it is waiting on
+  an earlier one and warns that sending it now could apply it to a state you did
+  not intend.
+- **Discard is the only way work leaves without being applied**, it is never
+  automatic, and it confirms while naming what is being thrown away. It is the
+  one irreversible action on the screen and the thing being discarded is work
+  the user believes they did.
+- **A refusal is announced when it happens**, not left to be discovered. The
+  drain raises a toast pointing at the screen. A failure that surfaces only if
+  you happen to open the right screen is, from the user's side, indistinguishable
+  from having been dropped.
+- **The entry point is always present, even at zero.** A route that appears only
+  when something is wrong is one nobody knows exists when it matters. The badge
+  separates *pending* from *needs you* — collapsing them into one number would
+  bury refusals behind work that is going to succeed anyway.
+
+**Verification:** `verify:conflicts` **23/0**. The DoD is produced for real
+rather than simulated: an assign is queued while "offline", a second session
+takes the same asset, the queue drains and is refused. Then the three claims are
+checked separately, because a screen can satisfy one and fail the others — the
+action is still there, the explanation carries the server's words
+("TRA-2026-000004 is already assigned to Karan Verma. Check it in before
+assigning it again."), and the offered actions are *open · discard* with no
+retry among them.
+
+Backend **719/719**. `tsc` clean. Mobile suite now 277 checks across eleven
+scripts.
+
+**Not covered without a handset:** the OS confirmation dialog on discard. What
+it guards — that nothing leaves the queue except through an explicit discard —
+is checked.
+
+---
 
 ### Day 49 — Mutation queue ✅
 
