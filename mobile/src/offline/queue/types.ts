@@ -20,7 +20,7 @@ export type QueueStatus =
 
 /** What the action is about, so the UI can point at it and ordering can group. */
 export type QueueSubject = {
-  type: "asset" | "request";
+  type: "asset" | "request" | "stocktake";
   id: number;
   /** Human label for the conflict screen — "TRA-2026-000019". */
   label?: string;
@@ -51,6 +51,16 @@ export type QueuedMutation = {
   subject: QueueSubject;
 
   createdAt: number;
+  /**
+   * Enqueue order within a run.
+   *
+   * `createdAt` alone is not enough: two actions queued in the same
+   * millisecond — which is exactly what submitting a stock take does, sending
+   * the scans and then closing the session — would fall back to comparing
+   * random UUIDs. Draining the submit first would reconcile a count the server
+   * had not yet received.
+   */
+  seq: number;
   attempts: number;
   /** Earliest time this may be tried again; backoff writes it. */
   nextAttemptAt: number;

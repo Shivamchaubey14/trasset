@@ -62,7 +62,12 @@ export function backoffFor(attempts: number, jitter = 0): number {
 
 /** Items in the order they must be sent: oldest first, always. */
 export function drainOrder(items: readonly QueuedMutation[]): QueuedMutation[] {
-  return [...items].sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+  return [...items].sort(
+    (a, b) =>
+      a.createdAt - b.createdAt ||
+      (a.seq ?? 0) - (b.seq ?? 0) ||
+      a.id.localeCompare(b.id),
+  );
 }
 
 /**
@@ -71,14 +76,36 @@ export function drainOrder(items: readonly QueuedMutation[]): QueuedMutation[] {
  * Only one goes at a time. Sending concurrently would be faster and wrong: two
  * actions on the same asset would race, and the loser would apply to a state
  * that no longer exists.
+ *
+ * **An item waits for anything queued before it on the same subject**, even
+ * when that earlier item is only in backoff. Skipping a backed-off item and
+ * taking the next one looks like progress and quietly reorders the work: a
+ * stock take whose scan batch failed once and is waiting a second would have
+ * its *submit* sent first, closing the session and reconciling a count the
+ * server never received. Every asset would be written off as missing.
+ *
+ * Only the same subject blocks. An unrelated asset's action has no reason to
+ * wait behind a stock take that is backing off.
  */
 export function nextReady(
   items: readonly QueuedMutation[],
   now: number,
 ): QueuedMutation | null {
-  for (const item of drainOrder(items)) {
+  const ordered = drainOrder(items);
+  const held = new Set<string>();
+
+  for (const item of ordered) {
+    const subject = `${item.subject.type}:${item.subject.id}`;
+
+    // A failed or blocked predecessor already holds its successors via
+    // `onFailure`; this covers the ones still legitimately waiting to retry.
+    if (item.status === "sending" || (item.status === "pending" && item.nextAttemptAt > now)) {
+      held.add(subject);
+      continue;
+    }
     if (item.status !== "pending") continue;
-    if (item.nextAttemptAt > now) continue;
+    if (held.has(subject)) continue;
+
     return item;
   }
   return null;
@@ -97,7 +124,7 @@ export function failedCount(items: readonly QueuedMutation[]): number {
 /** True when this subject has an action waiting, so a screen can mark it. */
 export function isPendingFor(
   items: readonly QueuedMutation[],
-  type: "asset" | "request",
+  type: "asset" | "request" | "stocktake",
   id: number,
 ): boolean {
   return items.some(
@@ -170,6 +197,24 @@ export function onFailure(
 
     return item;
   });
+}
+
+/**
+ * Cancel the waiting period on everything still pending.
+ *
+ * Backoff exists to avoid hammering a network that is not there. The moment
+ * connectivity is observed to return, the reason for waiting is gone — and
+ * waiting anyway means a user who has just walked back into signal watches a
+ * count sit there for no reason. Attempt counts are deliberately left alone:
+ * they are the record of how much trouble an item has been, and clearing them
+ * would let a genuinely broken action retry for ever.
+ */
+export function wakeAll(items: readonly QueuedMutation[]): QueuedMutation[] {
+  return items.map((item) =>
+    item.status === "pending" && item.nextAttemptAt !== 0
+      ? { ...item, nextAttemptAt: 0 }
+      : item,
+  );
 }
 
 /**

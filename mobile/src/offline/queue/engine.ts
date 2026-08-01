@@ -18,6 +18,7 @@ import {
   onSuccess,
   pendingCount,
   shouldHaltDrain,
+  wakeAll,
 } from "./policy";
 import type { QueuedMutation } from "./types";
 
@@ -144,6 +145,17 @@ export function createQueue(deps: QueueDeps) {
 
       report.remaining = pendingCount(items);
       return report;
+    },
+
+    /**
+     * Clear every pending backoff — called when the network comes back.
+     *
+     * Without this, an item that failed during an outage sits out its full
+     * backoff after the signal returns, and anything queued behind it on the
+     * same subject waits too.
+     */
+    async wake(): Promise<void> {
+      await commit(wakeAll(items));
     },
 
     /** Put a failed or blocked item back in line — the conflict screen's retry. */

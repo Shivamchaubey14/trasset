@@ -41,6 +41,7 @@ function recover(item: QueuedMutation, note: string | null): QueuedMutation {
   const status: QueueStatus = STATUSES.includes(item.status) ? item.status : "pending";
   return {
     ...item,
+    seq: typeof item.seq === "number" ? item.seq : 0,
     attempts: typeof item.attempts === "number" ? item.attempts : 0,
     nextAttemptAt: typeof item.nextAttemptAt === "number" ? item.nextAttemptAt : 0,
     // The crash-recovery rule. See the note at the top of this file.

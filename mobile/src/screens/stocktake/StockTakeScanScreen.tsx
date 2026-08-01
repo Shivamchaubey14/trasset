@@ -29,10 +29,10 @@ import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button, EmptyState, useToast } from "@/components";
-import { ApiError } from "@/api";
-import { submitScans } from "@/stocktake/api";
+import { useOnline } from "@/net/online";
+import { queueSubmission, submissionSummary } from "@/stocktake/submit";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
-import { type ScanOutcome, counts, scanPayload } from "@/stocktake/session";
+import { type ScanOutcome, counts } from "@/stocktake/session";
 import { scan as applyScan, setSession, undo, useSession } from "@/stocktake/store";
 import { fonts, fontSizes, radius, spacing, useTheme } from "@/theme";
 
@@ -50,6 +50,7 @@ export function StockTakeScanScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const isFocused = useIsFocused();
   const session = useSession();
+  const online = useOnline();
 
   const [permission, requestPermission] = useCameraPermissions();
   const [flash, setFlash] = useState<{ outcome: ScanOutcome; tag: string } | null>(null);
@@ -94,38 +95,33 @@ export function StockTakeScanScreen() {
   );
 
   /**
-   * Send the batch.
+   * Hand the count over.
    *
-   * One call for the whole count, not one per scan — which is what makes the
-   * loop above work at camera speed and with no signal. Queuing this for a
-   * later reconnect, and resuming a session that was interrupted, is the next
-   * day's work; today it needs a connection at the end.
+   * It goes to the mutation queue rather than the network, so this works
+   * identically with a full signal and with none at all — which is the whole
+   * point of the day. The queue drains when it can, retries on its own, and
+   * keeps a refusal for a person rather than dropping it.
+   *
+   * The session is only cleared **after** both calls are on disk. Clearing it
+   * first would open a window where a crash loses a count that had not yet been
+   * queued anywhere.
    */
   const send = useCallback(async () => {
     if (!session) return;
     setSending(true);
     try {
-      const result = await submitScans(session.stockTakeId, scanPayload(session));
-      const counted = result.counts ?? {};
-      toast.success(
-        `Sent. Found ${counted.found ?? 0}, missing ${counted.missing ?? 0}, unexpected ${counted.unexpected ?? 0}.`,
-      );
+      await queueSubmission(session);
+      toast.success(submissionSummary(session, online));
       setSession(null);
-      navigation.goBack();
-    } catch (error) {
-      // The count is not thrown away on a failure — the session stays exactly
-      // as it was, so the person can try again rather than recount the room.
-      toast.error(
-        error instanceof ApiError && error.isNetworkError
-          ? "No signal. Your count is safe on this phone — try again when you have a connection."
-          : error instanceof ApiError
-            ? error.message
-            : "Could not send the count.",
-      );
+      navigation.replace("StockTakeReport", { id: session.stockTakeId });
+    } catch {
+      // Only a storage failure can land here — the network is not involved.
+      // The count stays exactly as it was rather than being thrown away.
+      toast.error("Could not save the count on this phone. Nothing was lost — try again.");
     } finally {
       setSending(false);
     }
-  }, [navigation, session, toast]);
+  }, [navigation, online, session, toast]);
 
   if (!session) {
     return (
@@ -262,7 +258,11 @@ export function StockTakeScanScreen() {
 
       <View style={{ padding: spacing.md, paddingBottom: insets.bottom + spacing.md }}>
         <Button
-          label={`Send ${tally.scanned} ${tally.scanned === 1 ? "scan" : "scans"}`}
+          label={
+            online
+              ? `Submit ${tally.scanned} ${tally.scanned === 1 ? "scan" : "scans"}`
+              : `Finish — send ${tally.scanned} later`
+          }
           onPress={send}
           loading={sending}
           disabled={tally.scanned === 0 || sending}

@@ -107,6 +107,8 @@ function ConflictRow({ item }: { item: QueuedMutation }) {
   const onOpen = useCallback(() => {
     if (item.subject.type === "asset") {
       navigation.navigate("Asset", { id: item.subject.id });
+    } else if (item.subject.type === "stocktake") {
+      navigation.navigate("StockTakeReport", { id: item.subject.id });
     } else {
       navigation.navigate("Request", { id: item.subject.id });
     }
@@ -167,7 +169,13 @@ function ConflictRow({ item }: { item: QueuedMutation }) {
         ) : null}
         {explanation.actions.includes("open") ? (
           <Button
-            label={item.subject.type === "asset" ? "Open the asset" : "Open the request"}
+            label={
+              item.subject.type === "asset"
+                ? "Open the asset"
+                : item.subject.type === "stocktake"
+                  ? "Open the stock take"
+                  : "Open the request"
+            }
             variant="secondary"
             onPress={onOpen}
           />

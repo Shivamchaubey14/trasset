@@ -38,11 +38,15 @@ const KIND_TITLES: Record<string, string> = {
   request: "Raise a request",
   approve: "Approve a request",
   reject: "Reject a request",
+  "stocktake-scans": "Send a stock take count",
+  "stocktake-submit": "Close a stock take",
 };
 
 function subjectLabel(item: QueuedMutation): string {
   if (item.subject.label) return item.subject.label;
-  return item.subject.type === "asset" ? `asset #${item.subject.id}` : `request #${item.subject.id}`;
+  if (item.subject.type === "asset") return `asset #${item.subject.id}`;
+  if (item.subject.type === "stocktake") return `stock take #${item.subject.id}`;
+  return `request #${item.subject.id}`;
 }
 
 export function explainFailure(item: QueuedMutation): Explanation {

@@ -65,6 +65,7 @@ function makeItem(over: Partial<QueuedMutation> = {}): QueuedMutation {
     kind: "assign",
     subject: { type: "asset", id: 1, label: "TRA-2026-000019" },
     createdAt: Date.now(),
+    seq: 0,
     attempts: 0,
     nextAttemptAt: 0,
     status: "pending",

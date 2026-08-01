@@ -71,6 +71,7 @@ function makeItem(over: Partial<QueuedMutation> = {}): QueuedMutation {
     kind: "checkin",
     subject: { type: "asset", id: 1 },
     createdAt: 1000,
+    seq: 0,
     attempts: 0,
     nextAttemptAt: 0,
     status: "pending",

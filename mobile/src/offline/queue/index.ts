@@ -46,6 +46,10 @@ export const queue = createQueue({
  * this process or in one three days later, carries this same key, which is what
  * lets the server recognise a repeat and apply it once.
  */
+// Monotonic within a process. Across a restart `createdAt` separates the runs,
+// so a counter that resets is sufficient and needs no storage of its own.
+let sequence = 0;
+
 export function queuedMutation(input: {
   method: QueuedMutation["method"];
   path: string;
@@ -62,6 +66,7 @@ export function queuedMutation(input: {
     kind: input.kind,
     subject: input.subject,
     createdAt: Date.now(),
+    seq: (sequence += 1),
     attempts: 0,
     nextAttemptAt: 0,
     status: "pending",

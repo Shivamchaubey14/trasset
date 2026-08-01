@@ -29,7 +29,7 @@
 | **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
 | **Phase 6 — Mobile app foundation** | 36–41 | ✅ Complete (Days 36–41) |
 | **Phase 7 — Core journeys** | 42–47 | ✅ Complete (Days 42–47) |
-| **Phase 8 — Offline & stock take** | 48–53 | 🟡 Days 48–51 done · Days 52–53 open |
+| **Phase 8 — Offline & stock take** | 48–53 | 🟡 Days 48–52 done · Day 53 open |
 
 **Backend test suite:** 719 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
@@ -95,13 +95,17 @@ runs in Expo Go with the tab shell, both themes and both fonts. Next:
   the expected list downloaded up front, a continuous scan loop that never
   leaves the screen, running counts, and duplicates recognised rather than
   double-counted.
-- **Day 52** — ⬅ **next**: stock take, part 2. Full offline operation
-  (FR-14.21), submitting the batch on reconnect, a reconciliation summary, and
-  resuming an interrupted session. The groundwork is deliberate: `SessionState`
-  is a plain serialisable object so it can be stored without reshaping,
-  `scanPayload()` already produces the batch the server wants, and
-  `/stock-takes/{id}/submit/` is idempotent precisely because an offline client
-  will replay it.
+- **Day 52** — ✅ done: stock take, part 2. Counts survive a force-quit and
+  resume, submission goes through the mutation queue so it lands on reconnect,
+  and the reconciliation is honest while the count is still queued. Two real
+  ordering bugs fixed on the way.
+- **Day 53** — ⬅ **next**: offline hardening, and the last day of the phase.
+  Signal lost mid-request, a token expiring while work is queued, clock skew,
+  storage full, the app killed mid-drain; plus instrumenting queue depth and
+  failures. Several of these already have partial answers — `wakeAll` and the
+  per-subject hold landed here, `describeAge` already clamps a backwards clock,
+  and every storage helper swallows its own failure — so the day is as much
+  about proving them as writing them.
 
 **Still needed from the user, and now actually blocking:**
 
@@ -197,6 +201,70 @@ audit row.
 ---
 
 ## Completed
+
+### Day 52 — Stock take, part 2 ✅
+
+Full offline operation, submit on reconnect, reconciliation, and resume.
+
+- **The count is written on every scan.** A stock take is an hour of somebody's
+  afternoon walking a room; losing it to a low-memory kill is not a degraded
+  experience, it is the whole job again — and the second count will not match
+  the first. Resuming is checked properly: a label counted before the crash is
+  still a duplicate after it, or a resumed count double-counts everything that
+  came before.
+- **An unreadable session is discarded, not half-read** — the opposite of the
+  rule the mutation queue follows, deliberately. A queued action is something
+  the user believes they performed, so it must survive to be shown. A
+  half-finished count promises nobody anything, and resuming it with fields this
+  build cannot read would produce a *wrong* count, which is worse than an honest
+  recount.
+- **Submission goes through the mutation queue**, not the network. That is what
+  makes "completed entirely offline" true rather than aspirational: the queue
+  already survives a force-quit, drains on reconnect, backs off, and keeps a
+  refusal for a person. None of it was worth building twice.
+- **The reconciliation screen is honest before the count has been sent.**
+  Showing zeros would be a lie and a spinner would suggest something is in
+  progress; it says the count is safe, has not been sent yet, and points at
+  where to watch it go.
+
+**Two real ordering bugs, both found by running it rather than reading it.**
+
+The first: submitting a stock take enqueues two calls in the same millisecond,
+and `drainOrder` tie-broke on a random UUID. A submit reconciles *what the
+server has*, so a submit that overtook its own scans would close the session
+having received nothing. Fixed with a monotonic `seq` assigned at enqueue.
+
+The second was worse and only appeared end to end. The scan batch fails once
+with no signal and goes into backoff. On reconnect it is not *ready*, so
+`nextReady` skipped it and took the submit — which had never been attempted and
+so had no backoff. The session closed with **found 0, missing 15**: every asset
+in the room written off, from a count that had all of them. Fixed by making an
+item wait for anything queued before it **on the same subject**, even when the
+predecessor is only backing off. Unrelated subjects still drain past it.
+
+That fix exposed a third, smaller thing: holding the successor correctly meant
+nothing sent at all until the backoff expired. So a reconnect now calls
+`queue.wake()` first — the backoff was waiting out an outage that has
+demonstrably ended, and waiting anyway means a user who has walked back into
+signal watches their count sit there. Attempt counts are left alone, so a
+genuinely broken action still cannot retry for ever.
+
+**Verification:** `verify:stocktake-offline` **21/0**, reproducing the DoD
+rather than approximating it — the session opens online, the sender is then
+replaced with one that fails exactly as an offline client does, the room is
+counted with a force-quit taken mid-room, the finished count is queued, a drain
+with no network loses nothing, the app is killed again, and only then does the
+signal return. The server's own reconciliation is read back and matched against
+what the phone showed: **found 14, missing 1, unexpected 1** on both sides. A
+replayed submit leaves it unchanged.
+
+Backend **719/719**. `tsc` clean. Mobile suite now 321 checks across thirteen
+scripts.
+
+**Not covered without a handset:** literal aeroplane mode and a literal
+force-quit.
+
+---
 
 ### Day 51 — Stock take, part 1 ✅
 

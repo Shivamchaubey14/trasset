@@ -22,6 +22,8 @@ import { useSyncExternalStore } from "react";
 
 import { useToast } from "@/components";
 
+import { hydrate as hydrateStockTake } from "@/stocktake/store";
+
 import { queue } from ".";
 import { failedCount as countFailed, pendingCount as countPending } from "./policy";
 
@@ -50,8 +52,15 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
 
     void queue.load().then(kick);
 
+    // An interrupted count is read back here too. A stock take is an hour of
+    // somebody's afternoon; resuming it is the difference between a dropped
+    // phone costing a minute and costing the whole job.
+    void hydrateStockTake();
+
     const unsubscribeOnline = onlineManager.subscribe((online) => {
-      if (online) kick();
+      // Clear the backoff first: it was waiting out an outage that has just
+      // demonstrably ended, and anything queued behind it is waiting too.
+      if (online) void queue.wake().then(kick);
     });
 
     const appState = AppState.addEventListener("change", (status) => {
