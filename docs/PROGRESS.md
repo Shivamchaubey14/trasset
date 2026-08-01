@@ -29,7 +29,7 @@
 | **Phase 5 — Mobile API groundwork** | 31–35 | ✅ Complete (Days 31–35) |
 | **Phase 6 — Mobile app foundation** | 36–41 | ✅ Complete (Days 36–41) |
 | **Phase 7 — Core journeys** | 42–47 | ✅ Complete (Days 42–47) |
-| **Phase 8 — Offline & stock take** | 48–53 | 🟡 Days 48–52 done · Day 53 open |
+| **Phase 8 — Offline & stock take** | 48–53 | ✅ Complete (Days 48–53) |
 
 **Backend test suite:** 719 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
@@ -99,13 +99,10 @@ runs in Expo Go with the tab shell, both themes and both fonts. Next:
   resume, submission goes through the mutation queue so it lands on reconnect,
   and the reconciliation is honest while the count is still queued. Two real
   ordering bugs fixed on the way.
-- **Day 53** — ⬅ **next**: offline hardening, and the last day of the phase.
-  Signal lost mid-request, a token expiring while work is queued, clock skew,
-  storage full, the app killed mid-drain; plus instrumenting queue depth and
-  failures. Several of these already have partial answers — `wakeAll` and the
-  per-subject hold landed here, `describeAge` already clamps a backwards clock,
-  and every storage helper swallows its own failure — so the day is as much
-  about proving them as writing them.
+- **Day 53** — ✅ done: offline hardening. Session expiry, clock skew, a full
+  disk, a killed drain and a lost signal are each driven adversarially and each
+  recoverable. Two real bugs fixed — a 401 discarding queued work, and a
+  backwards clock stranding it. **Phase 8 complete.**
 
 **Still needed from the user, and now actually blocking:**
 
@@ -201,6 +198,65 @@ audit row.
 ---
 
 ## Completed
+
+### Day 53 — Offline hardening ✅
+
+The DoD is *no path loses a user's work; every failure is visible and
+recoverable* — two claims about every failure mode, not one claim about the
+happy path. Each case was **caused** rather than waited for, and two of them
+produced real bugs that reading the code would not have found.
+
+**A token expiring while work is queued.** `SessionExpiredError` carries status
+401, and 401 was treated like any other 4xx: a permanent refusal. So a queued
+check-in caught by an expired session was marked **failed for ever** — discarded
+for the one reason the user can actually repair. The client refreshes and
+replays a 401 by itself, so one that reaches the queue means the *refresh token*
+ran out, not that the request was judged. 401 is now retryable, it halts the
+drain (every following item carries the same dead session, so grinding on
+collects one identical failure per item), and signing back in or unlocking
+releases the queue.
+
+**Clock skew.** `nextAttemptAt` is an absolute timestamp, so a device clock that
+moves **backwards** after a backoff is scheduled leaves an item apparently
+waiting for years — and, since the per-subject hold landed on Day 52, everything
+behind it waits too. A wait longer than the maximum backoff is not one this code
+could have scheduled, so it is now read as the clock having moved rather than as
+an instruction to keep waiting. A clock moving forwards only sends early, which
+is harmless.
+
+**Storage full.** A phone at 100% cannot write, and a stock room is exactly where
+nobody is clearing photos. The failure was propagating out of `enqueue`, which
+would fail the mutation, roll back the optimistic update, and discard an action
+the user had already physically performed — trading a durability problem for a
+data-loss one, which is the wrong way round. The engine now absorbs it, keeps
+the action in memory, and **says so**: the conflict screen leads with a warning
+that the work will not survive the app closing. Visible, not silent.
+
+**Signal lost mid-request** and **the app killed mid-drain** were already sound
+and are now proven: the action survives with its idempotency key, and an item
+caught `sending` comes back `pending` **without its attempt count reset** — a
+crash loop that reset attempts would retry for ever and never surface.
+
+**Instrumentation.** Queue depth, waiting versus stuck, total delivery attempts,
+the age of the oldest item, and the distinct reasons — kept as a set so one
+message does not stand in for five. Surfaced on the conflict screen and in the
+about screen's support block.
+
+**Verification:** `verify:hardening` **24/0**, including the 401 path end to end
+against the real server — a genuinely tokenless queue leaves its work `pending`
+with HTTP 401 and halts, rather than failing it. That test needed fixing twice
+before it tested anything: clearing the stored refresh token left a live access
+token in memory, so the request succeeded and the server answered on the merits.
+
+Backend **719/719**. `tsc` clean. Mobile suite now 345 checks across fourteen
+scripts. **Phase 8 complete.**
+
+**Not covered without a handset:** a device genuinely out of storage, and a user
+changing the system clock by hand. Both are driven at the boundary the app
+actually sees — a storage write that throws, and a timestamp that cannot have
+been scheduled by this code.
+
+---
 
 ### Day 52 — Stock take, part 2 ✅
 

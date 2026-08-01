@@ -27,7 +27,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button, EmptyState, useToast } from "@/components";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
-import { queue } from "@/offline/queue";
+import { queue, queueStats } from "@/offline/queue";
+import { lastQueueSaveError } from "@/offline/queue/storage";
 import { useQueueItems } from "@/offline/queue/QueueProvider";
 import { explainFailure, needsAttention } from "@/offline/queue/explain";
 import type { QueuedMutation } from "@/offline/queue/types";
@@ -41,6 +42,8 @@ export function ConflictsScreen() {
 
   const attention = items.filter(needsAttention);
   const waiting = items.filter((i) => i.status === "pending" || i.status === "sending");
+  const stats = queueStats(items);
+  const storageError = lastQueueSaveError();
 
   return (
     <ScrollView
@@ -58,6 +61,32 @@ export function ConflictsScreen() {
           title="Nothing waiting"
           message="Everything you have done has reached the server."
         />
+      ) : null}
+
+      {/* Durability is the promise this whole screen rests on. If it has been
+          broken, that outranks anything else here — and saying nothing would
+          leave the user believing work is safe that is not (FR-14.27). */}
+      {storageError ? (
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              borderLeftWidth: 3,
+              borderLeftColor: colors.danger,
+            },
+          ]}
+        >
+          <Text style={[styles.title, { color: colors.text }]}>
+            This phone could not save your queued work
+          </Text>
+          <Text style={[styles.body, { color: colors.text }]}>
+            Your actions are still here and will send, but they would not survive
+            the app being closed. Freeing up storage will fix it.
+          </Text>
+          <Text style={[styles.meta, { color: colors.textMuted }]}>{storageError}</Text>
+        </View>
       ) : null}
 
       {attention.length ? (
@@ -85,6 +114,12 @@ export function ConflictsScreen() {
             <Text style={[styles.meta, { color: colors.textMuted }]}>
               Nothing to do — they are retried automatically.
             </Text>
+            {stats.attempts > 0 ? (
+              <Text style={[styles.meta, { color: colors.textMuted }]}>
+                {stats.attempts} delivery {stats.attempts === 1 ? "attempt" : "attempts"} so far ·
+                oldest queued {describeAge(Date.now() - stats.oldestAgeMs)}
+              </Text>
+            ) : null}
           </View>
         </>
       ) : null}

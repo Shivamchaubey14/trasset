@@ -23,12 +23,38 @@ export async function loadQueue(): Promise<QueuedMutation[]> {
   }
 }
 
+/**
+ * The last write that failed, if any.
+ *
+ * A full disk is rare and not hypothetical: a phone at 100% storage cannot
+ * write, and a stock room is exactly where nobody is clearing photos. It must
+ * not take the action down with it — the queue is still correct in memory and
+ * can still be sent — but it must not be silent either, because durability is
+ * the whole promise and it has just been broken (FR-14.27).
+ */
+let lastSaveError: string | null = null;
+
+export function lastQueueSaveError(): string | null {
+  return lastSaveError;
+}
+
 export async function saveQueue(items: readonly QueuedMutation[]): Promise<void> {
   // Written on every change rather than throttled. A queue is the one thing
   // that must be on disk *before* the request goes out — coalescing writes
   // would open exactly the window where a crash loses the record of an action
   // that the server has already performed.
-  await AsyncStorage.setItem(QUEUE_KEY, encodeQueue(items));
+  try {
+    await AsyncStorage.setItem(QUEUE_KEY, encodeQueue(items));
+    lastSaveError = null;
+  } catch (error) {
+    // Deliberately swallowed rather than rethrown. Throwing here would fail
+    // the enqueue, which would roll back the optimistic update and discard an
+    // action the user has already physically performed — trading a durability
+    // problem for a data-loss one. The action stays in memory and will send;
+    // only a crash before then would lose it, and that is what is reported.
+    lastSaveError =
+      error instanceof Error ? error.message : "Could not save to this phone's storage.";
+  }
 }
 
 export async function clearQueue(): Promise<void> {

@@ -109,6 +109,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const data = await apiLogin(email.trim().toLowerCase(), password);
     setUser((data.user as User) ?? null);
     setState("signedIn");
+
+    // Anything that stalled on the expired session can go now. A queued write
+    // caught by a dead token is not refused on merit — signing back in is
+    // exactly the fix — so it waits rather than failing, and this is what
+    // releases it. Without this the work sits until some other event nudges
+    // the queue, which on a stable connection may be a long time.
+    void queue.wake().then(() => queue.drain());
   }, []);
 
   const signOut = useCallback(async () => {
@@ -137,6 +144,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const unlock = useCallback(async () => {
     const ok = await promptBiometric();
     if (!ok) return false;
+
+    // Same reasoning as signIn: the session is usable again, so release
+    // anything that was waiting on it.
+    void queue.wake().then(() => queue.drain());
 
     try {
       setUser(await api.get<User>("/auth/me/"));

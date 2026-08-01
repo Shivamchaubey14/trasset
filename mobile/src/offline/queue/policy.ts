@@ -41,6 +41,12 @@ export const MAX_ATTEMPTS = 8;
  */
 export function isRetryable(statusCode: number): boolean {
   if (statusCode === 0) return true;
+  // A 401 reaching the queue means the session expired: the client refreshes
+  // and replays a 401 on its own, so anything that still arrives here has run
+  // out of refresh token, not been judged. The *request* was never refused on
+  // merit — signing back in makes it valid again — so failing it permanently
+  // would discard work for the one reason the user can actually fix.
+  if (statusCode === 401) return true;
   if (statusCode === 408 || statusCode === 429) return true;
   return statusCode >= 500;
 }
@@ -87,6 +93,25 @@ export function drainOrder(items: readonly QueuedMutation[]): QueuedMutation[] {
  * Only the same subject blocks. An unrelated asset's action has no reason to
  * wait behind a stock take that is backing off.
  */
+/**
+ * Whether an item is still legitimately waiting out its backoff.
+ *
+ * A device clock is wrong more often than anyone expects — a manual change, a
+ * timezone database update, a phone that was flat for a week. `nextAttemptAt`
+ * is an absolute timestamp, so a clock that jumps **backwards** after one was
+ * scheduled leaves an item apparently waiting for years. Nothing further can
+ * ever be sent for that subject, and the user's work sits there for ever.
+ *
+ * A wait longer than the maximum backoff is not a wait this code could have
+ * scheduled, so it is treated as the clock having moved rather than as an
+ * instruction to keep waiting.
+ */
+export function waiting(item: QueuedMutation, now: number): boolean {
+  const remaining = item.nextAttemptAt - now;
+  if (remaining <= 0) return false;
+  return remaining <= MAX_BACKOFF_MS;
+}
+
 export function nextReady(
   items: readonly QueuedMutation[],
   now: number,
@@ -99,7 +124,7 @@ export function nextReady(
 
     // A failed or blocked predecessor already holds its successors via
     // `onFailure`; this covers the ones still legitimately waiting to retry.
-    if (item.status === "sending" || (item.status === "pending" && item.nextAttemptAt > now)) {
+    if (item.status === "sending" || (item.status === "pending" && waiting(item, now))) {
       held.add(subject);
       continue;
     }
@@ -114,6 +139,35 @@ export function nextReady(
 /** Actions the user is still waiting on — what the banner counts. */
 export function pendingCount(items: readonly QueuedMutation[]): number {
   return items.filter((i) => i.status === "pending" || i.status === "sending").length;
+}
+
+/**
+ * Queue depth and health, for the about screen and a support call.
+ *
+ * "How many are stuck and since when" is the first question anyone asks about
+ * a queue that is not emptying, and it is unanswerable from a screen that only
+ * shows a count.
+ */
+export function queueStats(items: readonly QueuedMutation[], now: number = Date.now()) {
+  const pending = items.filter((i) => i.status === "pending" || i.status === "sending");
+  const stuck = items.filter((i) => i.status === "failed" || i.status === "blocked");
+  const oldest = items.reduce<number | null>(
+    (acc, i) => (acc === null || i.createdAt < acc ? i.createdAt : acc),
+    null,
+  );
+  return {
+    depth: items.length,
+    pending: pending.length,
+    failed: stuck.length,
+    /** Total delivery attempts across everything held — a flap detector. */
+    attempts: items.reduce((sum, i) => sum + i.attempts, 0),
+    /** Age of the oldest thing still waiting, in ms. */
+    oldestAgeMs: oldest === null ? 0 : Math.max(0, now - oldest),
+    /** Distinct reasons, so one message does not stand in for five. */
+    reasons: Array.from(
+      new Set(items.map((i) => i.lastError).filter((e): e is string => Boolean(e))),
+    ),
+  };
 }
 
 /** Actions that need a person. The conflict screen's inbox. */
@@ -226,5 +280,9 @@ export function wakeAll(items: readonly QueuedMutation[]): QueuedMutation[] {
  * `MAX_ATTEMPTS` for one outage.
  */
 export function shouldHaltDrain(statusCode: number): boolean {
-  return statusCode === 0 || statusCode >= 500;
+  // 401 halts too, and for the same reason as an outage: every following item
+  // carries the same dead session, so grinding on would collect one identical
+  // failure per item and push them all towards the attempt limit for a single
+  // sign-in.
+  return statusCode === 0 || statusCode === 401 || statusCode >= 500;
 }
