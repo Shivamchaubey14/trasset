@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { apiConfig } from "@/api";
 import { isExpoGo } from "@/notifications/push";
+import { queue, queueStats } from "@/offline/queue";
 import { fonts, fontSizes, radius, spacing, useTheme } from "@/theme";
 
 function easProjectId(): string | null {
@@ -37,6 +38,16 @@ function pushCapability(): string {
   return "Supported on this build";
 }
 
+/** Queue depth in one line, for a support call. */
+function queueSummary(): string {
+  const stats = queueStats(queue.getItems());
+  if (stats.depth === 0) return "Nothing waiting";
+  const parts = [`${stats.pending} waiting`];
+  if (stats.failed) parts.push(`${stats.failed} stuck`);
+  if (stats.attempts) parts.push(`${stats.attempts} attempts`);
+  return parts.join(" · ");
+}
+
 export function AboutScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -51,6 +62,10 @@ export function AboutScreen() {
     ["Device", Device.modelName ?? "—"],
     ["Server", apiConfig().baseUrl],
     ["Push", pushCapability()],
+    // "How much is stuck, and for how long" is the first question anyone asks
+    // about a queue that is not emptying, and it is unanswerable from a screen
+    // that only shows a badge.
+    ["Queued", queueSummary()],
   ];
 
   return (

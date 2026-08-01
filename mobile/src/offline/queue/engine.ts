@@ -53,7 +53,18 @@ export function createQueue(deps: QueueDeps) {
 
   async function commit(next: QueuedMutation[]) {
     items = next;
-    await deps.save(items);
+    try {
+      await deps.save(items);
+    } catch {
+      // A storage failure must not propagate. Letting it out of `enqueue`
+      // would fail the mutation, roll back the optimistic update, and discard
+      // an action the user has already physically performed — trading a
+      // durability problem for a data-loss one, which is the wrong way round.
+      //
+      // The queue is still correct in memory and will still send; only a crash
+      // before then loses it. `lastQueueSaveError` is what makes that visible
+      // rather than silent (FR-14.27).
+    }
     emit();
   }
 
