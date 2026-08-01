@@ -23,6 +23,7 @@
     "verify:queue": "tsx scripts/verify-queue.ts",
     "verify:conflicts": "tsx scripts/verify-conflicts.ts",
     "verify:stocktake": "tsx scripts/verify-stocktake.ts",
+    "verify:stocktake-offline": "tsx scripts/verify-stocktake-offline.ts",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },

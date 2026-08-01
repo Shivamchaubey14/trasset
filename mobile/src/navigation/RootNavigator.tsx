@@ -26,6 +26,7 @@ import { AssetDetailScreen } from "@/screens/AssetDetailScreen";
 import { ChangePasswordScreen } from "@/screens/ChangePasswordScreen";
 import { ConflictsScreen } from "@/screens/ConflictsScreen";
 import { StartStockTakeScreen } from "@/screens/stocktake/StartStockTakeScreen";
+import { StockTakeReportScreen } from "@/screens/stocktake/StockTakeReportScreen";
 import { StockTakeScanScreen } from "@/screens/stocktake/StockTakeScanScreen";
 import { AssignScreen } from "@/screens/assets/AssignScreen";
 import { CheckinScreen } from "@/screens/assets/CheckinScreen";
@@ -61,6 +62,7 @@ export type RootStackParamList = {
   Conflicts: undefined;
   StartStockTake: undefined;
   StockTakeScan: undefined;
+  StockTakeReport: { id: number };
   // Arriving in later phases:
   // StockTake: { id?: number };
 };
@@ -175,6 +177,11 @@ export function RootNavigator() {
               name="StockTakeScan"
               component={StockTakeScanScreen}
               options={{ headerShown: false, gestureEnabled: false }}
+            />
+            <Stack.Screen
+              name="StockTakeReport"
+              component={StockTakeReportScreen}
+              options={{ headerShown: true, title: "Reconciliation" }}
             />
             {/* Presented as sheets: both are a short decision on top of the
                 asset you are looking at, not a place you navigate to. */}
