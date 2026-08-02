@@ -1,5 +1,5 @@
 /**
- * Component gallery (Day 39 DoD).
+ * Component gallery.
  *
  * Every primitive, rendered in light *and* dark on one screen. Two reasons it
  * earns its place rather than being a toy:

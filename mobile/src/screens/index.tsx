@@ -1,7 +1,7 @@
 /**
  * Tab roots.
  *
- * Every tab now has a real screen — the last placeholder went with Day 46.
+ * Every tab now has a real screen — the last placeholder is gone.
  * `Placeholder` itself stays in the design system: the stock-take screens
  * (Days 51–52) will use it, and the component gallery renders it.
  */

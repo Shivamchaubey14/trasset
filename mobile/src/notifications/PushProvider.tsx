@@ -19,7 +19,7 @@
  *
  * Registration runs at launch with `prompt: false`: it picks up an existing
  * grant without spending iOS's single permission ask, which belongs behind a
- * screen that can explain itself (Day 47's settings).
+ * screen that can explain itself — the notification settings.
  */
 import { useQueryClient } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
@@ -84,7 +84,7 @@ export function PushProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!signedIn) return;
     // Fire and forget: every outcome is a value, and a failure to register is
-    // not a reason to block the app. Day 47's settings screen surfaces the
+    // not a reason to block the app. The settings screen surfaces the
     // reason, with a button that may prompt.
     registerForPush({ prompt: false }).catch(() => {});
   }, [signedIn]);

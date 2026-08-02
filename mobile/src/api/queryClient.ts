@@ -35,13 +35,13 @@ export function createQueryClient(): QueryClient {
         // data is exactly what BE-5's delta sync exists to avoid.
         staleTime: 60_000,
         // Kept far longer than it is fresh, so an offline screen can still
-        // render something with its age shown rather than a spinner (Day 48).
+        // render something with its age shown rather than a spinner.
         gcTime: 24 * 60 * 60 * 1000,
         refetchOnWindowFocus: false,
       },
       mutations: {
         // Mutations are never retried automatically here. A blind retry can
-        // apply an action twice; the durable queue on Day 49 owns replay,
+        // apply an action twice; the durable mutation queue owns replay,
         // because only it holds the idempotency key that makes it safe (BE-4).
         retry: false,
       },

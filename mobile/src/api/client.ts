@@ -1,5 +1,5 @@
 /**
- * API client (Day 37).
+ * API client.
  *
  * Mirrors `frontend/js/api.js`, which already solved this for the web: attach
  * the JWT, unwrap the envelope, refresh once on 401 and replay, and normalise
@@ -14,7 +14,7 @@
  * * **`X-Client: mobile`** goes on every request, which is what earns the
  *   30-day refresh lifetime instead of the web's 7 (BE-1).
  * * **`Idempotency-Key` is supported per call** (BE-4), so the offline queue on
- *   Day 49 can replay a mutation without applying it twice. It is never
+ *   can replay a mutation without applying it twice. It is never
  *   generated automatically: a fresh key on each attempt would defeat the whole
  *   mechanism, so the key must come from whoever owns the retry.
  */

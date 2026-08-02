@@ -1,5 +1,5 @@
 /**
- * The design system's public surface (Day 39).
+ * The design system's public surface.
  *
  * Screens import from `@/components` so a primitive can be reworked in one
  * place. Anything a screen builds locally instead of using here is a gap in

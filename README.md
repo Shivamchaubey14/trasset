@@ -5,7 +5,7 @@
 **Asset Management System** — track physical and digital assets across their full lifecycle,
 from procurement to disposal.
 
-`Django REST Framework` · `MySQL 8` · `HTML / CSS / JS / jQuery`
+`Django REST Framework` · `MySQL 8` · `HTML / CSS / JS / jQuery` · `React Native (Expo)`
 
 </div>
 
@@ -46,6 +46,12 @@ trasset/
 │  ├─ common/               envelope renderer, pagination, permissions, base models
 │  └─ tests/                test suite
 ├─ frontend/                HTML/CSS/JS/jQuery dashboard
+├─ mobile/                  React Native (Expo) app for the field
+│  ├─ src/api/              typed client, generated from the OpenAPI schema
+│  ├─ src/offline/          persisted cache, durable mutation queue
+│  ├─ src/stocktake/        counting sessions, reconciled on the phone
+│  ├─ src/screens/          scan, assets, requests, alerts, settings
+│  └─ scripts/              verification scripts, run against a live server
 └─ docs/                    SRS, build plan, progress log
 ```
 
@@ -172,13 +178,50 @@ deterministic and quick.
 
 ---
 
+## The mobile app
+
+The field client (SRS §12). It is offline-first because a store room is where
+the signal is worst: reads come from a persisted cache with their age shown,
+writes go to a durable queue that survives a force-quit and drains on reconnect,
+and a stock take is reconciled on the phone so a hundred scans cost one request.
+
+**Requires:** Node 20+, and the Expo Go app on a handset (or a development build
+for push notifications, which Expo Go dropped in SDK 53).
+
+```bash
+cd mobile
+npm install
+npx expo start -c          # scan the QR with Expo Go
+```
+
+The API host is derived from the packager, so the phone finds the backend
+without configuration — but the backend must be bound to all interfaces
+(`runserver 0.0.0.0:8000`), because `127.0.0.1` from a phone is the phone.
+
+### Verification
+
+Behaviour that matters is checked against a **live server** rather than mocks,
+so the scripts need the backend running and the demo data seeded.
+
+```bash
+npm run verify:queue        # durable writes: exactly-once under replay
+npm run verify:offline      # cached reads, ages, what may be persisted
+npm run verify:hardening    # expired tokens, clock skew, full disk, killed drains
+npm run verify:stocktake    # a hundred scans in sequence
+```
+
+`npm run tsc` typechecks. The full list is in `mobile/package.json`.
+
+---
+
 ## Documentation
 
 | Document | Purpose |
 |----------|---------|
 | [`docs/Trasset_SRS.md`](docs/Trasset_SRS.md) | Software Requirements Specification — the contract |
-| [`docs/Trasset_Build_Plan.md`](docs/Trasset_Build_Plan.md) | 30-day build plan with per-day objectives and DoD |
+| [`docs/Trasset_Build_Plan.md`](docs/Trasset_Build_Plan.md) | 60-day build plan with per-day objectives and DoD |
 | [`docs/PROGRESS.md`](docs/PROGRESS.md) | Running log of what is built and what is next |
+| [`docs/Trasset_Design_Tokens.md`](docs/Trasset_Design_Tokens.md) | Colour and type tokens, with measured contrast ratios |
 
 ---
 
@@ -189,9 +232,16 @@ deterministic and quick.
 | `--color-primary` | Nest Green | `#3BB77E` |
 | `--color-accent` | Cream Yolk | `#FDC040` |
 | `--color-ink` | Ink | `#253D4E` |
-| `--color-bg` | Cloud | `#F4F6F8` |
-| `--color-muted` | Slate | `#7B8794` |
+| `--color-bg` | Cloud | `#E7EDF2` |
+| `--color-slate` | Slate | `#7B8794` |
+| `--color-muted` | Slate Text | `#5C6877` |
 | `--color-danger` | Coral | `#E5484D` |
+
+`slate` and `muted` are two roles, not one colour. Brand Slate is 3.7:1 on
+white, which fails WCAG AA for normal text — and secondary copy is everywhere.
+So Slate stays the swatch for status dots, chart series and fills, while a
+darkened `muted` carries the text and clears AA on every surface. Measured
+pairings are in [`docs/Trasset_Design_Tokens.md`](docs/Trasset_Design_Tokens.md).
 
 Type: **Quicksand** for the wordmark, headings and KPI numbers; **Lexend** for
 body text, tables, forms and buttons.
