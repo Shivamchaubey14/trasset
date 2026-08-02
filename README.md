@@ -232,9 +232,16 @@ npm run verify:stocktake    # a hundred scans in sequence
 | `--color-primary` | Nest Green | `#3BB77E` |
 | `--color-accent` | Cream Yolk | `#FDC040` |
 | `--color-ink` | Ink | `#253D4E` |
-| `--color-bg` | Cloud | `#F4F6F8` |
-| `--color-muted` | Slate | `#7B8794` |
+| `--color-bg` | Cloud | `#E7EDF2` |
+| `--color-slate` | Slate | `#7B8794` |
+| `--color-muted` | Slate Text | `#5C6877` |
 | `--color-danger` | Coral | `#E5484D` |
+
+`slate` and `muted` are two roles, not one colour. Brand Slate is 3.7:1 on
+white, which fails WCAG AA for normal text — and secondary copy is everywhere.
+So Slate stays the swatch for status dots, chart series and fills, while a
+darkened `muted` carries the text and clears AA on every surface. Measured
+pairings are in [`docs/Trasset_Design_Tokens.md`](docs/Trasset_Design_Tokens.md).
 
 Type: **Quicksand** for the wordmark, headings and KPI numbers; **Lexend** for
 body text, tables, forms and buttons.
