@@ -98,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSessionExpiredHandler(() => {
       // Only the tokens are dropped. Nothing else is cleared, so anything the
       // user has queued offline survives to be replayed once they sign back in
-      // (Day 49) — losing queued work at the exact moment a token expires
+      // — losing queued work at the exact moment a token expires
       // would be the worst possible time to lose it.
       setUser(null);
       setState("signedOut");

@@ -8,7 +8,7 @@
  * than a permission boundary.
  *
  * This is the *presentation* rule only. The server enforces the same
- * constraints independently (SEC-3, and the Day 8 state machine), so hiding a
+ * constraints independently (SEC-3, and the server's state machine), so hiding a
  * button is a courtesy, never the control.
  *
  * Deliberately narrower than the web (§12.8): no Edit and no Delete. Editing an

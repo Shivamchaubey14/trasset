@@ -1,5 +1,5 @@
 /**
- * Environment configuration (Day 36).
+ * Environment configuration.
  *
  * The API base URL differs per build profile, and — importantly for local work
  * — a phone cannot reach `127.0.0.1`, because that is the phone itself. On a

@@ -87,7 +87,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       Asset: "assets/:id",
       // `trasset://requests/7` — what `Notification.deep_link` emits for an
       // AssetRequest, per `DEEP_LINK_TARGETS`. Registered with the route rather
-      // than waiting for Day 46: the server already sends it, and an
+      // than waiting for the notifications work: the server already sends it, and an
       // unregistered path silently lands on the tab instead of the record.
       Request: "requests/:id",
     },

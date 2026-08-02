@@ -1,6 +1,6 @@
 /**
- * Button. Minimal on purpose — Day 39 builds the full primitive set; this is
- * what Day 38's sign-in form needs and no more.
+ * Button. Minimal on purpose — it predates the full primitive set, and is
+ * what the sign-in form needs and no more.
  */
 import React from "react";
 import {

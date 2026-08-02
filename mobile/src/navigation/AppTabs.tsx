@@ -4,7 +4,7 @@
  * action of the whole app.
  *
  * React Navigation rather than expo-router: SRS §12.2 names it explicitly, and
- * the build plan's Day 36 line saying expo-router contradicts the contract.
+ * the build plan's line saying expo-router contradicts the contract.
  */
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
