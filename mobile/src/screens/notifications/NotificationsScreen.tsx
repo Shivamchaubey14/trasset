@@ -141,7 +141,10 @@ export function NotificationsScreen() {
 
       <View style={styles.header}>
         <View style={styles.titleRow}>
-          <Text style={[styles.title, { color: colors.text }]}>Alerts</Text>
+          <Text
+          accessibilityRole="header"
+          style={[styles.title, { color: colors.text }]}
+        >Alerts</Text>
           {unread > 0 ? (
             <Pressable
               onPress={() => markAllRead.mutate()}

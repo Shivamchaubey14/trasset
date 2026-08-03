@@ -165,17 +165,43 @@ export function StockTakeScanScreen() {
     <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
       {/* --- running tally: the reason to look up ------------------------- */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Text style={[styles.location, { color: colors.textMuted }]} numberOfLines={1}>
+        <Text
+          accessibilityRole="header"
+          style={[styles.location, { color: colors.textMuted }]}
+          numberOfLines={1}
+        >
           {session.locationName}
         </Text>
-        <View style={styles.tally}>
-          <Tally label="Found" value={tally.found} colour={colors.primary} />
-          <Tally label="Missing" value={tally.missing} colour={colors.danger} />
-          <Tally label="Unexpected" value={tally.unexpected} colour={colors.accent} />
+
+        {/*
+          One accessible element, not six. Read individually a screen reader
+          announces "14", "Found", "1", "Missing" — numbers with no subjects.
+          Grouped, it reads the sentence a person actually wants.
+
+          It is also a live region, because this is the one screen where the
+          user is looking at a shelf rather than the phone: the tally changing
+          *is* the feedback, and without an announcement a blind user has the
+          haptic but no running total.
+        */}
+        <View
+          accessible
+          accessibilityRole="summary"
+          accessibilityLiveRegion="polite"
+          accessibilityLabel={
+            `${tally.found} found, ${tally.missing} missing, ` +
+            `${tally.unexpected} unexpected. ` +
+            `${tally.found} of ${tally.expected} expected.`
+          }
+        >
+          <View style={styles.tally}>
+            <Tally label="Found" value={tally.found} colour={colors.primary} />
+            <Tally label="Missing" value={tally.missing} colour={colors.danger} />
+            <Tally label="Unexpected" value={tally.unexpected} colour={colors.accent} />
+          </View>
+          <Text style={[styles.progress, { color: colors.textMuted }]}>
+            {tally.found} of {tally.expected} expected · {tally.scanned} scanned
+          </Text>
         </View>
-        <Text style={[styles.progress, { color: colors.textMuted }]}>
-          {tally.found} of {tally.expected} expected · {tally.scanned} scanned
-        </Text>
       </View>
 
       {/* --- the camera, which never closes ------------------------------- */}
@@ -266,6 +292,11 @@ export function StockTakeScanScreen() {
           onPress={send}
           loading={sending}
           disabled={tally.scanned === 0 || sending}
+          accessibilityHint={
+            online
+              ? "Closes the count and reconciles it against the register."
+              : "Saves the count on this phone. It sends by itself when you have signal."
+          }
         />
       </View>
     </View>

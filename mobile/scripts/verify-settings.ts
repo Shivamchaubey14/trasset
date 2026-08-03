@@ -285,11 +285,17 @@ async function main() {
       await logout();
       await login("admin@trasset.local", PASSWORD);
       await api.post(`/assets/${spare.id}/checkin/`, {}, { idempotencyKey: uuid() });
-      await logout();
-      await login(SUBJECT_EMAIL, SUBJECT_PASSWORD);
     } else {
       console.log("  SKIP  no available asset to assign");
     }
+
+    // Whichever branch ran, this section signed in as admin to look for an
+    // asset. Only the `if` put the subject back, so the skip path left every
+    // password test below running against the *admin* account — where
+    // `current_password` is wrong by definition, and three checks failed for a
+    // reason that had nothing to do with what they were testing.
+    await logout();
+    await login(SUBJECT_EMAIL, SUBJECT_PASSWORD);
 
     // =====================================================================
     console.log("\n4. Password change — the refusals");

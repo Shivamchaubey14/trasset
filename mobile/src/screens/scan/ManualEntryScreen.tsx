@@ -65,7 +65,10 @@ export function ManualEntryScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={[styles.title, { color: colors.text }]}>Enter by hand</Text>
+        <Text
+          accessibilityRole="header"
+          style={[styles.title, { color: colors.text }]}
+        >Enter by hand</Text>
         <Text style={[styles.body, { color: colors.textMuted }]}>
           Type the asset tag from the label, or the manufacturer&apos;s serial
           number from the case.

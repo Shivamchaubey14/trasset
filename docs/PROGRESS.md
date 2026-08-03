@@ -30,6 +30,7 @@
 | **Phase 6 — Mobile app foundation** | 36–41 | ✅ Complete (Days 36–41) |
 | **Phase 7 — Core journeys** | 42–47 | ✅ Complete (Days 42–47) |
 | **Phase 8 — Offline & stock take** | 48–53 | ✅ Complete (Days 48–53) |
+| **Phase 9 — Release** | 54–60 | 🟡 Day 54 done · Days 55–60 open |
 
 **Backend test suite:** 719 tests, all passing · **Coverage:** 89.7% (target ≥ 70%, NFR-12)
 **Performance:** every list endpoint under 400 ms at **10,000 assets**; worst p95 288 ms (NFR-1)
@@ -198,6 +199,68 @@ audit row.
 ---
 
 ## Completed
+
+### Day 54 — Accessibility & dark mode ✅
+
+VoiceOver, TalkBack and focus order need a handset. Everything they depend on
+does not, and that is the part which rots silently as screens are added, so it
+is now a check rather than a memory: `verify:a11y`, 27 checks covering contrast
+on every surface in both themes, palette key parity, dynamic type, touch
+targets, heading marks and dark-mode coverage.
+
+**Three real screen-reader gaps, all now closed.**
+
+*No headings existed anywhere.* Zero `accessibilityRole="header"` in the whole
+app, so the only way past a long list was to swipe through every row in it. The
+tab roots now mark their titles.
+
+*The stock take tally was six loose numbers and silent.* Read individually a
+screen reader announces "14", "Found", "1", "Missing" — numbers with no
+subjects. It is now one grouped element with a composed label, and a polite live
+region, because this is the one screen where the user is deliberately looking at
+a shelf rather than the phone: the tally changing *is* the feedback, and without
+an announcement a blind user had the haptic and no running total.
+
+*No hints anywhere.* Added only where the label cannot carry the meaning —
+offline, "Finish" does not say that a count will send by itself later. A hint on
+an obvious button is noise read aloud on every focus, so most buttons have none.
+
+**The audit found six failures and five were the checker's fault.** Status dots
+looked broken because it measured the raw hue on white, when what renders is a
+dot beside a label in normal text — the fix made after `StatusPill` measured
+1.45:1. "Clipped text" was a `shadowOffset` and some icon circles, because the
+shape of a style is no evidence about what it contains. One "unthemed screen"
+was a barrel of re-exports. The code was right; the check was crude, and the
+check was what changed. The dot ratios are still reported — light's faintest are
+`under_maintenance` and `pending` at 1.64:1 — because a hue that vanishes is
+worth knowing about even when nothing depends on it.
+
+**Two verification defects fixed, both found by re-running rather than reading.**
+
+`verify:settings` signed in as admin to look for an asset and only signed back
+in as the subject inside the `if`. When no asset was available the skip path ran
+every password test against the *admin* account, where `current_password` is
+wrong by definition — three checks failed for a reason unrelated to what they
+tested.
+
+`verify:requests` created a pending request for its duplicate-rule check and
+never cancelled it, so the second run collided with its own leftover. A
+verification that only passes once is not a verification; it now clears and
+restores the fixture, and was proven by running it twice.
+
+**Fixture drift, repaired.** Interrupted runs had left every asset assigned —
+zero available — which silently reduced five suites to skipped blocks rather
+than failures. Current state was restored from the pre-import backup. The
+assignment rows were left alone: those check-outs really happened, and rewriting
+an audit trail to tidy a fixture is the opposite of what one is for.
+
+**Verification:** `verify:a11y` **27/0**; full mobile suite **372 checks across
+fifteen scripts**, backend **719/719**, `tsc` clean.
+
+**Not covered without a handset:** VoiceOver and TalkBack themselves, focus
+order, and rendering at the largest system type size.
+
+---
 
 ### Day 53 — Offline hardening ✅
 
