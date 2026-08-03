@@ -157,7 +157,10 @@ export function RequestsScreen() {
       />
 
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Requests</Text>
+        <Text
+          accessibilityRole="header"
+          style={[styles.title, { color: colors.text }]}
+        >Requests</Text>
 
         {approver ? (
           <View style={[styles.segmented, { backgroundColor: colors.surfaceElevated }]}>

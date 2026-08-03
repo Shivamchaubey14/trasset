@@ -137,7 +137,10 @@ export function AssetsScreen() {
       />
 
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Assets</Text>
+        <Text
+          accessibilityRole="header"
+          style={[styles.title, { color: colors.text }]}
+        >Assets</Text>
 
         <View style={[styles.segmented, { backgroundColor: colors.surfaceElevated }]}>
           {(["mine", "all"] as Mode[]).map((value) => (

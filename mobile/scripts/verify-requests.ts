@@ -279,9 +279,26 @@ async function main() {
   const spare = (await api.get<Page<Asset>>("/assets/", { status: "available", page_size: 1 }))
     .results[0];
   if (spare) {
-    const dupReason = `Day 45 duplicate check ${uuid().slice(0, 8)} — needed on site.`;
-    await api.post("/asset-requests/", { asset_id: spare.id, reason: dupReason },
-      { idempotencyKey: uuid() });
+    // Clear anything this check left behind last time. Without it the *first*
+    // post below collides with its own leftover and the script fails on its
+    // second run — which is what happened: a verification that only passes
+    // once is not a verification.
+    const mine = await api.get<Page<AssetRequest>>("/asset-requests/", {
+      status: "pending", page_size: 50,
+    });
+    for (const stale of mine.results) {
+      const assetId = (stale as { asset?: { id?: number } }).asset?.id;
+      if (assetId === spare.id) {
+        await api.post(`/asset-requests/${stale.id}/cancel/`, {}, { idempotencyKey: uuid() })
+          .catch(() => {});
+      }
+    }
+
+    const dupReason = `duplicate check ${uuid().slice(0, 8)} — needed on site.`;
+    const first = await api.post<AssetRequest>(
+      "/asset-requests/", { asset_id: spare.id, reason: dupReason },
+      { idempotencyKey: uuid() },
+    );
     try {
       // A different submission, same asset — the noise an approver would get.
       await api.post("/asset-requests/", { asset_id: spare.id, reason: dupReason },
@@ -292,6 +309,10 @@ async function main() {
       check("a second pending request for the same asset is refused",
         apiError.status === 400, JSON.stringify(apiError.errors));
     }
+
+    // And put the fixture back, so the next run starts where this one did.
+    await api.post(`/asset-requests/${first.id}/cancel/`, {}, { idempotencyKey: uuid() })
+      .catch(() => {});
   } else {
     console.log("  SKIP  no available asset left to test the duplicate rule");
   }

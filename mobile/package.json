@@ -25,6 +25,7 @@
     "verify:stocktake": "tsx scripts/verify-stocktake.ts",
     "verify:stocktake-offline": "tsx scripts/verify-stocktake-offline.ts",
     "verify:hardening": "tsx scripts/verify-hardening.ts",
+    "verify:a11y": "tsx scripts/verify-a11y.ts",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },

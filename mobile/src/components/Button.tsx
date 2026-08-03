@@ -22,6 +22,7 @@ export function Button({
   loading = false,
   disabled = false,
   style,
+  accessibilityHint,
 }: {
   label: string;
   onPress: () => void;
@@ -29,6 +30,14 @@ export function Button({
   loading?: boolean;
   disabled?: boolean;
   style?: ViewStyle;
+  /**
+   * What happens when it is pressed, for a screen reader.
+   *
+   * Only where the label cannot say it on its own — "Finish" does not convey
+   * that a count will send by itself later. A hint on an obvious button is
+   * noise read aloud on every focus, so most buttons should not have one.
+   */
+  accessibilityHint?: string;
 }) {
   const { colors } = useTheme();
   const inactive = disabled || loading;
@@ -42,6 +51,7 @@ export function Button({
     <Pressable
       onPress={onPress}
       disabled={inactive}
+      accessibilityHint={accessibilityHint}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: inactive, busy: loading }}
